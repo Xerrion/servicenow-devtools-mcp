@@ -1,9 +1,25 @@
 [project]
-name = "servicenow-mcp"
+name = "servicenow-devtools-mcp"
 version = "0.1.0"
-description = "A developer & debug-focused MCP server for ServiceNow"
+description = "A developer & debug-focused MCP server for ServiceNow — 32 tools for platform introspection, change intelligence, debugging, investigations, and documentation generation."
 readme = "README.md"
+license = "MIT"
 requires-python = ">=3.12"
+authors = [
+    { name = "Lasse Nielsen", email = "lasse@xerrion.dk" },
+]
+keywords = ["servicenow", "mcp", "model-context-protocol", "devtools", "debugging"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Software Development :: Debuggers",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+]
 dependencies = [
     "mcp>=1.0.0",
     "httpx>=0.27.0",
@@ -14,8 +30,13 @@ dependencies = [
     "starlette>=0.38.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/xerrion/servicenow-devtools-mcp"
+Repository = "https://github.com/xerrion/servicenow-devtools-mcp"
+Issues = "https://github.com/xerrion/servicenow-devtools-mcp/issues"
+
 [project.scripts]
-servicenow-mcp = "servicenow_mcp.server:main"
+servicenow-devtools-mcp = "servicenow_mcp.server:main"
 
 [build-system]
 requires = ["hatchling"]
