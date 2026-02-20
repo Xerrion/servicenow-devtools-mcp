@@ -204,7 +204,7 @@ uvx servicenow-devtools-mcp
 - Row limits: Queries capped at MAX_ROW_LIMIT (default 100)
 - Large tables: syslog, sys_audit, etc. require date-bounded filters
 - Write gating: All write operations blocked when SERVICENOW_ENV=prod (unless explicitly overridden)
-- Standardized responses: All tools return JSON with correlation_id, status, data, pagination, and warnings
+- Standardized responses: Tools return JSON with correlation_id, status, data, and optionally pagination and warnings when relevant
 ````
 
 ---
