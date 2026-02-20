@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/Xerrion/servicenow-devtools-mcp/compare/v0.2.0...v0.2.1) (2026-02-20)
+
+
+### Bug Fixes
+
+* remvoe the workflow_dispatch that came in by mistake ([#23](https://github.com/Xerrion/servicenow-devtools-mcp/issues/23)) ([9598214](https://github.com/Xerrion/servicenow-devtools-mcp/commit/959821451fa2d050bc747d6f1bdfef35482fb396))
+
 ## [0.2.0](https://github.com/Xerrion/servicenow-devtools-mcp/compare/v0.1.0...v0.2.0) (2026-02-20)
 
 
