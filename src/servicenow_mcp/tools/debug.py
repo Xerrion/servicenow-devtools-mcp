@@ -464,7 +464,11 @@ def register_tools(
             limit: Maximum number of audit entries to return (default 50).
         """
         correlation_id = generate_correlation_id()
+        warnings: list[str] = []
         try:
+            effective_limit = min(limit, settings.max_row_limit)
+            if effective_limit < limit:
+                warnings.append(f"Limit capped at {effective_limit}")
             async with ServiceNowClient(settings, auth_provider) as client:
                 audit_result = await client.query_records(
                     "sys_audit",
@@ -477,7 +481,7 @@ def register_tools(
                         "newvalue",
                         "sys_created_on",
                     ],
-                    limit=limit,
+                    limit=effective_limit,
                     order_by="sys_created_on",
                 )
 
@@ -502,6 +506,7 @@ def register_tools(
                         "mutations": mutations,
                     },
                     correlation_id=correlation_id,
+                    warnings=warnings if warnings else None,
                 ),
                 indent=2,
             )
