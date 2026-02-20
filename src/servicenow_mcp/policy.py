@@ -12,6 +12,8 @@ logger = logging.getLogger(__name__)
 # Tables that must never be accessed via the MCP server
 DENIED_TABLES: set[str] = {
     "sys_user_has_password",
+    "sys_user_has_role",
+    "sys_user_grmember",
     "oauth_credential",
     "oauth_entity",
     "sys_certificate",
