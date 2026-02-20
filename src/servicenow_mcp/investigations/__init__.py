@@ -1,0 +1,1 @@
+"""Pluggable investigation modules."""

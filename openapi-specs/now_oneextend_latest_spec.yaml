@@ -1,0 +1,49 @@
+---
+openapi: "3.0.1"
+info:
+  title: "OneExtend"
+  description: ""
+  version: "latest"
+externalDocs:
+  url: ""
+servers:
+- url: "https://dev272070.service-now.com/"
+paths:
+  /api/now/oneextend/scripted/capabilities/{builderName}:
+    get:
+      description: ""
+      parameters:
+      - name: "builderName"
+        in: "path"
+        required: true
+        schema: {}
+      responses:
+        "200":
+          description: "ok"
+          content:
+            application/json: {}
+  /api/now/oneextend/scripted/capability/attributes/{capabilityId}:
+    get:
+      description: ""
+      parameters:
+      - name: "capabilityId"
+        in: "path"
+        required: true
+        schema: {}
+      responses:
+        "200":
+          description: "ok"
+          content:
+            application/json: {}
+  /api/now/oneextend/scripted/setup_and_execute:
+    post:
+      description: ""
+      parameters: []
+      requestBody:
+        content:
+          application/json: {}
+      responses:
+        "200":
+          description: "ok"
+          content:
+            application/json: {}

@@ -1,0 +1,908 @@
+"""Tests for ServiceNow REST client."""
+
+import httpx
+import pytest
+import respx
+
+from servicenow_mcp.auth import BasicAuthProvider
+
+
+BASE_URL = "https://test.service-now.com"
+
+
+@pytest.fixture
+def auth_provider(settings):
+    """Create a BasicAuthProvider from test settings."""
+    return BasicAuthProvider(settings)
+
+
+class TestServiceNowClientGetRecord:
+    """Test get_record method."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_get_record_success(self, settings, auth_provider):
+        """Fetches a single record by sys_id."""
+        from servicenow_mcp.client import ServiceNowClient
+
+        route = respx.get(f"{BASE_URL}/api/now/table/incident/abc123").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": {"sys_id": "abc123", "number": "INC0001"}},
+            )
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            record = await client.get_record("incident", "abc123")
+
+        assert record == {"sys_id": "abc123", "number": "INC0001"}
+        assert route.called
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_get_record_with_fields(self, settings, auth_provider):
+        """Respects field selection parameter."""
+        from servicenow_mcp.client import ServiceNowClient
+
+        route = respx.get(f"{BASE_URL}/api/now/table/incident/abc123").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": {"sys_id": "abc123", "number": "INC0001"}},
+            )
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            await client.get_record("incident", "abc123", fields=["sys_id", "number"])
+
+        assert "sysparm_fields" in str(route.calls[0].request.url)
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_get_record_with_display_values(self, settings, auth_provider):
+        """Passes display_value parameter."""
+        from servicenow_mcp.client import ServiceNowClient
+
+        route = respx.get(f"{BASE_URL}/api/now/table/incident/abc123").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": {"sys_id": "abc123"}},
+            )
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            await client.get_record("incident", "abc123", display_values=True)
+
+        assert "sysparm_display_value=true" in str(route.calls[0].request.url)
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_get_record_not_found(self, settings, auth_provider):
+        """Raises NotFoundError for 404."""
+        from servicenow_mcp.client import ServiceNowClient
+        from servicenow_mcp.errors import NotFoundError
+
+        respx.get(f"{BASE_URL}/api/now/table/incident/missing").mock(
+            return_value=httpx.Response(404, json={"error": {"message": "Not found"}})
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            with pytest.raises(NotFoundError):
+                await client.get_record("incident", "missing")
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_get_record_auth_error(self, settings, auth_provider):
+        """Raises AuthError for 401."""
+        from servicenow_mcp.client import ServiceNowClient
+        from servicenow_mcp.errors import AuthError
+
+        respx.get(f"{BASE_URL}/api/now/table/incident/abc123").mock(
+            return_value=httpx.Response(
+                401, json={"error": {"message": "Unauthorized"}}
+            )
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            with pytest.raises(AuthError):
+                await client.get_record("incident", "abc123")
+
+
+class TestServiceNowClientQueryRecords:
+    """Test query_records method."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_query_records_success(self, settings, auth_provider):
+        """Returns list of matching records."""
+        from servicenow_mcp.client import ServiceNowClient
+
+        respx.get(f"{BASE_URL}/api/now/table/incident").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": [
+                        {"sys_id": "1", "number": "INC0001"},
+                        {"sys_id": "2", "number": "INC0002"},
+                    ]
+                },
+                headers={"X-Total-Count": "2"},
+            )
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            result = await client.query_records("incident", "active=true")
+
+        assert len(result["records"]) == 2
+        assert result["count"] == 2
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_query_records_with_limit_and_offset(self, settings, auth_provider):
+        """Passes limit and offset parameters."""
+        from servicenow_mcp.client import ServiceNowClient
+
+        route = respx.get(f"{BASE_URL}/api/now/table/incident").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": []},
+                headers={"X-Total-Count": "0"},
+            )
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            await client.query_records("incident", "active=true", limit=10, offset=20)
+
+        url = str(route.calls[0].request.url)
+        assert "sysparm_limit=10" in url
+        assert "sysparm_offset=20" in url
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_query_records_with_order_by(self, settings, auth_provider):
+        """Passes order_by parameter."""
+        from servicenow_mcp.client import ServiceNowClient
+
+        route = respx.get(f"{BASE_URL}/api/now/table/incident").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": []},
+                headers={"X-Total-Count": "0"},
+            )
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            await client.query_records(
+                "incident", "active=true", order_by="sys_created_on"
+            )
+
+        url = str(route.calls[0].request.url)
+        assert "sysparm_orderby" in url
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_query_records_empty_results(self, settings, auth_provider):
+        """Handles empty result set."""
+        from servicenow_mcp.client import ServiceNowClient
+
+        respx.get(f"{BASE_URL}/api/now/table/incident").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": []},
+                headers={"X-Total-Count": "0"},
+            )
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            result = await client.query_records("incident", "number=NONEXISTENT")
+
+        assert result["records"] == []
+        assert result["count"] == 0
+
+
+class TestServiceNowClientGetMetadata:
+    """Test get_metadata method."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_get_metadata_queries_sys_dictionary(self, settings, auth_provider):
+        """Queries sys_dictionary for the given table."""
+        from servicenow_mcp.client import ServiceNowClient
+
+        route = respx.get(f"{BASE_URL}/api/now/table/sys_dictionary").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": [
+                        {
+                            "element": "number",
+                            "internal_type": "string",
+                            "max_length": "40",
+                        }
+                    ]
+                },
+            )
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            result = await client.get_metadata("incident")
+
+        assert route.called
+        url = str(route.calls[0].request.url)
+        # URL-encoded = becomes %3D in query params
+        assert "name" in url and "incident" in url
+
+
+class TestServiceNowClientAggregate:
+    """Test aggregate method."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_aggregate_count(self, settings, auth_provider):
+        """Performs aggregate query for counts."""
+        from servicenow_mcp.client import ServiceNowClient
+
+        respx.get(f"{BASE_URL}/api/now/stats/incident").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": {
+                        "stats": {"count": "42"},
+                    }
+                },
+            )
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            result = await client.aggregate("incident", "active=true")
+
+        assert result is not None
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_aggregate_with_field_specific_stats(self, settings, auth_provider):
+        """Passes field-specific avg/min/max/sum params."""
+        from servicenow_mcp.client import ServiceNowClient
+
+        route = respx.get(f"{BASE_URL}/api/now/stats/incident").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": {"stats": {"count": "10", "avg": {"priority": "2.5"}}}},
+            )
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            await client.aggregate(
+                "incident",
+                "active=true",
+                avg_fields=["priority", "impact"],
+                min_fields=["priority"],
+                max_fields=["impact"],
+                sum_fields=["reassignment_count"],
+            )
+
+        url = str(route.calls[0].request.url)
+        assert "sysparm_avg_fields" in url
+        assert "sysparm_min_fields" in url
+        assert "sysparm_max_fields" in url
+        assert "sysparm_sum_fields" in url
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_aggregate_with_having_and_order_by(self, settings, auth_provider):
+        """Passes having and order_by parameters."""
+        from servicenow_mcp.client import ServiceNowClient
+
+        route = respx.get(f"{BASE_URL}/api/now/stats/incident").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": {"stats": {"count": "5"}}},
+            )
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            await client.aggregate(
+                "incident",
+                "active=true",
+                group_by="priority",
+                order_by="count",
+                having="count>5",
+            )
+
+        url = str(route.calls[0].request.url)
+        assert "sysparm_orderby" in url
+        assert "sysparm_having" in url
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_aggregate_with_display_value(self, settings, auth_provider):
+        """Passes display_value parameter."""
+        from servicenow_mcp.client import ServiceNowClient
+
+        route = respx.get(f"{BASE_URL}/api/now/stats/incident").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": {"stats": {"count": "5"}}},
+            )
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            await client.aggregate(
+                "incident",
+                "active=true",
+                display_value=True,
+            )
+
+        url = str(route.calls[0].request.url)
+        assert "sysparm_display_value=true" in url
+
+
+class TestServiceNowClientCreateRecord:
+    """Test create_record method."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_create_record_success(self, settings, auth_provider):
+        """Creates a record via POST."""
+        from servicenow_mcp.client import ServiceNowClient
+
+        respx.post(f"{BASE_URL}/api/now/table/incident").mock(
+            return_value=httpx.Response(
+                201,
+                json={"result": {"sys_id": "new123", "number": "INC0099"}},
+            )
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            record = await client.create_record(
+                "incident", {"short_description": "Test incident"}
+            )
+
+        assert record["sys_id"] == "new123"
+
+
+class TestServiceNowClientUpdateRecord:
+    """Test update_record method."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_update_record_success(self, settings, auth_provider):
+        """Updates a record via PATCH."""
+        from servicenow_mcp.client import ServiceNowClient
+
+        respx.patch(f"{BASE_URL}/api/now/table/incident/abc123").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": {"sys_id": "abc123", "state": "2"}},
+            )
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            record = await client.update_record("incident", "abc123", {"state": "2"})
+
+        assert record["state"] == "2"
+
+
+class TestServiceNowClientDeleteRecord:
+    """Test delete_record method."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_delete_record_success(self, settings, auth_provider):
+        """Deletes a record via DELETE."""
+        from servicenow_mcp.client import ServiceNowClient
+
+        respx.delete(f"{BASE_URL}/api/now/table/incident/abc123").mock(
+            return_value=httpx.Response(204)
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            result = await client.delete_record("incident", "abc123")
+
+        assert result is True
+
+
+class TestServiceNowClientErrorHandling:
+    """Test error mapping for various HTTP status codes."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_403_raises_forbidden_error(self, settings, auth_provider):
+        """403 maps to ForbiddenError."""
+        from servicenow_mcp.client import ServiceNowClient
+        from servicenow_mcp.errors import ForbiddenError
+
+        respx.get(f"{BASE_URL}/api/now/table/incident/abc123").mock(
+            return_value=httpx.Response(403, json={"error": {"message": "Forbidden"}})
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            with pytest.raises(ForbiddenError):
+                await client.get_record("incident", "abc123")
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_500_raises_server_error(self, settings, auth_provider):
+        """500 maps to ServerError."""
+        from servicenow_mcp.client import ServiceNowClient
+        from servicenow_mcp.errors import ServerError
+
+        respx.get(f"{BASE_URL}/api/now/table/incident/abc123").mock(
+            return_value=httpx.Response(500, json={"error": {"message": "Internal"}})
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            with pytest.raises(ServerError):
+                await client.get_record("incident", "abc123")
+
+
+class TestServiceNowClientCorrelationId:
+    """Test that correlation ID is included in requests."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_correlation_id_in_headers(self, settings, auth_provider):
+        """Every request includes an X-Correlation-ID header."""
+        from servicenow_mcp.client import ServiceNowClient
+
+        route = respx.get(f"{BASE_URL}/api/now/table/incident/abc123").mock(
+            return_value=httpx.Response(200, json={"result": {"sys_id": "abc123"}})
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            await client.get_record("incident", "abc123")
+
+        request_headers = dict(route.calls[0].request.headers)
+        assert "x-correlation-id" in request_headers
+
+
+class TestServiceNowClientGetEmail:
+    """Test get_email method."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_get_email_success(self, settings, auth_provider):
+        """Fetches an email record by ID."""
+        from servicenow_mcp.client import ServiceNowClient
+
+        respx.get(f"{BASE_URL}/api/now/v1/email/email123").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": {
+                        "sys_id": "email123",
+                        "subject": "Test email",
+                        "type": "send",
+                    }
+                },
+            )
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            result = await client.get_email("email123")
+
+        assert result["sys_id"] == "email123"
+        assert result["subject"] == "Test email"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_get_email_with_fields(self, settings, auth_provider):
+        """Passes sysparm_fields parameter."""
+        from servicenow_mcp.client import ServiceNowClient
+
+        route = respx.get(f"{BASE_URL}/api/now/v1/email/email123").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": {"sys_id": "email123"}},
+            )
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            await client.get_email("email123", fields=["sys_id", "subject"])
+
+        assert "sysparm_fields" in str(route.calls[0].request.url)
+
+
+class TestServiceNowClientGetImportSetRecord:
+    """Test get_import_set_record method."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_get_import_set_record_success(self, settings, auth_provider):
+        """Retrieves an import set record."""
+        from servicenow_mcp.client import ServiceNowClient
+
+        respx.get(f"{BASE_URL}/api/now/import/u_staging_table/rec123").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": {
+                        "sys_id": "rec123",
+                        "import_set": "IMP001",
+                        "status": "inserted",
+                    }
+                },
+            )
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            result = await client.get_import_set_record("u_staging_table", "rec123")
+
+        assert result["sys_id"] == "rec123"
+        assert result["status"] == "inserted"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_get_import_set_record_not_found(self, settings, auth_provider):
+        """Raises NotFoundError for missing import set record."""
+        from servicenow_mcp.client import ServiceNowClient
+        from servicenow_mcp.errors import NotFoundError
+
+        respx.get(f"{BASE_URL}/api/now/import/u_staging_table/missing").mock(
+            return_value=httpx.Response(404, json={"error": {"message": "Not found"}})
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            with pytest.raises(NotFoundError):
+                await client.get_import_set_record("u_staging_table", "missing")
+
+
+class TestServiceNowClientReportingAPIs:
+    """Test reporting API methods."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_list_reports_success(self, settings, auth_provider):
+        """Returns a list of reports."""
+        from servicenow_mcp.client import ServiceNowClient
+
+        respx.get(f"{BASE_URL}/api/now/reporting").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": [
+                        {"sys_id": "rpt1", "title": "Incident Report"},
+                        {"sys_id": "rpt2", "title": "Change Report"},
+                    ]
+                },
+            )
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            result = await client.list_reports()
+
+        assert len(result) == 2
+        assert result[0]["title"] == "Incident Report"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_list_reports_with_params(self, settings, auth_provider):
+        """Passes search, sort, and pagination parameters."""
+        from servicenow_mcp.client import ServiceNowClient
+
+        route = respx.get(f"{BASE_URL}/api/now/reporting").mock(
+            return_value=httpx.Response(200, json={"result": []})
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            await client.list_reports(
+                search="incident",
+                sort_by="title",
+                sort_dir="asc",
+                page=2,
+                per_page=25,
+            )
+
+        url = str(route.calls[0].request.url)
+        assert "sysparm_contains" in url
+        assert "sysparm_sortby" in url
+        assert "sysparm_sortdir" in url
+        assert "sysparm_page" in url
+        assert "sysparm_per_page" in url
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_get_table_description_success(self, settings, auth_provider):
+        """Returns table description."""
+        from servicenow_mcp.client import ServiceNowClient
+
+        respx.get(f"{BASE_URL}/api/now/reporting_table_description/incident").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": {"label": "Incident", "name": "incident"}},
+            )
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            result = await client.get_table_description("incident")
+
+        assert result["label"] == "Incident"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_get_field_descriptions_success(self, settings, auth_provider):
+        """Returns field descriptions for a table."""
+        from servicenow_mcp.client import ServiceNowClient
+
+        respx.get(
+            f"{BASE_URL}/api/now/reporting_table_description/field_description/incident"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": [
+                        {"name": "number", "label": "Number"},
+                        {"name": "state", "label": "State"},
+                    ]
+                },
+            )
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            result = await client.get_field_descriptions("incident")
+
+        assert len(result) == 2
+        assert result[0]["label"] == "Number"
+
+
+class TestServiceNowClientCodeSearch:
+    """Test Code Search API methods."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_code_search_success(self, settings, auth_provider):
+        """Performs code search and returns results."""
+        from servicenow_mcp.client import ServiceNowClient
+
+        respx.get(f"{BASE_URL}/api/sn_codesearch/code_search/search").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": {
+                        "search_results": [
+                            {
+                                "className": "sys_script_include",
+                                "name": "TestUtil",
+                                "match": "AbstractAjaxProcessor",
+                            }
+                        ]
+                    }
+                },
+            )
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            result = await client.code_search("AbstractAjaxProcessor")
+
+        assert result is not None
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_code_search_with_table_and_group(self, settings, auth_provider):
+        """Passes table and search_group parameters."""
+        from servicenow_mcp.client import ServiceNowClient
+
+        route = respx.get(f"{BASE_URL}/api/sn_codesearch/code_search/search").mock(
+            return_value=httpx.Response(200, json={"result": {}})
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            await client.code_search(
+                "myFunction",
+                table="sys_script_include",
+                search_group="sn_codesearch.Default Search Group",
+            )
+
+        url = str(route.calls[0].request.url)
+        assert "table" in url
+        assert "search_group" in url
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_code_search_with_limit(self, settings, auth_provider):
+        """Passes limit parameter."""
+        from servicenow_mcp.client import ServiceNowClient
+
+        route = respx.get(f"{BASE_URL}/api/sn_codesearch/code_search/search").mock(
+            return_value=httpx.Response(200, json={"result": {}})
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            await client.code_search("myFunction", limit=50)
+
+        url = str(route.calls[0].request.url)
+        assert "limit=50" in url
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_code_search_tables_success(self, settings, auth_provider):
+        """Returns list of searchable tables."""
+        from servicenow_mcp.client import ServiceNowClient
+
+        respx.get(f"{BASE_URL}/api/sn_codesearch/code_search/tables").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": {
+                        "tables": [
+                            {"name": "sys_script_include"},
+                            {"name": "sys_script"},
+                        ]
+                    }
+                },
+            )
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            result = await client.code_search_tables()
+
+        assert result is not None
+
+
+class TestServiceNowClientCMDB:
+    """Test CMDB API methods."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_cmdb_query_success(self, settings, auth_provider):
+        """Queries CMDB instances for a class."""
+        from servicenow_mcp.client import ServiceNowClient
+
+        respx.get(f"{BASE_URL}/api/now/cmdb/instance/cmdb_ci_linux_server").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": [
+                        {"sys_id": "ci1", "name": "server01"},
+                        {"sys_id": "ci2", "name": "server02"},
+                    ]
+                },
+                headers={"X-Total-Count": "2"},
+            )
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            result = await client.cmdb_query("cmdb_ci_linux_server")
+
+        assert len(result["records"]) == 2
+        assert result["count"] == 2
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_cmdb_query_with_params(self, settings, auth_provider):
+        """Passes query, limit, and offset parameters."""
+        from servicenow_mcp.client import ServiceNowClient
+
+        route = respx.get(
+            f"{BASE_URL}/api/now/cmdb/instance/cmdb_ci_linux_server"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": []},
+                headers={"X-Total-Count": "0"},
+            )
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            await client.cmdb_query(
+                "cmdb_ci_linux_server",
+                query="name=server01",
+                limit=10,
+                offset=5,
+            )
+
+        url = str(route.calls[0].request.url)
+        assert "sysparm_query" in url
+        assert "sysparm_limit=10" in url
+        assert "sysparm_offset=5" in url
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_cmdb_get_instance_success(self, settings, auth_provider):
+        """Retrieves a CMDB CI with relationships."""
+        from servicenow_mcp.client import ServiceNowClient
+
+        respx.get(f"{BASE_URL}/api/now/cmdb/instance/cmdb_ci_linux_server/ci123").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": {
+                        "attributes": {"sys_id": "ci123", "name": "server01"},
+                        "inbound_relations": [],
+                        "outbound_relations": [],
+                    }
+                },
+            )
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            result = await client.cmdb_get_instance("cmdb_ci_linux_server", "ci123")
+
+        assert result["attributes"]["sys_id"] == "ci123"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_cmdb_get_instance_not_found(self, settings, auth_provider):
+        """Raises NotFoundError for missing CI."""
+        from servicenow_mcp.client import ServiceNowClient
+        from servicenow_mcp.errors import NotFoundError
+
+        respx.get(
+            f"{BASE_URL}/api/now/cmdb/instance/cmdb_ci_linux_server/missing"
+        ).mock(
+            return_value=httpx.Response(404, json={"error": {"message": "Not found"}})
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            with pytest.raises(NotFoundError):
+                await client.cmdb_get_instance("cmdb_ci_linux_server", "missing")
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_cmdb_get_meta_success(self, settings, auth_provider):
+        """Retrieves CMDB class metadata."""
+        from servicenow_mcp.client import ServiceNowClient
+
+        respx.get(f"{BASE_URL}/api/now/cmdb/meta/cmdb_ci_linux_server").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": {
+                        "name": "cmdb_ci_linux_server",
+                        "label": "Linux Server",
+                        "attributes": [],
+                    }
+                },
+            )
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            result = await client.cmdb_get_meta("cmdb_ci_linux_server")
+
+        assert result["name"] == "cmdb_ci_linux_server"
+
+
+class TestServiceNowClientEncodedQueryTranslator:
+    """Test encoded query translator method."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_translate_encoded_query_success(self, settings, auth_provider):
+        """Translates encoded query to human-readable form."""
+        from servicenow_mcp.client import ServiceNowClient
+
+        respx.get(f"{BASE_URL}/api/now/cmdb_workspace_api/encodedquery").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": {
+                        "display_value": "Name contains linux OR Name contains lin"
+                    }
+                },
+            )
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            result = await client.translate_encoded_query(
+                "cmdb_ci_linux_server", "nameLIKElnux^ORnameLIKElin"
+            )
+
+        assert result is not None
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_translate_encoded_query_passes_params(self, settings, auth_provider):
+        """Passes table and query parameters correctly."""
+        from servicenow_mcp.client import ServiceNowClient
+
+        route = respx.get(f"{BASE_URL}/api/now/cmdb_workspace_api/encodedquery").mock(
+            return_value=httpx.Response(
+                200, json={"result": {"display_value": "Active is true"}}
+            )
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            await client.translate_encoded_query("incident", "active=true")
+
+        url = str(route.calls[0].request.url)
+        assert "table" in url
+        assert "query" in url
