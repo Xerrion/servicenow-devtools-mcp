@@ -1,0 +1,601 @@
+"""Tests for investigation tools (investigate_run, investigate_explain) and 7 investigation modules."""
+
+import json
+
+import httpx
+import pytest
+import respx
+
+from servicenow_mcp.auth import BasicAuthProvider
+
+BASE_URL = "https://test.service-now.com"
+
+
+@pytest.fixture
+def auth_provider(settings):
+    """Create a BasicAuthProvider from test settings."""
+    return BasicAuthProvider(settings)
+
+
+def _register_and_get_tools(settings, auth_provider):
+    """Helper: register investigation tools on a fresh MCP server and return tool map."""
+    from mcp.server.fastmcp import FastMCP
+
+    from servicenow_mcp.tools.investigations import register_tools
+
+    mcp = FastMCP("test")
+    register_tools(mcp, settings, auth_provider)
+    return {t.name: t.fn for t in mcp._tool_manager._tools.values()}
+
+
+# ── Dispatcher: investigate_run ───────────────────────────────────────────
+
+
+class TestInvestigateRun:
+    """Tests for the investigate_run dispatcher tool."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_dispatches_to_stale_automations(self, settings, auth_provider):
+        """Dispatches to stale_automations and returns findings."""
+        # Stuck flow context
+        respx.get(f"{BASE_URL}/api/now/table/flow_context").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": [
+                        {
+                            "sys_id": "fc001",
+                            "name": "Approval Flow",
+                            "state": "IN_PROGRESS",
+                            "sys_created_on": "2026-01-01 00:00:00",
+                        }
+                    ]
+                },
+                headers={"X-Total-Count": "1"},
+            )
+        )
+        # Disabled BRs — empty
+        respx.get(f"{BASE_URL}/api/now/table/sys_script").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": []},
+                headers={"X-Total-Count": "0"},
+            )
+        )
+        # Disabled script includes — empty
+        respx.get(f"{BASE_URL}/api/now/table/sys_script_include").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": []},
+                headers={"X-Total-Count": "0"},
+            )
+        )
+        # Stale scheduled jobs — empty
+        respx.get(f"{BASE_URL}/api/now/table/sysauto_script").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": []},
+                headers={"X-Total-Count": "0"},
+            )
+        )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["investigate_run"](investigation="stale_automations")
+        result = json.loads(raw)
+
+        assert result["status"] == "success"
+        assert result["data"]["finding_count"] >= 1
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_rejects_unknown_investigation(self, settings, auth_provider):
+        """Returns error for unknown investigation name."""
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["investigate_run"](investigation="nonexistent")
+        result = json.loads(raw)
+
+        assert result["status"] == "error"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_investigate_explain_returns_context(self, settings, auth_provider):
+        """investigate_explain returns contextual explanation for a finding."""
+        # Mock fetching the flow_context record
+        respx.get(f"{BASE_URL}/api/now/table/flow_context/fc001").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": {
+                        "sys_id": "fc001",
+                        "name": "Approval Flow",
+                        "state": "IN_PROGRESS",
+                        "sys_created_on": "2026-01-01 00:00:00",
+                    }
+                },
+            )
+        )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["investigate_explain"](
+            investigation="stale_automations",
+            element_id="flow_context:fc001",
+        )
+        result = json.loads(raw)
+
+        assert result["status"] == "success"
+        assert "explanation" in result["data"]
+        assert "element" in result["data"]
+
+
+# ── stale_automations ─────────────────────────────────────────────────────
+
+
+class TestStaleAutomations:
+    """Tests for the stale_automations investigation module."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_finds_stuck_flow(self, settings, auth_provider):
+        """Finds a stuck Flow Designer context."""
+        respx.get(f"{BASE_URL}/api/now/table/flow_context").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": [
+                        {
+                            "sys_id": "fc001",
+                            "name": "Stuck Flow",
+                            "state": "IN_PROGRESS",
+                            "sys_created_on": "2026-01-01 00:00:00",
+                        }
+                    ]
+                },
+                headers={"X-Total-Count": "1"},
+            )
+        )
+        respx.get(f"{BASE_URL}/api/now/table/sys_script").mock(
+            return_value=httpx.Response(
+                200, json={"result": []}, headers={"X-Total-Count": "0"}
+            )
+        )
+        respx.get(f"{BASE_URL}/api/now/table/sys_script_include").mock(
+            return_value=httpx.Response(
+                200, json={"result": []}, headers={"X-Total-Count": "0"}
+            )
+        )
+        respx.get(f"{BASE_URL}/api/now/table/sysauto_script").mock(
+            return_value=httpx.Response(
+                200, json={"result": []}, headers={"X-Total-Count": "0"}
+            )
+        )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["investigate_run"](investigation="stale_automations")
+        result = json.loads(raw)
+
+        assert result["status"] == "success"
+        assert result["data"]["finding_count"] == 1
+        assert result["data"]["findings"][0]["category"] == "stuck_flow"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_clean_instance_no_findings(self, settings, auth_provider):
+        """Clean instance returns no findings."""
+        for table in [
+            "flow_context",
+            "sys_script",
+            "sys_script_include",
+            "sysauto_script",
+        ]:
+            respx.get(f"{BASE_URL}/api/now/table/{table}").mock(
+                return_value=httpx.Response(
+                    200, json={"result": []}, headers={"X-Total-Count": "0"}
+                )
+            )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["investigate_run"](investigation="stale_automations")
+        result = json.loads(raw)
+
+        assert result["status"] == "success"
+        assert result["data"]["finding_count"] == 0
+
+
+# ── deprecated_apis ───────────────────────────────────────────────────────
+
+
+class TestDeprecatedApis:
+    """Tests for the deprecated_apis investigation module."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_finds_deprecated_pattern(self, settings, auth_provider):
+        """Finds scripts using deprecated Packages. API."""
+        # Code Search returns a match for "Packages."
+        respx.get(f"{BASE_URL}/api/sn_codesearch/code_search/search").mock(
+            side_effect=lambda request: httpx.Response(
+                200,
+                json={
+                    "result": {
+                        "search_results": (
+                            [
+                                {
+                                    "sys_id": "script001",
+                                    "className": "sys_script_include",
+                                    "name": "OldHelper",
+                                }
+                            ]
+                            if "Packages." in str(request.url)
+                            else []
+                        )
+                    }
+                },
+            )
+        )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["investigate_run"](investigation="deprecated_apis")
+        result = json.loads(raw)
+
+        assert result["status"] == "success"
+        assert result["data"]["finding_count"] >= 1
+        # At least one finding should reference the Packages. pattern
+        patterns_found = [f["pattern"] for f in result["data"]["findings"]]
+        assert "Packages." in patterns_found
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_clean_code_no_findings(self, settings, auth_provider):
+        """Clean code returns no findings."""
+        respx.get(f"{BASE_URL}/api/sn_codesearch/code_search/search").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": {"search_results": []}},
+            )
+        )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["investigate_run"](investigation="deprecated_apis")
+        result = json.loads(raw)
+
+        assert result["status"] == "success"
+        assert result["data"]["finding_count"] == 0
+
+
+# ── table_health ──────────────────────────────────────────────────────────
+
+
+class TestTableHealth:
+    """Tests for the table_health investigation module."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_returns_health_report(self, settings, auth_provider):
+        """Returns a complete health report for a table."""
+        # Aggregate count
+        respx.get(f"{BASE_URL}/api/now/stats/incident").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": {"stats": {"count": "500"}}},
+            )
+        )
+        # Business rules
+        respx.get(f"{BASE_URL}/api/now/table/sys_script").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": [
+                        {"sys_id": "br1", "name": "BR One", "when": "before"},
+                        {"sys_id": "br2", "name": "BR Two", "when": "after"},
+                        {"sys_id": "br3", "name": "BR Three", "when": "async"},
+                    ]
+                },
+                headers={"X-Total-Count": "3"},
+            )
+        )
+        # Client scripts
+        respx.get(f"{BASE_URL}/api/now/table/sys_script_client").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": [{"sys_id": "cs1", "name": "CS One"}]},
+                headers={"X-Total-Count": "1"},
+            )
+        )
+        # ACLs
+        respx.get(f"{BASE_URL}/api/now/table/sys_security_acl").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": [
+                        {"sys_id": "acl1", "name": "incident.*.read"},
+                        {"sys_id": "acl2", "name": "incident.*.write"},
+                    ]
+                },
+                headers={"X-Total-Count": "2"},
+            )
+        )
+        # UI policies
+        respx.get(f"{BASE_URL}/api/now/table/sys_ui_policy").mock(
+            return_value=httpx.Response(
+                200, json={"result": []}, headers={"X-Total-Count": "0"}
+            )
+        )
+        # Syslog errors
+        respx.get(f"{BASE_URL}/api/now/table/syslog").mock(
+            return_value=httpx.Response(
+                200, json={"result": []}, headers={"X-Total-Count": "0"}
+            )
+        )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["investigate_run"](
+            investigation="table_health", params='{"table": "incident"}'
+        )
+        result = json.loads(raw)
+
+        assert result["status"] == "success"
+        data = result["data"]
+        assert data["table"] == "incident"
+        assert data["record_count"] == 500
+        assert data["automation"]["business_rules"]["count"] == 3
+        assert data["automation"]["client_scripts"]["count"] == 1
+        assert data["automation"]["acl_count"] == 2
+
+
+# ── acl_conflicts ─────────────────────────────────────────────────────────
+
+
+class TestAclConflicts:
+    """Tests for the acl_conflicts investigation module."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_detects_overlapping_acls(self, settings, auth_provider):
+        """Detects two ACLs with the same name but different conditions."""
+        respx.get(f"{BASE_URL}/api/now/table/sys_security_acl").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": [
+                        {
+                            "sys_id": "acl1",
+                            "name": "incident.*.read",
+                            "operation": "read",
+                            "condition": "active=true",
+                            "script": "",
+                            "active": "true",
+                        },
+                        {
+                            "sys_id": "acl2",
+                            "name": "incident.*.read",
+                            "operation": "read",
+                            "condition": "priority=1",
+                            "script": "",
+                            "active": "true",
+                        },
+                    ]
+                },
+                headers={"X-Total-Count": "2"},
+            )
+        )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["investigate_run"](
+            investigation="acl_conflicts", params='{"table": "incident"}'
+        )
+        result = json.loads(raw)
+
+        assert result["status"] == "success"
+        assert result["data"]["finding_count"] >= 1
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_no_conflicts(self, settings, auth_provider):
+        """Unique ACL names produce no conflicts."""
+        respx.get(f"{BASE_URL}/api/now/table/sys_security_acl").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": [
+                        {
+                            "sys_id": "acl1",
+                            "name": "incident.*.read",
+                            "operation": "read",
+                            "condition": "",
+                            "script": "",
+                            "active": "true",
+                        },
+                        {
+                            "sys_id": "acl2",
+                            "name": "incident.*.write",
+                            "operation": "write",
+                            "condition": "",
+                            "script": "",
+                            "active": "true",
+                        },
+                    ]
+                },
+                headers={"X-Total-Count": "2"},
+            )
+        )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["investigate_run"](
+            investigation="acl_conflicts", params='{"table": "incident"}'
+        )
+        result = json.loads(raw)
+
+        assert result["status"] == "success"
+        assert result["data"]["finding_count"] == 0
+
+
+# ── error_analysis ────────────────────────────────────────────────────────
+
+
+class TestErrorAnalysis:
+    """Tests for the error_analysis investigation module."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_clusters_errors_by_source(self, settings, auth_provider):
+        """Clusters syslog errors by source field."""
+        respx.get(f"{BASE_URL}/api/now/table/syslog").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": [
+                        {
+                            "sys_id": "log1",
+                            "message": "Error evaluating script",
+                            "source": "sys_script.My BR",
+                            "level": "0",
+                            "sys_created_on": "2026-02-20 10:00:00",
+                        },
+                        {
+                            "sys_id": "log2",
+                            "message": "Error evaluating script again",
+                            "source": "sys_script.My BR",
+                            "level": "0",
+                            "sys_created_on": "2026-02-20 10:05:00",
+                        },
+                        {
+                            "sys_id": "log3",
+                            "message": "Null pointer",
+                            "source": "sys_script_include.Helper",
+                            "level": "0",
+                            "sys_created_on": "2026-02-20 11:00:00",
+                        },
+                    ]
+                },
+                headers={"X-Total-Count": "3"},
+            )
+        )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["investigate_run"](investigation="error_analysis")
+        result = json.loads(raw)
+
+        assert result["status"] == "success"
+        assert result["data"]["finding_count"] == 2  # 2 clusters
+        # Top cluster should have frequency 2
+        top = result["data"]["findings"][0]
+        assert top["frequency"] == 2
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_no_errors_clean_report(self, settings, auth_provider):
+        """No syslog errors returns clean report."""
+        respx.get(f"{BASE_URL}/api/now/table/syslog").mock(
+            return_value=httpx.Response(
+                200, json={"result": []}, headers={"X-Total-Count": "0"}
+            )
+        )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["investigate_run"](investigation="error_analysis")
+        result = json.loads(raw)
+
+        assert result["status"] == "success"
+        assert result["data"]["finding_count"] == 0
+
+
+# ── slow_transactions ─────────────────────────────────────────────────────
+
+
+class TestSlowTransactions:
+    """Tests for the slow_transactions investigation module."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_finds_slow_query_pattern(self, settings, auth_provider):
+        """Finds a slow query pattern from sys_query_pattern."""
+        # sys_query_pattern returns a hit
+        respx.get(f"{BASE_URL}/api/now/table/sys_query_pattern").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": [
+                        {
+                            "sys_id": "qp001",
+                            "name": "incident - complex query",
+                            "count": "450",
+                            "sys_created_on": "2026-02-20 08:00:00",
+                        }
+                    ]
+                },
+                headers={"X-Total-Count": "1"},
+            )
+        )
+        # All other pattern tables empty
+        for table in [
+            "sys_transaction_pattern",
+            "sys_script_pattern",
+            "sys_mutex_pattern",
+            "sysevent_pattern",
+            "sys_interaction_pattern",
+            "syslog_cancellation",
+        ]:
+            respx.get(f"{BASE_URL}/api/now/table/{table}").mock(
+                return_value=httpx.Response(
+                    200, json={"result": []}, headers={"X-Total-Count": "0"}
+                )
+            )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["investigate_run"](investigation="slow_transactions")
+        result = json.loads(raw)
+
+        assert result["status"] == "success"
+        assert result["data"]["finding_count"] >= 1
+        assert result["data"]["findings"][0]["category"] == "slow_query"
+
+
+# ── performance_bottlenecks ───────────────────────────────────────────────
+
+
+class TestPerformanceBottlenecks:
+    """Tests for the performance_bottlenecks investigation module."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_finds_heavy_automation_table(self, settings, auth_provider):
+        """Finds a table with excessive active business rules."""
+        # Query sys_script for active BRs — returns many for 'incident'
+        respx.get(f"{BASE_URL}/api/now/table/sys_script").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": [
+                        {
+                            "sys_id": f"br{i}",
+                            "name": f"BR {i}",
+                            "collection": "incident",
+                            "active": "true",
+                        }
+                        for i in range(15)
+                    ]
+                },
+                headers={"X-Total-Count": "15"},
+            )
+        )
+        # Scheduled jobs — empty
+        respx.get(f"{BASE_URL}/api/now/table/sysauto_script").mock(
+            return_value=httpx.Response(
+                200, json={"result": []}, headers={"X-Total-Count": "0"}
+            )
+        )
+        # Flow contexts — empty
+        respx.get(f"{BASE_URL}/api/now/table/flow_context").mock(
+            return_value=httpx.Response(
+                200, json={"result": []}, headers={"X-Total-Count": "0"}
+            )
+        )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["investigate_run"](investigation="performance_bottlenecks")
+        result = json.loads(raw)
+
+        assert result["status"] == "success"
+        assert result["data"]["finding_count"] >= 1
+        assert result["data"]["findings"][0]["category"] == "heavy_automation"
