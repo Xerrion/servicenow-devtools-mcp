@@ -11,9 +11,7 @@ from servicenow_mcp.config import Settings
 from servicenow_mcp.utils import format_response, generate_correlation_id
 
 
-def register_tools(
-    mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider
-) -> None:
+def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
     """Register debug/trace tools on the MCP server."""
 
     @mcp.tool()
@@ -66,9 +64,7 @@ def register_tools(
                 # Fetch syslog entries (keyed by source document)
                 syslog_result = await client.query_records(
                     "syslog",
-                    f"source={table}^documentkey={record_sys_id}"
-                    if record_sys_id
-                    else f"source={table}",
+                    f"source={table}^documentkey={record_sys_id}" if record_sys_id else f"source={table}",
                     fields=[
                         "sys_id",
                         "message",
@@ -109,10 +105,7 @@ def register_tools(
                             "source": "sys_journal_field",
                             "timestamp": entry.get("sys_created_on", ""),
                             "user": entry.get("sys_created_by", ""),
-                            "detail": (
-                                f"[{entry.get('element', '')}] "
-                                f"{entry.get('value', '')[:200]}"
-                            ),
+                            "detail": (f"[{entry.get('element', '')}] {entry.get('value', '')[:200]}"),
                         }
                     )
 
@@ -383,9 +376,7 @@ def register_tools(
         try:
             async with ServiceNowClient(settings, auth_provider) as client:
                 # Fetch import set header
-                import_set = await client.get_record(
-                    "sys_import_set", import_set_sys_id
-                )
+                import_set = await client.get_record("sys_import_set", import_set_sys_id)
 
                 # Fetch import set rows
                 rows_result = await client.query_records(

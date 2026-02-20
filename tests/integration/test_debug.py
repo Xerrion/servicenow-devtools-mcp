@@ -44,9 +44,7 @@ class TestDebug:
         assert isinstance(audit_r["records"], list)
         assert isinstance(journal_r["records"], list)
 
-    async def test_debug_integration_health(
-        self, live_settings: Settings, live_auth: BasicAuthProvider
-    ) -> None:
+    async def test_debug_integration_health(self, live_settings: Settings, live_auth: BasicAuthProvider) -> None:
         """Query ecc_queue for error entries."""
         async with ServiceNowClient(live_settings, live_auth) as client:
             ecc_result = await client.query_records(

@@ -6,7 +6,6 @@ import respx
 
 from servicenow_mcp.auth import BasicAuthProvider
 
-
 BASE_URL = "https://test.service-now.com"
 
 
@@ -97,9 +96,7 @@ class TestServiceNowClientGetRecord:
         from servicenow_mcp.errors import AuthError
 
         respx.get(f"{BASE_URL}/api/now/table/incident/abc123").mock(
-            return_value=httpx.Response(
-                401, json={"error": {"message": "Unauthorized"}}
-            )
+            return_value=httpx.Response(401, json={"error": {"message": "Unauthorized"}})
         )
 
         async with ServiceNowClient(settings, auth_provider) as client:
@@ -171,9 +168,7 @@ class TestServiceNowClientQueryRecords:
         )
 
         async with ServiceNowClient(settings, auth_provider) as client:
-            await client.query_records(
-                "incident", "active=true", order_by="sys_created_on"
-            )
+            await client.query_records("incident", "active=true", order_by="sys_created_on")
 
         url = str(route.calls[0].request.url)
         assert "sysparm_orderby" in url
@@ -224,7 +219,7 @@ class TestServiceNowClientGetMetadata:
         )
 
         async with ServiceNowClient(settings, auth_provider) as client:
-            result = await client.get_metadata("incident")
+            await client.get_metadata("incident")
 
         assert route.called
         url = str(route.calls[0].request.url)
@@ -353,9 +348,7 @@ class TestServiceNowClientCreateRecord:
         )
 
         async with ServiceNowClient(settings, auth_provider) as client:
-            record = await client.create_record(
-                "incident", {"short_description": "Test incident"}
-            )
+            record = await client.create_record("incident", {"short_description": "Test incident"})
 
         assert record["sys_id"] == "new123"
 
@@ -391,9 +384,7 @@ class TestServiceNowClientDeleteRecord:
         """Deletes a record via DELETE."""
         from servicenow_mcp.client import ServiceNowClient
 
-        respx.delete(f"{BASE_URL}/api/now/table/incident/abc123").mock(
-            return_value=httpx.Response(204)
-        )
+        respx.delete(f"{BASE_URL}/api/now/table/incident/abc123").mock(return_value=httpx.Response(204))
 
         async with ServiceNowClient(settings, auth_provider) as client:
             result = await client.delete_record("incident", "abc123")
@@ -579,9 +570,7 @@ class TestServiceNowClientReportingAPIs:
         """Passes search, sort, and pagination parameters."""
         from servicenow_mcp.client import ServiceNowClient
 
-        route = respx.get(f"{BASE_URL}/api/now/reporting").mock(
-            return_value=httpx.Response(200, json={"result": []})
-        )
+        route = respx.get(f"{BASE_URL}/api/now/reporting").mock(return_value=httpx.Response(200, json={"result": []}))
 
         async with ServiceNowClient(settings, auth_provider) as client:
             await client.list_reports(
@@ -623,9 +612,7 @@ class TestServiceNowClientReportingAPIs:
         """Returns field descriptions for a table."""
         from servicenow_mcp.client import ServiceNowClient
 
-        respx.get(
-            f"{BASE_URL}/api/now/reporting_table_description/field_description/incident"
-        ).mock(
+        respx.get(f"{BASE_URL}/api/now/reporting_table_description/field_description/incident").mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -772,9 +759,7 @@ class TestServiceNowClientCMDB:
         """Passes query, limit, and offset parameters."""
         from servicenow_mcp.client import ServiceNowClient
 
-        route = respx.get(
-            f"{BASE_URL}/api/now/cmdb/instance/cmdb_ci_linux_server"
-        ).mock(
+        route = respx.get(f"{BASE_URL}/api/now/cmdb/instance/cmdb_ci_linux_server").mock(
             return_value=httpx.Response(
                 200,
                 json={"result": []},
@@ -826,9 +811,7 @@ class TestServiceNowClientCMDB:
         from servicenow_mcp.client import ServiceNowClient
         from servicenow_mcp.errors import NotFoundError
 
-        respx.get(
-            f"{BASE_URL}/api/now/cmdb/instance/cmdb_ci_linux_server/missing"
-        ).mock(
+        respx.get(f"{BASE_URL}/api/now/cmdb/instance/cmdb_ci_linux_server/missing").mock(
             return_value=httpx.Response(404, json={"error": {"message": "Not found"}})
         )
 
@@ -873,18 +856,12 @@ class TestServiceNowClientEncodedQueryTranslator:
         respx.get(f"{BASE_URL}/api/now/cmdb_workspace_api/encodedquery").mock(
             return_value=httpx.Response(
                 200,
-                json={
-                    "result": {
-                        "display_value": "Name contains linux OR Name contains lin"
-                    }
-                },
+                json={"result": {"display_value": "Name contains linux OR Name contains lin"}},
             )
         )
 
         async with ServiceNowClient(settings, auth_provider) as client:
-            result = await client.translate_encoded_query(
-                "cmdb_ci_linux_server", "nameLIKElnux^ORnameLIKElin"
-            )
+            result = await client.translate_encoded_query("cmdb_ci_linux_server", "nameLIKElnux^ORnameLIKElin")
 
         assert result is not None
 
@@ -895,9 +872,7 @@ class TestServiceNowClientEncodedQueryTranslator:
         from servicenow_mcp.client import ServiceNowClient
 
         route = respx.get(f"{BASE_URL}/api/now/cmdb_workspace_api/encodedquery").mock(
-            return_value=httpx.Response(
-                200, json={"result": {"display_value": "Active is true"}}
-            )
+            return_value=httpx.Response(200, json={"result": {"display_value": "Active is true"}})
         )
 
         async with ServiceNowClient(settings, auth_provider) as client:

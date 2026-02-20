@@ -48,7 +48,7 @@ packages = ["src/servicenow_mcp"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
-addopts = "-m 'not integration'"
+addopts = "-m 'not integration' --cov=servicenow_mcp --cov-report=xml --cov-report=term-missing"
 markers = [
     "integration: tests that run against a live ServiceNow instance (requires .env.local credentials)",
 ]
@@ -58,4 +58,29 @@ dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.24.0",
     "respx>=0.21.0",
+    "ruff>=0.9.0",
+    "mypy>=1.14.0",
+    "pytest-cov>=6.0.0",
 ]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+ignore = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = false
+warn_unused_configs = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "servicenow_mcp.server"
+disable_error_code = ["call-arg"]

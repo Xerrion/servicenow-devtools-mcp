@@ -1,7 +1,8 @@
 """Tests for configuration module."""
 
-import pytest
 from unittest.mock import patch
+
+import pytest
 
 
 class TestSettings:
@@ -35,9 +36,8 @@ class TestSettings:
 
         env = self._make_env()
         del env["SERVICENOW_INSTANCE_URL"]
-        with patch.dict("os.environ", env, clear=True):
-            with pytest.raises(Exception):
-                Settings(_env_file=None)
+        with patch.dict("os.environ", env, clear=True), pytest.raises((ValueError, TypeError)):
+            Settings(_env_file=None)
 
     def test_missing_username_raises(self):
         """Missing SERVICENOW_USERNAME raises validation error."""
@@ -45,9 +45,8 @@ class TestSettings:
 
         env = self._make_env()
         del env["SERVICENOW_USERNAME"]
-        with patch.dict("os.environ", env, clear=True):
-            with pytest.raises(Exception):
-                Settings(_env_file=None)
+        with patch.dict("os.environ", env, clear=True), pytest.raises((ValueError, TypeError)):
+            Settings(_env_file=None)
 
     def test_missing_password_raises(self):
         """Missing SERVICENOW_PASSWORD raises validation error."""
@@ -55,9 +54,8 @@ class TestSettings:
 
         env = self._make_env()
         del env["SERVICENOW_PASSWORD"]
-        with patch.dict("os.environ", env, clear=True):
-            with pytest.raises(Exception):
-                Settings(_env_file=None)
+        with patch.dict("os.environ", env, clear=True), pytest.raises((ValueError, TypeError)):
+            Settings(_env_file=None)
 
     def test_default_mcp_tool_package(self):
         """MCP_TOOL_PACKAGE defaults to 'dev_debug'."""

@@ -12,9 +12,7 @@ from servicenow_mcp.policy import check_table_access
 from servicenow_mcp.utils import format_response, generate_correlation_id
 
 
-def register_tools(
-    mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider
-) -> None:
+def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
     """Register relationship tools on the MCP server."""
 
     @mcp.tool()

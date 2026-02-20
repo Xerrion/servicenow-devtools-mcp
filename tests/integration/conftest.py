@@ -14,7 +14,6 @@ from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.config import Settings
 
-
 # Apply the integration marker to every test in this directory
 pytestmark = pytest.mark.integration
 
@@ -32,9 +31,7 @@ def live_auth(live_settings: Settings) -> BasicAuthProvider:
 
 
 @pytest_asyncio.fixture(scope="session")
-async def incident_sys_id(
-    live_settings: Settings, live_auth: BasicAuthProvider
-) -> str | None:
+async def incident_sys_id(live_settings: Settings, live_auth: BasicAuthProvider) -> str | None:
     """Discover a real active incident sys_id for tests that need one."""
     async with ServiceNowClient(live_settings, live_auth) as client:
         result = await client.query_records(
@@ -50,9 +47,7 @@ async def incident_sys_id(
 
 
 @pytest_asyncio.fixture(scope="session")
-async def update_set_sys_id(
-    live_settings: Settings, live_auth: BasicAuthProvider
-) -> str | None:
+async def update_set_sys_id(live_settings: Settings, live_auth: BasicAuthProvider) -> str | None:
     """Discover a real update set sys_id for change intelligence tests."""
     async with ServiceNowClient(live_settings, live_auth) as client:
         result = await client.query_records(
@@ -68,9 +63,7 @@ async def update_set_sys_id(
 
 
 @pytest_asyncio.fixture(scope="session")
-async def business_rule_sys_id(
-    live_settings: Settings, live_auth: BasicAuthProvider
-) -> str | None:
+async def business_rule_sys_id(live_settings: Settings, live_auth: BasicAuthProvider) -> str | None:
     """Discover a real business rule sys_id for metadata tests."""
     async with ServiceNowClient(live_settings, live_auth) as client:
         result = await client.query_records(

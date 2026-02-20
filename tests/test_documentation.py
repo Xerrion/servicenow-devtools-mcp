@@ -86,15 +86,11 @@ class TestDocsLogicMap:
         )
         # UI policies
         respx.get(f"{BASE_URL}/api/now/table/sys_ui_policy").mock(
-            return_value=httpx.Response(
-                200, json={"result": []}, headers={"X-Total-Count": "0"}
-            )
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
         )
         # UI actions
         respx.get(f"{BASE_URL}/api/now/table/sys_ui_action").mock(
-            return_value=httpx.Response(
-                200, json={"result": []}, headers={"X-Total-Count": "0"}
-            )
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
@@ -119,9 +115,7 @@ class TestDocsLogicMap:
             "sys_ui_action",
         ]:
             respx.get(f"{BASE_URL}/api/now/table/{table}").mock(
-                return_value=httpx.Response(
-                    200, json={"result": []}, headers={"X-Total-Count": "0"}
-                )
+                return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
             )
 
         tools = _register_and_get_tools(settings, auth_provider)
@@ -166,9 +160,7 @@ class TestDocsArtifactSummary:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["docs_artifact_summary"](
-            artifact_type="business_rule", sys_id="br001"
-        )
+        raw = await tools["docs_artifact_summary"](artifact_type="business_rule", sys_id="br001")
         result = json.loads(raw)
 
         assert result["status"] == "success"
@@ -186,9 +178,7 @@ class TestDocsArtifactSummary:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["docs_artifact_summary"](
-            artifact_type="business_rule", sys_id="bad_id"
-        )
+        raw = await tools["docs_artifact_summary"](artifact_type="business_rule", sys_id="bad_id")
         result = json.loads(raw)
 
         assert result["status"] == "error"
@@ -219,18 +209,14 @@ class TestDocsTestScenarios:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["docs_test_scenarios"](
-            artifact_type="business_rule", sys_id="br001"
-        )
+        raw = await tools["docs_test_scenarios"](artifact_type="business_rule", sys_id="br001")
         result = json.loads(raw)
 
         assert result["status"] == "success"
         assert len(result["data"]["scenarios"]) >= 1
         # Should suggest testing the conditional branches
         scenario_names = [s["scenario"] for s in result["data"]["scenarios"]]
-        assert any(
-            "condition" in s.lower() or "branch" in s.lower() for s in scenario_names
-        )
+        assert any("condition" in s.lower() or "branch" in s.lower() for s in scenario_names)
 
     @pytest.mark.asyncio
     @respx.mock
@@ -251,9 +237,7 @@ class TestDocsTestScenarios:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["docs_test_scenarios"](
-            artifact_type="business_rule", sys_id="br002"
-        )
+        raw = await tools["docs_test_scenarios"](artifact_type="business_rule", sys_id="br002")
         result = json.loads(raw)
 
         assert result["status"] == "success"
@@ -279,9 +263,7 @@ class TestDocsTestScenarios:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["docs_test_scenarios"](
-            artifact_type="business_rule", sys_id="br003"
-        )
+        raw = await tools["docs_test_scenarios"](artifact_type="business_rule", sys_id="br003")
         result = json.loads(raw)
 
         assert result["status"] == "success"
@@ -322,9 +304,7 @@ class TestDocsReviewNotes:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["docs_review_notes"](
-            artifact_type="business_rule", sys_id="br001"
-        )
+        raw = await tools["docs_review_notes"](artifact_type="business_rule", sys_id="br001")
         result = json.loads(raw)
 
         assert result["status"] == "success"
@@ -353,9 +333,7 @@ class TestDocsReviewNotes:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["docs_review_notes"](
-            artifact_type="business_rule", sys_id="br002"
-        )
+        raw = await tools["docs_review_notes"](artifact_type="business_rule", sys_id="br002")
         result = json.loads(raw)
 
         assert result["status"] == "success"
@@ -382,9 +360,7 @@ class TestDocsReviewNotes:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["docs_review_notes"](
-            artifact_type="business_rule", sys_id="br003"
-        )
+        raw = await tools["docs_review_notes"](artifact_type="business_rule", sys_id="br003")
         result = json.loads(raw)
 
         assert result["status"] == "success"
