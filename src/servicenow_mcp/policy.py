@@ -26,8 +26,6 @@ DENIED_TABLES: set[str] = {
     "ecc_agent_credential",
     "sys_user_token",
     "sn_auth_token",
-    "sys_user_has_role",
-    "sys_user_grmember",
 }
 
 # Field name patterns that trigger masking

@@ -202,7 +202,7 @@ uvx servicenow-devtools-mcp
 
 - Table deny list: sys_user_has_role, sys_user_grmember, and other sensitive tables are blocked
 - Sensitive fields: password, token, secret fields are masked in responses
-- Row limits: Queries capped at MAX_ROW_LIMIT (default 100)
+- Row limits: User-supplied limit parameters capped at MAX_ROW_LIMIT (default 100)
 - Large tables: syslog, sys_audit, etc. require date-bounded filters
 - Write gating: All write operations blocked when SERVICENOW_ENV=prod (unless explicitly overridden)
 - Standardized responses: Tools return JSON with correlation_id, status, data, and optionally pagination and warnings when relevant
@@ -219,6 +219,7 @@ uvx servicenow-devtools-mcp
 | `SERVICENOW_PASSWORD` | ServiceNow password | -- | Yes |
 | `MCP_TOOL_PACKAGE` | Tool package to load | `dev_debug` | No |
 | `SERVICENOW_ENV` | Environment label (`dev`, `test`, `staging`, `prod`) | `dev` | No |
+| `ALLOW_WRITES_IN_PROD` | Set to `true` to allow writes when `SERVICENOW_ENV=prod` | `false` | No |
 | `MAX_ROW_LIMIT` | Maximum rows returned per query | `100` | No |
 | `LARGE_TABLE_NAMES_CSV` | Comma-separated tables requiring date filters | `syslog,sys_audit,sys_log_transaction,sys_email_log` | No |
 
@@ -339,7 +340,7 @@ The server includes built-in guardrails that are always active:
 
 - **Table deny list** -- Sensitive tables like `sys_user_has_role` and `sys_user_grmember` are blocked from queries
 - **Sensitive field masking** -- Fields whose names contain patterns like `password`, `token`, `secret`, `credential`, `api_key`, or `private_key` are masked with the literal value `***MASKED***` in responses
-- **Row limit caps** -- All queries are capped at `MAX_ROW_LIMIT` (default 100). If a tool requests more, the limit is silently reduced and a warning is included
+- **Row limit caps** -- User-supplied `limit` parameters are capped at `MAX_ROW_LIMIT` (default 100). If a larger value is requested, the limit is reduced and a warning is included in the response
 - **Large table protection** -- Tables listed in `LARGE_TABLE_NAMES_CSV` require date-bounded filters in queries to prevent full-table scans
 - **Write gating** -- All write operations (`dev_toggle`, `dev_set_property`, `dev_seed_test_data`, `table_preview_update`, etc.) are blocked when `SERVICENOW_ENV=prod`
 - **Standardized responses** -- Every tool returns a JSON envelope with `correlation_id`, `status`, and `data`, and may include `pagination` and `warnings` when applicable, for consistent error handling
