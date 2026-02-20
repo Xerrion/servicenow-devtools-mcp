@@ -32,9 +32,7 @@ SCRIPT_TABLES: list[str] = [
 ]
 
 
-def register_tools(
-    mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider
-) -> None:
+def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
     """Register metadata tools on the MCP server."""
 
     @mcp.tool()
@@ -55,10 +53,7 @@ def register_tools(
             table = ARTIFACT_TABLES.get(artifact_type)
             if table is None:
                 valid_types = ", ".join(sorted(ARTIFACT_TABLES.keys()))
-                raise ValueError(
-                    f"Unknown artifact type '{artifact_type}'. "
-                    f"Valid types: {valid_types}"
-                )
+                raise ValueError(f"Unknown artifact type '{artifact_type}'. Valid types: {valid_types}")
 
             encoded_query = query if query else ""
 
@@ -108,10 +103,7 @@ def register_tools(
             table = ARTIFACT_TABLES.get(artifact_type)
             if table is None:
                 valid_types = ", ".join(sorted(ARTIFACT_TABLES.keys()))
-                raise ValueError(
-                    f"Unknown artifact type '{artifact_type}'. "
-                    f"Valid types: {valid_types}"
-                )
+                raise ValueError(f"Unknown artifact type '{artifact_type}'. Valid types: {valid_types}")
 
             async with ServiceNowClient(settings, auth_provider) as client:
                 record = await client.get_record(table, sys_id)
@@ -153,9 +145,7 @@ def register_tools(
             async with ServiceNowClient(settings, auth_provider) as client:
                 # Try Code Search API first (indexed, single call)
                 try:
-                    cs_result = await client.code_search(
-                        term=target, limit=limit * len(SCRIPT_TABLES)
-                    )
+                    cs_result = await client.code_search(term=target, limit=limit * len(SCRIPT_TABLES))
                     search_results = cs_result.get("search_results", [])
                     for sr in search_results:
                         matches.append(
@@ -184,9 +174,7 @@ def register_tools(
                                         "table": table,
                                         "sys_id": record.get("sys_id", ""),
                                         "name": record.get("name", ""),
-                                        "sys_class_name": record.get(
-                                            "sys_class_name", table
-                                        ),
+                                        "sys_class_name": record.get("sys_class_name", table),
                                     }
                                 )
                         except Exception:

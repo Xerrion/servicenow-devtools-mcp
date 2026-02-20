@@ -155,19 +155,13 @@ class TestStaleAutomations:
             )
         )
         respx.get(f"{BASE_URL}/api/now/table/sys_script").mock(
-            return_value=httpx.Response(
-                200, json={"result": []}, headers={"X-Total-Count": "0"}
-            )
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
         )
         respx.get(f"{BASE_URL}/api/now/table/sys_script_include").mock(
-            return_value=httpx.Response(
-                200, json={"result": []}, headers={"X-Total-Count": "0"}
-            )
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
         )
         respx.get(f"{BASE_URL}/api/now/table/sysauto_script").mock(
-            return_value=httpx.Response(
-                200, json={"result": []}, headers={"X-Total-Count": "0"}
-            )
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
@@ -189,9 +183,7 @@ class TestStaleAutomations:
             "sysauto_script",
         ]:
             respx.get(f"{BASE_URL}/api/now/table/{table}").mock(
-                return_value=httpx.Response(
-                    200, json={"result": []}, headers={"X-Total-Count": "0"}
-                )
+                return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
             )
 
         tools = _register_and_get_tools(settings, auth_provider)
@@ -317,21 +309,15 @@ class TestTableHealth:
         )
         # UI policies
         respx.get(f"{BASE_URL}/api/now/table/sys_ui_policy").mock(
-            return_value=httpx.Response(
-                200, json={"result": []}, headers={"X-Total-Count": "0"}
-            )
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
         )
         # Syslog errors
         respx.get(f"{BASE_URL}/api/now/table/syslog").mock(
-            return_value=httpx.Response(
-                200, json={"result": []}, headers={"X-Total-Count": "0"}
-            )
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["investigate_run"](
-            investigation="table_health", params='{"table": "incident"}'
-        )
+        raw = await tools["investigate_run"](investigation="table_health", params='{"table": "incident"}')
         result = json.loads(raw)
 
         assert result["status"] == "success"
@@ -381,9 +367,7 @@ class TestAclConflicts:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["investigate_run"](
-            investigation="acl_conflicts", params='{"table": "incident"}'
-        )
+        raw = await tools["investigate_run"](investigation="acl_conflicts", params='{"table": "incident"}')
         result = json.loads(raw)
 
         assert result["status"] == "success"
@@ -421,9 +405,7 @@ class TestAclConflicts:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["investigate_run"](
-            investigation="acl_conflicts", params='{"table": "incident"}'
-        )
+        raw = await tools["investigate_run"](investigation="acl_conflicts", params='{"table": "incident"}')
         result = json.loads(raw)
 
         assert result["status"] == "success"
@@ -487,9 +469,7 @@ class TestErrorAnalysis:
     async def test_no_errors_clean_report(self, settings, auth_provider):
         """No syslog errors returns clean report."""
         respx.get(f"{BASE_URL}/api/now/table/syslog").mock(
-            return_value=httpx.Response(
-                200, json={"result": []}, headers={"X-Total-Count": "0"}
-            )
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
@@ -537,9 +517,7 @@ class TestSlowTransactions:
             "syslog_cancellation",
         ]:
             respx.get(f"{BASE_URL}/api/now/table/{table}").mock(
-                return_value=httpx.Response(
-                    200, json={"result": []}, headers={"X-Total-Count": "0"}
-                )
+                return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
             )
 
         tools = _register_and_get_tools(settings, auth_provider)
@@ -581,15 +559,11 @@ class TestPerformanceBottlenecks:
         )
         # Scheduled jobs — empty
         respx.get(f"{BASE_URL}/api/now/table/sysauto_script").mock(
-            return_value=httpx.Response(
-                200, json={"result": []}, headers={"X-Total-Count": "0"}
-            )
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
         )
         # Flow contexts — empty
         respx.get(f"{BASE_URL}/api/now/table/flow_context").mock(
-            return_value=httpx.Response(
-                200, json={"result": []}, headers={"X-Total-Count": "0"}
-            )
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
         )
 
         tools = _register_and_get_tools(settings, auth_provider)

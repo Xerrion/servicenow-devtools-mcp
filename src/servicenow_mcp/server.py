@@ -1,15 +1,12 @@
 """MCP server entry point with stdio and SSE transport."""
 
-import asyncio
 import importlib
 import json
 import logging
-from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
 from servicenow_mcp.auth import create_auth
-from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.config import Settings
 from servicenow_mcp.packages import get_package, list_packages
 

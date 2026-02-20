@@ -1,7 +1,6 @@
 """Introspection tools for ServiceNow table discovery and querying."""
 
 import json
-from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
@@ -16,9 +15,7 @@ from servicenow_mcp.policy import (
 from servicenow_mcp.utils import format_response, generate_correlation_id
 
 
-def register_tools(
-    mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider
-) -> None:
+def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
     """Register introspection tools on the MCP server."""
 
     @mcp.tool()
@@ -81,13 +78,9 @@ def register_tools(
         correlation_id = generate_correlation_id()
         try:
             check_table_access(table)
-            field_list = (
-                [f.strip() for f in fields.split(",") if f.strip()] if fields else None
-            )
+            field_list = [f.strip() for f in fields.split(",") if f.strip()] if fields else None
             async with ServiceNowClient(settings, auth_provider) as client:
-                record = await client.get_record(
-                    table, sys_id, fields=field_list, display_values=display_values
-                )
+                record = await client.get_record(table, sys_id, fields=field_list, display_values=display_values)
             record = mask_sensitive_fields(record)
             return json.dumps(
                 format_response(data=record, correlation_id=correlation_id),
@@ -132,9 +125,7 @@ def register_tools(
             if effective_limit < limit:
                 warnings.append(f"Limit capped at {effective_limit}")
 
-            field_list = (
-                [f.strip() for f in fields.split(",") if f.strip()] if fields else None
-            )
+            field_list = [f.strip() for f in fields.split(",") if f.strip()] if fields else None
             order = order_by if order_by else None
 
             async with ServiceNowClient(settings, auth_provider) as client:

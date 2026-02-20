@@ -12,9 +12,7 @@ from servicenow_mcp.investigations import INVESTIGATION_REGISTRY
 from servicenow_mcp.utils import format_response, generate_correlation_id
 
 
-def register_tools(
-    mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider
-) -> None:
+def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
     """Register investigation dispatcher tools on the MCP server."""
 
     @mcp.tool()
@@ -50,9 +48,7 @@ def register_tools(
             async with ServiceNowClient(settings, auth_provider) as client:
                 result = await module.run(client, params_dict)
 
-            return json.dumps(
-                format_response(data=result, correlation_id=correlation_id)
-            )
+            return json.dumps(format_response(data=result, correlation_id=correlation_id))
         except Exception as exc:
             return json.dumps(
                 format_response(
@@ -91,9 +87,7 @@ def register_tools(
             async with ServiceNowClient(settings, auth_provider) as client:
                 result = await module.explain(client, element_id)
 
-            return json.dumps(
-                format_response(data=result, correlation_id=correlation_id)
-            )
+            return json.dumps(format_response(data=result, correlation_id=correlation_id))
         except Exception as exc:
             return json.dumps(
                 format_response(

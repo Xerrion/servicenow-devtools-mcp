@@ -2,8 +2,6 @@
 
 import time
 
-import pytest
-
 from servicenow_mcp.state import PreviewTokenStore, SeededRecordTracker
 
 
@@ -13,9 +11,7 @@ class TestPreviewTokenStore:
     def test_create_returns_token_string(self):
         """create() returns a UUID-style string token."""
         store = PreviewTokenStore(ttl_seconds=300)
-        token = store.create(
-            {"table": "incident", "sys_id": "abc", "changes": {"state": "2"}}
-        )
+        token = store.create({"table": "incident", "sys_id": "abc", "changes": {"state": "2"}})
         assert isinstance(token, str)
         assert len(token) > 0
 

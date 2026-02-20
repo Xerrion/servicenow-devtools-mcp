@@ -14,9 +14,7 @@ from servicenow_mcp.tools.metadata import ARTIFACT_TABLES
 from servicenow_mcp.utils import format_response, generate_correlation_id
 
 
-def register_tools(
-    mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider
-) -> None:
+def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
     """Register developer action tools on the MCP server."""
 
     # In-memory state stores, shared across tools via closure
@@ -64,9 +62,7 @@ def register_tools(
                 old_active = current.get("active", "unknown")
 
                 # Update active field
-                updated = await client.update_record(
-                    table, sys_id, {"active": str(active).lower()}
-                )
+                updated = await client.update_record(table, sys_id, {"active": str(active).lower()})
                 new_active = updated.get("active", "unknown")
 
             return json.dumps(
@@ -135,9 +131,7 @@ def register_tools(
                 old_value = prop.get("value", "")
 
                 # Update the property value
-                updated = await client.update_record(
-                    "sys_properties", prop_sys_id, {"value": value}
-                )
+                updated = await client.update_record("sys_properties", prop_sys_id, {"value": value})
                 new_value = updated.get("value", value)
 
             return json.dumps(
@@ -162,9 +156,7 @@ def register_tools(
             )
 
     @mcp.tool()
-    async def dev_seed_test_data(
-        table: str, records: str, tag: str | None = None
-    ) -> str:
+    async def dev_seed_test_data(table: str, records: str, tag: str | None = None) -> str:
         """Create test data records in a ServiceNow table. Returns sys_ids and a cleanup tag.
 
         Args:

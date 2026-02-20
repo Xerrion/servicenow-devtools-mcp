@@ -201,9 +201,7 @@ class TestChangesDiffArtifact:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["changes_diff_artifact"](
-            table="sys_script_include", sys_id="abc"
-        )
+        raw = await tools["changes_diff_artifact"](table="sys_script_include", sys_id="abc")
         result = json.loads(raw)
 
         assert result["status"] == "success"
@@ -222,9 +220,7 @@ class TestChangesDiffArtifact:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["changes_diff_artifact"](
-            table="sys_script_include", sys_id="abc"
-        )
+        raw = await tools["changes_diff_artifact"](table="sys_script_include", sys_id="abc")
         result = json.loads(raw)
 
         assert result["status"] == "error"

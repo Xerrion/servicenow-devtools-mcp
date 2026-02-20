@@ -40,10 +40,7 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
             continue
 
         # Pattern tables use window queries; syslog_cancellation uses simple query
-        if table_name == "syslog_cancellation":
-            query = ""
-        else:
-            query = "window_endISEMPTY^window_startISEMPTY"
+        query = "" if table_name == "syslog_cancellation" else "window_endISEMPTY^window_startISEMPTY"
 
         try:
             result = await client.query_records(

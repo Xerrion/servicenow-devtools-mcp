@@ -1,7 +1,5 @@
 """Tool package registry and loader for the ServiceNow MCP server."""
 
-from typing import Any
-
 # Registry mapping package names to lists of tool group names.
 # Tool groups correspond to modules in servicenow_mcp.tools.
 PACKAGE_REGISTRY: dict[str, list[str]] = {
@@ -40,10 +38,7 @@ def get_package(name: str) -> list[str]:
     Raises ValueError if the package is not found.
     """
     if name not in PACKAGE_REGISTRY:
-        raise ValueError(
-            f"Unknown tool package '{name}'. "
-            f"Available packages: {', '.join(PACKAGE_REGISTRY.keys())}"
-        )
+        raise ValueError(f"Unknown tool package '{name}'. Available packages: {', '.join(PACKAGE_REGISTRY.keys())}")
     return PACKAGE_REGISTRY[name]
 
 

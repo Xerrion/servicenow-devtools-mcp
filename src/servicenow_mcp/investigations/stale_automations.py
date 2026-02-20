@@ -1,6 +1,6 @@
 """Investigation: find stale automations — stuck flows, disabled scripts, stale jobs."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from servicenow_mcp.client import ServiceNowClient
@@ -21,7 +21,7 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
     """
     stale_days = params.get("stale_days", 30)
     limit = params.get("limit", 20)
-    cutoff = datetime.now(tz=timezone.utc) - timedelta(days=stale_days)
+    cutoff = datetime.now(tz=UTC) - timedelta(days=stale_days)
     cutoff_str = cutoff.strftime("%Y-%m-%d %H:%M:%S")
 
     findings: list[dict[str, Any]] = []
@@ -118,23 +118,19 @@ async def explain(client: ServiceNowClient, element_id: str) -> dict[str, Any]:
             f"'{record.get('state', '')}' since {record.get('sys_created_on', '')}."
         )
         explanation_parts.append(
-            "Consider cancelling this flow if it is no longer needed, "
-            "or investigate why it is stuck."
+            "Consider cancelling this flow if it is no longer needed, or investigate why it is stuck."
         )
     elif table == "sys_script":
         explanation_parts.append(
-            f"Business rule '{record.get('name', '')}' is disabled. "
-            "Review whether it should be removed or re-enabled."
+            f"Business rule '{record.get('name', '')}' is disabled. Review whether it should be removed or re-enabled."
         )
     elif table == "sys_script_include":
         explanation_parts.append(
-            f"Script include '{record.get('name', '')}' is disabled. "
-            "Check if any other scripts reference it."
+            f"Script include '{record.get('name', '')}' is disabled. Check if any other scripts reference it."
         )
     elif table == "sysauto_script":
         explanation_parts.append(
-            f"Scheduled job '{record.get('name', '')}' has not been updated recently. "
-            "Verify it is still needed."
+            f"Scheduled job '{record.get('name', '')}' has not been updated recently. Verify it is still needed."
         )
 
     return {

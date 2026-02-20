@@ -66,9 +66,7 @@ class TestDevToggle:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["dev_toggle"](
-            artifact_type="business_rule", sys_id="br001", active=False
-        )
+        raw = await tools["dev_toggle"](artifact_type="business_rule", sys_id="br001", active=False)
         result = json.loads(raw)
 
         assert result["status"] == "success"
@@ -89,9 +87,7 @@ class TestDevToggle:
         register_tools(mcp, prod_settings, prod_auth)
         tools = {t.name: t.fn for t in mcp._tool_manager._tools.values()}
 
-        raw = await tools["dev_toggle"](
-            artifact_type="business_rule", sys_id="br001", active=False
-        )
+        raw = await tools["dev_toggle"](artifact_type="business_rule", sys_id="br001", active=False)
         result = json.loads(raw)
 
         assert result["status"] == "error"
@@ -101,9 +97,7 @@ class TestDevToggle:
     async def test_unknown_artifact_type(self, settings, auth_provider):
         """Returns error for unknown artifact type."""
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["dev_toggle"](
-            artifact_type="unknown_type", sys_id="br001", active=False
-        )
+        raw = await tools["dev_toggle"](artifact_type="unknown_type", sys_id="br001", active=False)
         result = json.loads(raw)
 
         assert result["status"] == "error"
@@ -150,9 +144,7 @@ class TestDevSetProperty:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["dev_set_property"](
-            name="glide.ui.session_timeout", value="60"
-        )
+        raw = await tools["dev_set_property"](name="glide.ui.session_timeout", value="60")
         result = json.loads(raw)
 
         assert result["status"] == "success"
@@ -172,9 +164,7 @@ class TestDevSetProperty:
         register_tools(mcp, prod_settings, prod_auth)
         tools = {t.name: t.fn for t in mcp._tool_manager._tools.values()}
 
-        raw = await tools["dev_set_property"](
-            name="glide.ui.session_timeout", value="60"
-        )
+        raw = await tools["dev_set_property"](name="glide.ui.session_timeout", value="60")
         result = json.loads(raw)
 
         assert result["status"] == "error"
@@ -290,9 +280,7 @@ class TestDevCleanup:
         assert seed_result["status"] == "success"
 
         # Now mock DELETE
-        respx.delete(f"{BASE_URL}/api/now/table/incident/new1").mock(
-            return_value=httpx.Response(204)
-        )
+        respx.delete(f"{BASE_URL}/api/now/table/incident/new1").mock(return_value=httpx.Response(204))
 
         # Cleanup
         raw = await tools["dev_cleanup"](tag="cleanup-test-tag")
@@ -339,9 +327,7 @@ class TestTablePreviewUpdate:
 
         tools = _register_and_get_tools(settings, auth_provider)
         changes_json = json.dumps({"state": "2", "short_description": "Updated"})
-        raw = await tools["table_preview_update"](
-            table="incident", sys_id="inc001", changes=changes_json
-        )
+        raw = await tools["table_preview_update"](table="incident", sys_id="inc001", changes=changes_json)
         result = json.loads(raw)
 
         assert result["status"] == "success"

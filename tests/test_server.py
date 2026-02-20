@@ -2,8 +2,6 @@
 
 from unittest.mock import patch
 
-import pytest
-
 
 class TestCreateMcpServer:
     """Test MCP server creation."""

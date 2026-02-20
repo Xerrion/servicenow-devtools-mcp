@@ -24,9 +24,7 @@ RISKY_TYPES = {
 }
 
 
-def register_tools(
-    mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider
-) -> None:
+def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
     """Register change intelligence tools on the MCP server."""
 
     @mcp.tool()
@@ -91,8 +89,7 @@ def register_tools(
             risky_found = member_types & RISKY_TYPES
             for risky_type in sorted(risky_found):
                 risk_flags.append(
-                    f"Contains {groups[risky_type].__len__()} "
-                    f"'{risky_type}' artifact(s) — review carefully"
+                    f"Contains {groups[risky_type].__len__()} '{risky_type}' artifact(s) — review carefully"
                 )
 
             return json.dumps(

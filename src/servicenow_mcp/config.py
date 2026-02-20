@@ -21,6 +21,7 @@ class Settings(BaseSettings):
         "env_file": [".env", ".env.local"],
         "env_file_encoding": "utf-8",
         "env_prefix": "",
+        "extra": "ignore",
     }
 
     @field_validator("servicenow_instance_url")

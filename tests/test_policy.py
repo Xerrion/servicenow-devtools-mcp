@@ -2,7 +2,7 @@
 
 import pytest
 
-from servicenow_mcp.errors import PolicyError, QuerySafetyError, WriteGatingError
+from servicenow_mcp.errors import PolicyError, QuerySafetyError
 
 
 class TestDenyList:
@@ -95,18 +95,14 @@ class TestQuerySafety:
         """Limit is capped at max_row_limit."""
         from servicenow_mcp.policy import enforce_query_safety
 
-        result = enforce_query_safety(
-            "incident", "active=true", limit=500, settings=settings
-        )
+        result = enforce_query_safety("incident", "active=true", limit=500, settings=settings)
         assert result["limit"] <= settings.max_row_limit
 
     def test_default_limit_applied(self, settings):
         """Default limit is applied when none specified."""
         from servicenow_mcp.policy import enforce_query_safety
 
-        result = enforce_query_safety(
-            "incident", "active=true", limit=None, settings=settings
-        )
+        result = enforce_query_safety("incident", "active=true", limit=None, settings=settings)
         assert result["limit"] == settings.max_row_limit
 
     def test_large_table_requires_date_filter(self, settings):
@@ -134,9 +130,7 @@ class TestQuerySafety:
         from servicenow_mcp.policy import enforce_query_safety
 
         # Should not raise
-        result = enforce_query_safety(
-            "incident", "active=true", limit=50, settings=settings
-        )
+        result = enforce_query_safety("incident", "active=true", limit=50, settings=settings)
         assert result["limit"] == 50
 
 

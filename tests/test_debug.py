@@ -94,9 +94,7 @@ class TestDebugTrace:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["debug_trace"](
-            record_sys_id="inc001", table="incident", minutes=60
-        )
+        raw = await tools["debug_trace"](record_sys_id="inc001", table="incident", minutes=60)
         result = json.loads(raw)
 
         assert result["status"] == "success"
@@ -110,19 +108,13 @@ class TestDebugTrace:
     async def test_empty_trace(self, settings, auth_provider):
         """Returns empty timeline when no events found."""
         respx.get(f"{BASE_URL}/api/now/table/sys_audit").mock(
-            return_value=httpx.Response(
-                200, json={"result": []}, headers={"X-Total-Count": "0"}
-            )
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
         )
         respx.get(f"{BASE_URL}/api/now/table/syslog").mock(
-            return_value=httpx.Response(
-                200, json={"result": []}, headers={"X-Total-Count": "0"}
-            )
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
         )
         respx.get(f"{BASE_URL}/api/now/table/sys_journal_field").mock(
-            return_value=httpx.Response(
-                200, json={"result": []}, headers={"X-Total-Count": "0"}
-            )
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
@@ -231,10 +223,7 @@ class TestDebugFlowExecution:
         result = json.loads(raw)
 
         assert result["status"] == "success"
-        assert (
-            result["data"]["steps"][0]["error_message"]
-            == "NullPointerException at line 5"
-        )
+        assert result["data"]["steps"][0]["error_message"] == "NullPointerException at line 5"
 
 
 class TestDebugEmailTrace:
@@ -285,9 +274,7 @@ class TestDebugEmailTrace:
     async def test_handles_no_emails(self, settings, auth_provider):
         """Returns empty list when no emails found."""
         respx.get(f"{BASE_URL}/api/now/table/sys_email").mock(
-            return_value=httpx.Response(
-                200, json={"result": []}, headers={"X-Total-Count": "0"}
-            )
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
@@ -437,9 +424,7 @@ class TestDebugImportsetRun:
             )
         )
         respx.get(f"{BASE_URL}/api/now/table/sys_import_set_row").mock(
-            return_value=httpx.Response(
-                200, json={"result": []}, headers={"X-Total-Count": "0"}
-            )
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
@@ -485,9 +470,7 @@ class TestDebugFieldMutationStory:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["debug_field_mutation_story"](
-            table="incident", sys_id="inc001", field="state"
-        )
+        raw = await tools["debug_field_mutation_story"](table="incident", sys_id="inc001", field="state")
         result = json.loads(raw)
 
         assert result["status"] == "success"
@@ -501,15 +484,11 @@ class TestDebugFieldMutationStory:
     async def test_handles_no_mutations(self, settings, auth_provider):
         """Returns empty when no mutations found for the field."""
         respx.get(f"{BASE_URL}/api/now/table/sys_audit").mock(
-            return_value=httpx.Response(
-                200, json={"result": []}, headers={"X-Total-Count": "0"}
-            )
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["debug_field_mutation_story"](
-            table="incident", sys_id="inc001", field="state"
-        )
+        raw = await tools["debug_field_mutation_story"](table="incident", sys_id="inc001", field="state")
         result = json.loads(raw)
 
         assert result["status"] == "success"

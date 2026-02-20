@@ -209,9 +209,7 @@ class ServiceNowClient:
         self._raise_for_status(response)
         return response.json()["result"]
 
-    async def update_record(
-        self, table: str, sys_id: str, data: dict[str, Any]
-    ) -> dict[str, Any]:
+    async def update_record(self, table: str, sys_id: str, data: dict[str, Any]) -> dict[str, Any]:
         """Update an existing record via PATCH."""
         assert self._http_client is not None
         response = await self._http_client.patch(
@@ -261,10 +259,7 @@ class ServiceNowClient:
 
     def _import_set_url(self, staging_table: str, sys_id: str) -> str:
         """Build the Import Set API URL."""
-        return (
-            f"{self._settings.servicenow_instance_url}"
-            f"/api/now/import/{staging_table}/{sys_id}"
-        )
+        return f"{self._settings.servicenow_instance_url}/api/now/import/{staging_table}/{sys_id}"
 
     async def get_import_set_record(
         self,
@@ -288,17 +283,11 @@ class ServiceNowClient:
 
     def _table_description_url(self, table: str) -> str:
         """Build the Reporting Table Description API URL."""
-        return (
-            f"{self._settings.servicenow_instance_url}"
-            f"/api/now/reporting_table_description/{table}"
-        )
+        return f"{self._settings.servicenow_instance_url}/api/now/reporting_table_description/{table}"
 
     def _field_descriptions_url(self, table: str) -> str:
         """Build the Reporting Field Description API URL."""
-        return (
-            f"{self._settings.servicenow_instance_url}"
-            f"/api/now/reporting_table_description/field_description/{table}"
-        )
+        return f"{self._settings.servicenow_instance_url}/api/now/reporting_table_description/field_description/{table}"
 
     async def list_reports(
         self,
@@ -354,17 +343,11 @@ class ServiceNowClient:
 
     def _code_search_url(self) -> str:
         """Build the Code Search API URL."""
-        return (
-            f"{self._settings.servicenow_instance_url}"
-            f"/api/sn_codesearch/code_search/search"
-        )
+        return f"{self._settings.servicenow_instance_url}/api/sn_codesearch/code_search/search"
 
     def _code_search_tables_url(self) -> str:
         """Build the Code Search Tables API URL."""
-        return (
-            f"{self._settings.servicenow_instance_url}"
-            f"/api/sn_codesearch/code_search/tables"
-        )
+        return f"{self._settings.servicenow_instance_url}/api/sn_codesearch/code_search/tables"
 
     async def code_search(
         self,
@@ -413,19 +396,14 @@ class ServiceNowClient:
 
     def _cmdb_instance_url(self, class_name: str, sys_id: str | None = None) -> str:
         """Build the CMDB Instance API URL."""
-        base = (
-            f"{self._settings.servicenow_instance_url}"
-            f"/api/now/cmdb/instance/{class_name}"
-        )
+        base = f"{self._settings.servicenow_instance_url}/api/now/cmdb/instance/{class_name}"
         if sys_id:
             base = f"{base}/{sys_id}"
         return base
 
     def _cmdb_meta_url(self, class_name: str) -> str:
         """Build the CMDB Meta API URL."""
-        return (
-            f"{self._settings.servicenow_instance_url}/api/now/cmdb/meta/{class_name}"
-        )
+        return f"{self._settings.servicenow_instance_url}/api/now/cmdb/meta/{class_name}"
 
     async def cmdb_query(
         self,
@@ -482,10 +460,7 @@ class ServiceNowClient:
 
     def _encoded_query_url(self) -> str:
         """Build the Encoded Query Translator API URL."""
-        return (
-            f"{self._settings.servicenow_instance_url}"
-            f"/api/now/cmdb_workspace_api/encodedquery"
-        )
+        return f"{self._settings.servicenow_instance_url}/api/now/cmdb_workspace_api/encodedquery"
 
     async def translate_encoded_query(
         self,
