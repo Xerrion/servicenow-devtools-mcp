@@ -514,3 +514,22 @@ class TestDebugFieldMutationStory:
 
         assert result["status"] == "success"
         assert result["data"]["mutations"] == []
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_limit_capped_with_warning(self, settings, auth_provider):
+        """When requested limit exceeds max_row_limit, it is capped and a warning is added."""
+        respx.get(f"{BASE_URL}/api/now/table/sys_audit").mock(
+            return_value=httpx.Response(
+                200, json={"result": []}, headers={"X-Total-Count": "0"}
+            )
+        )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["debug_field_mutation_story"](
+            table="incident", sys_id="inc001", field="state", limit=500
+        )
+        result = json.loads(raw)
+
+        assert result["status"] == "success"
+        assert any("capped" in w.lower() for w in result.get("warnings", []))

@@ -62,11 +62,16 @@ def register_tools(
 
             encoded_query = query if query else ""
 
+            effective_limit = min(limit, settings.max_row_limit)
+            warnings: list[str] = []
+            if effective_limit < limit:
+                warnings.append(f"Limit capped at {effective_limit}")
+
             async with ServiceNowClient(settings, auth_provider) as client:
                 result = await client.query_records(
                     table,
                     encoded_query,
-                    limit=limit,
+                    limit=effective_limit,
                 )
 
             return json.dumps(
@@ -78,6 +83,7 @@ def register_tools(
                         "total": result["count"],
                     },
                     correlation_id=correlation_id,
+                    warnings=warnings if warnings else None,
                 ),
                 indent=2,
             )
@@ -147,6 +153,11 @@ def register_tools(
         """
         correlation_id = generate_correlation_id()
         try:
+            effective_limit = min(limit, settings.max_row_limit)
+            warnings: list[str] = []
+            if effective_limit < limit:
+                warnings.append(f"Limit capped at {effective_limit}")
+
             matches: list[dict[str, Any]] = []
             search_method = "code_search_api"
 
@@ -154,7 +165,7 @@ def register_tools(
                 # Try Code Search API first (indexed, single call)
                 try:
                     cs_result = await client.code_search(
-                        term=target, limit=limit * len(SCRIPT_TABLES)
+                        term=target, limit=effective_limit * len(SCRIPT_TABLES)
                     )
                     search_results = cs_result.get("search_results", [])
                     for sr in search_results:
@@ -176,7 +187,7 @@ def register_tools(
                                 table,
                                 query,
                                 fields=["sys_id", "name", "sys_class_name"],
-                                limit=limit,
+                                limit=effective_limit,
                             )
                             for record in result["records"]:
                                 matches.append(
@@ -202,6 +213,7 @@ def register_tools(
                         "search_method": search_method,
                     },
                     correlation_id=correlation_id,
+                    warnings=warnings if warnings else None,
                 ),
                 indent=2,
             )

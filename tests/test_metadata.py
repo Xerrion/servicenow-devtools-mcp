@@ -148,6 +148,27 @@ class TestMetaListArtifacts:
         assert "correlation_id" in result
         assert len(result["correlation_id"]) > 0
 
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_limit_capped_with_warning(self, settings, auth_provider):
+        """When requested limit exceeds max_row_limit, it is capped and a warning is added."""
+        respx.get(f"{BASE_URL}/api/now/table/sys_script").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": []},
+                headers={"X-Total-Count": "0"},
+            )
+        )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["meta_list_artifacts"](
+            artifact_type="business_rule", limit=500
+        )
+        result = json.loads(raw)
+
+        assert result["status"] == "success"
+        assert any("capped" in w.lower() for w in result.get("warnings", []))
+
 
 class TestMetaGetArtifact:
     """Tests for the meta_get_artifact tool."""
@@ -297,6 +318,24 @@ class TestMetaFindReferences:
 
         assert result["status"] == "success"
         assert result["data"]["matches"] == []
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_limit_capped_with_warning(self, settings, auth_provider):
+        """When requested limit exceeds max_row_limit, it is capped and a warning is added."""
+        respx.get(f"{BASE_URL}/api/sn_codesearch/code_search/search").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": {"search_results": []}},
+            )
+        )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["meta_find_references"](target="GlideRecord", limit=500)
+        result = json.loads(raw)
+
+        assert result["status"] == "success"
+        assert any("capped" in w.lower() for w in result.get("warnings", []))
 
 
 class TestMetaWhatWrites:

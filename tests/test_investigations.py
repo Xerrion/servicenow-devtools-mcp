@@ -127,6 +127,31 @@ class TestInvestigateRun:
         assert "explanation" in result["data"]
         assert "element" in result["data"]
 
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_limit_param_capped_at_max_row_limit(self, settings, auth_provider):
+        """A limit param exceeding max_row_limit is silently capped before reaching the investigation."""
+        # error_analysis uses syslog and accepts a `limit` param
+        respx.get(f"{BASE_URL}/api/now/table/syslog").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": []},
+                headers={"X-Total-Count": "0"},
+            )
+        )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        # Pass limit=500, which exceeds the default max_row_limit of 100
+        raw = await tools["investigate_run"](
+            investigation="error_analysis",
+            params='{"limit": 500}',
+        )
+        result = json.loads(raw)
+
+        assert result["status"] == "success"
+        # The investigation should have received the capped limit (100)
+        assert result["data"]["params"]["limit"] <= settings.max_row_limit
+
 
 # ── stale_automations ─────────────────────────────────────────────────────
 

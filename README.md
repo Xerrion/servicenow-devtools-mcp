@@ -341,7 +341,7 @@ The server includes built-in guardrails that are always active:
 - **Row limit caps** -- All queries are capped at `MAX_ROW_LIMIT` (default 100). If a tool requests more, the limit is silently reduced and a warning is included
 - **Large table protection** -- Tables listed in `LARGE_TABLE_NAMES_CSV` require date-bounded filters in queries to prevent full-table scans
 - **Write gating** -- All write operations (`dev_toggle`, `dev_set_property`, `dev_seed_test_data`, `table_preview_update`, etc.) are blocked when `SERVICENOW_ENV=prod`
-- **Standardized responses** -- Every tool returns a JSON envelope with `correlation_id`, `status`, `data`, `pagination`, and `warnings` for consistent error handling
+- **Standardized responses** -- Every tool returns a JSON envelope with `correlation_id`, `status`, and `data`; `pagination` and `warnings` are included when relevant
 
 ---
 
