@@ -47,6 +47,12 @@ def register_tools(
 
             params_dict: dict[str, Any] = json.loads(params) if params else {}
 
+            # Cap any user-supplied limit at max_row_limit
+            if "limit" in params_dict:
+                params_dict["limit"] = min(
+                    int(params_dict["limit"]), settings.max_row_limit
+                )
+
             async with ServiceNowClient(settings, auth_provider) as client:
                 result = await module.run(client, params_dict)
 
