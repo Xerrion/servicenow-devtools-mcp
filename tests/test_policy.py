@@ -166,3 +166,22 @@ class TestWriteGating:
         from servicenow_mcp.policy import can_write
 
         assert can_write("sys_user_has_password", settings) is False
+
+    def test_write_allowed_in_prod_with_settings_flag(self):
+        """Writes allowed in prod when allow_writes_in_prod is True in settings."""
+        from unittest.mock import patch
+
+        from servicenow_mcp.config import Settings
+        from servicenow_mcp.policy import can_write
+
+        env = {
+            "SERVICENOW_INSTANCE_URL": "https://prod.service-now.com",
+            "SERVICENOW_USERNAME": "admin",
+            "SERVICENOW_PASSWORD": "s3cret",
+            "SERVICENOW_ENV": "prod",
+            "ALLOW_WRITES_IN_PROD": "true",
+        }
+        with patch.dict("os.environ", env, clear=True):
+            prod_override_settings = Settings(_env_file=None)
+
+        assert can_write("incident", prod_override_settings, override=prod_override_settings.allow_writes_in_prod) is True

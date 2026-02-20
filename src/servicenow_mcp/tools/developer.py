@@ -48,7 +48,7 @@ def register_tools(
                 )
 
             # Write gate
-            if not can_write(table, settings):
+            if not can_write(table, settings, override=settings.allow_writes_in_prod):
                 return json.dumps(
                     format_response(
                         data=None,
@@ -102,7 +102,7 @@ def register_tools(
         correlation_id = generate_correlation_id()
         try:
             # Write gate
-            if not can_write("sys_properties", settings):
+            if not can_write("sys_properties", settings, override=settings.allow_writes_in_prod):
                 return json.dumps(
                     format_response(
                         data=None,
@@ -175,7 +175,7 @@ def register_tools(
         correlation_id = generate_correlation_id()
         try:
             # Write gate
-            if not can_write(table, settings):
+            if not can_write(table, settings, override=settings.allow_writes_in_prod):
                 return json.dumps(
                     format_response(
                         data=None,
@@ -284,7 +284,7 @@ def register_tools(
         correlation_id = generate_correlation_id()
         try:
             # Write gate
-            if not can_write(table, settings):
+            if not can_write(table, settings, override=settings.allow_writes_in_prod):
                 return json.dumps(
                     format_response(
                         data=None,
