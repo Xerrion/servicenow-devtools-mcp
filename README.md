@@ -337,7 +337,7 @@ Control which tools are loaded using the `MCP_TOOL_PACKAGE` environment variable
 The server includes built-in guardrails that are always active:
 
 - **Table deny list** -- Sensitive tables like `sys_user_has_role` and `sys_user_grmember` are blocked from queries
-- **Sensitive field masking** -- Fields containing `password`, `token`, `secret`, or `credential` in their name are masked with `***` in responses
+- **Sensitive field masking** -- Fields whose names contain patterns like `password`, `token`, `secret`, `credential`, `api_key`, or `private_key` are masked with the literal value `***MASKED***` in responses
 - **Row limit caps** -- All queries are capped at `MAX_ROW_LIMIT` (default 100). If a tool requests more, the limit is silently reduced and a warning is included
 - **Large table protection** -- Tables listed in `LARGE_TABLE_NAMES_CSV` require date-bounded filters in queries to prevent full-table scans
 - **Write gating** -- All write operations (`dev_toggle`, `dev_set_property`, `dev_seed_test_data`, `table_preview_update`, etc.) are blocked when `SERVICENOW_ENV=prod`
