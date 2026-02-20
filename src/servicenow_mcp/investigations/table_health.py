@@ -104,9 +104,7 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
         "recent_errors": recent_errors,
         "health_indicators": health_indicators,
         "finding_count": len(health_indicators),
-        "findings": [
-            {"category": "health_indicator", "detail": ind} for ind in health_indicators
-        ],
+        "findings": [{"category": "health_indicator", "detail": ind} for ind in health_indicators],
     }
 
 

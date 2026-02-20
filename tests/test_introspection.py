@@ -111,9 +111,7 @@ class TestTableGet:
         respx.get(f"{BASE_URL}/api/now/table/incident/abc123").mock(
             return_value=httpx.Response(
                 200,
-                json={
-                    "result": {"sys_id": "abc123", "number": "INC0001", "state": "1"}
-                },
+                json={"result": {"sys_id": "abc123", "number": "INC0001", "state": "1"}},
             )
         )
 
@@ -220,9 +218,7 @@ class TestTableQuery:
 
         tools = _register_and_get_tools(settings, auth_provider)
         # Default max_row_limit is 100, request 500
-        raw = await tools["table_query"](
-            table="incident", query="active=true", limit=500
-        )
+        raw = await tools["table_query"](table="incident", query="active=true", limit=500)
         result = json.loads(raw)
 
         assert result["status"] == "success"
@@ -230,9 +226,7 @@ class TestTableQuery:
         assert any("capped" in w.lower() for w in result.get("warnings", []))
 
     @pytest.mark.asyncio
-    async def test_large_table_without_date_filter_returns_error(
-        self, settings, auth_provider
-    ):
+    async def test_large_table_without_date_filter_returns_error(self, settings, auth_provider):
         """Large tables require a date filter; omitting it returns an error."""
         # Add syslog to large tables for this test
         settings.large_table_names_csv = "syslog,sys_audit"

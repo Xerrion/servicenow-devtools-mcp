@@ -7,7 +7,6 @@ import pytest
 import respx
 
 from servicenow_mcp.auth import BasicAuthProvider
-from servicenow_mcp.policy import DENIED_TABLES
 
 BASE_URL = "https://test.service-now.com"
 
@@ -111,9 +110,7 @@ class TestMetaListArtifacts:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["meta_list_artifacts"](
-            artifact_type="business_rule", query="collection=incident^active=true"
-        )
+        raw = await tools["meta_list_artifacts"](artifact_type="business_rule", query="collection=incident^active=true")
         result = json.loads(raw)
 
         assert result["status"] == "success"
@@ -173,9 +170,7 @@ class TestMetaGetArtifact:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["meta_get_artifact"](
-            artifact_type="business_rule", sys_id="br1"
-        )
+        raw = await tools["meta_get_artifact"](artifact_type="business_rule", sys_id="br1")
         result = json.loads(raw)
 
         assert result["status"] == "success"
@@ -191,9 +186,7 @@ class TestMetaGetArtifact:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["meta_get_artifact"](
-            artifact_type="business_rule", sys_id="missing"
-        )
+        raw = await tools["meta_get_artifact"](artifact_type="business_rule", sys_id="missing")
         result = json.loads(raw)
 
         assert result["status"] == "error"

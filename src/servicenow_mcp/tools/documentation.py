@@ -13,9 +13,7 @@ from servicenow_mcp.tools.metadata import ARTIFACT_TABLES
 from servicenow_mcp.utils import format_response, generate_correlation_id
 
 
-def register_tools(
-    mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider
-) -> None:
+def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
     """Register documentation tools on the MCP server."""
 
     @mcp.tool()
@@ -139,12 +137,7 @@ def register_tools(
                     for a in uia_records
                 ]
 
-            total = (
-                len(br_result["records"])
-                + len(cs_records)
-                + len(uip_records)
-                + len(uia_records)
-            )
+            total = len(br_result["records"]) + len(cs_records) + len(uip_records) + len(uia_records)
 
             return json.dumps(
                 format_response(
@@ -358,9 +351,7 @@ def _extract_gliderecord_tables(script: str) -> list[str]:
     return result
 
 
-def _generate_test_scenarios(
-    script: str, record: dict[str, Any]
-) -> list[dict[str, str]]:
+def _generate_test_scenarios(script: str, record: dict[str, Any]) -> list[dict[str, str]]:
     """Analyze script and generate test scenario suggestions."""
     scenarios: list[dict[str, str]] = []
 
@@ -496,15 +487,9 @@ def _scan_for_anti_patterns(script: str) -> list[dict[str, str]]:
         )
 
     # 3. Unbounded GlideRecord query (query() without addQuery/addEncodedQuery/get)
-    gr_blocks = re.findall(
-        r"new\s+GlideRecord\s*\([^)]+\)\s*;(.*?)\.query\(\)", script, re.DOTALL
-    )
+    gr_blocks = re.findall(r"new\s+GlideRecord\s*\([^)]+\)\s*;(.*?)\.query\(\)", script, re.DOTALL)
     for block in gr_blocks:
-        if (
-            "addQuery" not in block
-            and "addEncodedQuery" not in block
-            and "get(" not in block
-        ):
+        if "addQuery" not in block and "addEncodedQuery" not in block and "get(" not in block:
             findings.append(
                 {
                     "category": "unbounded_query",

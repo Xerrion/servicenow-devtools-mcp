@@ -85,10 +85,7 @@ def enforce_query_safety(
     check_table_access(table)
 
     # Cap limit at max_row_limit
-    if limit is None or limit > settings.max_row_limit:
-        effective_limit = settings.max_row_limit
-    else:
-        effective_limit = limit
+    effective_limit = settings.max_row_limit if limit is None or limit > settings.max_row_limit else limit
 
     # Large tables require date-bounded filters
     if table in settings.large_table_names and not _has_date_filter(query):
@@ -112,7 +109,4 @@ def can_write(
         return False
 
     # In production, require explicit override
-    if settings.is_production and not override:
-        return False
-
-    return True
+    return not (settings.is_production and not override)
