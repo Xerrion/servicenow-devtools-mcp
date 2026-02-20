@@ -148,7 +148,8 @@ uvx servicenow-devtools-mcp
 ### Optional Environment Variables
 
 - MCP_TOOL_PACKAGE -- Which tools to load: "dev_debug" (default, all tools), "introspection_only" (read-only), "full" (same as dev_debug), "none"
-- SERVICENOW_ENV -- Environment label: "dev" (default), "test", "staging", "prod". Write operations are blocked when set to "prod" unless ALLOW_WRITES_IN_PROD=true.
+- SERVICENOW_ENV -- Environment label: "dev" (default), "test", "staging", "prod". Write operations are blocked when set to "prod" unless ALLOW_WRITES_IN_PROD is set to true.
+- ALLOW_WRITES_IN_PROD -- Set to "true" to allow write operations even when SERVICENOW_ENV is "prod" (default: false).
 - MAX_ROW_LIMIT -- Max records per query (default: 100)
 - LARGE_TABLE_NAMES_CSV -- Tables requiring date-bounded queries (default: syslog,sys_audit,sys_log_transaction,sys_email_log)
 
