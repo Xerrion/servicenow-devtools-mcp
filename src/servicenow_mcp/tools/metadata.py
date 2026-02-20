@@ -8,6 +8,7 @@ from mcp.server.fastmcp import FastMCP
 from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.config import Settings
+from servicenow_mcp.policy import enforce_query_safety
 from servicenow_mcp.utils import format_response, generate_correlation_id
 
 # Mapping from human-friendly artifact type names to ServiceNow tables
@@ -51,6 +52,7 @@ def register_tools(
             limit: Maximum number of artifacts to return.
         """
         correlation_id = generate_correlation_id()
+        warnings: list[str] = []
         try:
             table = ARTIFACT_TABLES.get(artifact_type)
             if table is None:
@@ -61,9 +63,8 @@ def register_tools(
                 )
 
             encoded_query = query if query else ""
-
-            effective_limit = min(limit, settings.max_row_limit)
-            warnings: list[str] = []
+            safety = enforce_query_safety(table, encoded_query, limit, settings)
+            effective_limit = safety["limit"]
             if effective_limit < limit:
                 warnings.append(f"Limit capped at {effective_limit}")
 
@@ -152,12 +153,11 @@ def register_tools(
             limit: Maximum number of matches to return per table.
         """
         correlation_id = generate_correlation_id()
+        warnings: list[str] = []
         try:
             effective_limit = min(limit, settings.max_row_limit)
-            warnings: list[str] = []
             if effective_limit < limit:
                 warnings.append(f"Limit capped at {effective_limit}")
-
             matches: list[dict[str, Any]] = []
             search_method = "code_search_api"
 

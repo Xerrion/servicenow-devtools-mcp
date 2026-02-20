@@ -148,7 +148,8 @@ uvx servicenow-devtools-mcp
 ### Optional Environment Variables
 
 - MCP_TOOL_PACKAGE -- Which tools to load: "dev_debug" (default, all tools), "introspection_only" (read-only), "full" (same as dev_debug), "none"
-- SERVICENOW_ENV -- Environment label: "dev" (default), "test", "staging", "prod". Write operations are blocked when set to "prod" unless ALLOW_WRITES_IN_PROD=true.
+- SERVICENOW_ENV -- Environment label: "dev" (default), "test", "staging", "prod". Write operations are blocked when set to "prod" unless ALLOW_WRITES_IN_PROD is set to true.
+- ALLOW_WRITES_IN_PROD -- Set to "true" to allow write operations even when SERVICENOW_ENV is "prod" (default: false).
 - MAX_ROW_LIMIT -- Max records per query (default: 100)
 - LARGE_TABLE_NAMES_CSV -- Tables requiring date-bounded queries (default: syslog,sys_audit,sys_log_transaction,sys_email_log)
 
@@ -341,7 +342,7 @@ The server includes built-in guardrails that are always active:
 - **Row limit caps** -- All queries are capped at `MAX_ROW_LIMIT` (default 100). If a tool requests more, the limit is silently reduced and a warning is included
 - **Large table protection** -- Tables listed in `LARGE_TABLE_NAMES_CSV` require date-bounded filters in queries to prevent full-table scans
 - **Write gating** -- All write operations (`dev_toggle`, `dev_set_property`, `dev_seed_test_data`, `table_preview_update`, etc.) are blocked when `SERVICENOW_ENV=prod`
-- **Standardized responses** -- Every tool returns a JSON envelope with `correlation_id`, `status`, and `data`; `pagination` and `warnings` are included when relevant
+- **Standardized responses** -- Every tool returns a JSON envelope with `correlation_id`, `status`, and `data`, and may include `pagination` and `warnings` when applicable, for consistent error handling
 
 ---
 

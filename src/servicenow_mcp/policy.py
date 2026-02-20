@@ -12,13 +12,22 @@ logger = logging.getLogger(__name__)
 # Tables that must never be accessed via the MCP server
 DENIED_TABLES: set[str] = {
     "sys_user_has_password",
+    "sys_user_has_role",
+    "sys_user_grmember",
     "oauth_credential",
     "oauth_entity",
+    "oauth_token",
     "sys_certificate",
     "sys_ssh_key",
     "sys_credentials",
+    "sys_keystore",
     "discovery_credentials",
+    "mid_server_credential",
+    "ecc_agent_credential",
     "sys_user_token",
+    "sn_auth_token",
+    "sys_user_has_role",
+    "sys_user_grmember",
 }
 
 # Field name patterns that trigger masking

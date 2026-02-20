@@ -159,3 +159,23 @@ class TestSettings:
             settings = Settings(_env_file=None)
 
         assert settings.is_production is False
+
+    def test_allow_writes_in_prod_default_false(self):
+        """ALLOW_WRITES_IN_PROD defaults to False."""
+        from servicenow_mcp.config import Settings
+
+        env = self._make_env()
+        with patch.dict("os.environ", env, clear=True):
+            settings = Settings(_env_file=None)
+
+        assert settings.allow_writes_in_prod is False
+
+    def test_allow_writes_in_prod_can_be_enabled(self):
+        """ALLOW_WRITES_IN_PROD can be set to True via environment variable."""
+        from servicenow_mcp.config import Settings
+
+        env = self._make_env(ALLOW_WRITES_IN_PROD="true")
+        with patch.dict("os.environ", env, clear=True):
+            settings = Settings(_env_file=None)
+
+        assert settings.allow_writes_in_prod is True
