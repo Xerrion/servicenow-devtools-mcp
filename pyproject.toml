@@ -27,6 +27,10 @@ packages = ["src/servicenow_mcp"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+addopts = "-m 'not integration'"
+markers = [
+    "integration: tests that run against a live ServiceNow instance (requires .env.local credentials)",
+]
 
 [dependency-groups]
 dev = [
