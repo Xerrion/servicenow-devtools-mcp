@@ -5,6 +5,7 @@ from typing import Any
 
 from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.policy import check_table_access, mask_sensitive_fields
+from servicenow_mcp.utils import validate_identifier
 
 
 async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any]:
@@ -27,10 +28,10 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
 
     check_table_access(table)
 
-    # Query ACLs for the exact table name
+    # Query ACLs for the table name and field-level ACLs
     acl_result = await client.query_records(
         "sys_security_acl",
-        f"name={table}",
+        f"name={table}^ORnameSTARTSWITH{table}.",
         fields=["sys_id", "name", "operation", "condition", "script", "active"],
         limit=500,
     )
@@ -80,6 +81,8 @@ async def explain(client: ServiceNowClient, element_id: str) -> dict[str, Any]:
 
     element_id is an ACL sys_id.
     """
+    validate_identifier(element_id)
+    check_table_access("sys_security_acl")
     record = mask_sensitive_fields(await client.get_record("sys_security_acl", element_id))
 
     explanation_parts = [

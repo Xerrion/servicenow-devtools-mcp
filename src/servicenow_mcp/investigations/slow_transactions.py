@@ -4,7 +4,8 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from servicenow_mcp.client import ServiceNowClient
-from servicenow_mcp.policy import mask_sensitive_fields
+from servicenow_mcp.policy import check_table_access, mask_sensitive_fields
+from servicenow_mcp.utils import validate_identifier
 
 # ServiceNow performance pattern tables and their finding categories
 PERFORMANCE_TABLES = [
@@ -16,6 +17,8 @@ PERFORMANCE_TABLES = [
     ("sys_interaction_pattern", "slow_interaction"),
     ("syslog_cancellation", "cancelled_transaction"),
 ]
+
+_ALLOWED_TABLES = {t[0] for t in PERFORMANCE_TABLES}
 
 
 async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any]:
@@ -89,6 +92,13 @@ async def explain(client: ServiceNowClient, element_id: str) -> dict[str, Any]:
     element_id format: "table:sys_id".
     """
     table, sys_id = element_id.split(":", 1)
+    if table not in _ALLOWED_TABLES:
+        return {
+            "element": element_id,
+            "error": f"Table '{table}' is not in the allowed tables for this investigation",
+        }
+    validate_identifier(sys_id)
+    check_table_access(table)
     record = mask_sensitive_fields(await client.get_record(table, sys_id))
 
     explanation_parts = [

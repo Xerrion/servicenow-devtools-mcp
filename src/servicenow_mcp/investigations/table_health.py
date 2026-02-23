@@ -44,7 +44,7 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
         ),
         client.query_records(
             "sys_security_acl",
-            f"nameSTARTSWITH{table}",
+            f"name={table}^ORnameSTARTSWITH{table}.",
             fields=["sys_id", "name", "operation"],
             limit=200,
         ),
