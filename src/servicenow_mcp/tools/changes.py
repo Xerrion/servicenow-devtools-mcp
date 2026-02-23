@@ -142,10 +142,9 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             async with ServiceNowClient(settings, auth_provider) as client:
                 versions_result = await client.query_records(
                     "sys_update_version",
-                    f"name={update_name}",
+                    f"name={update_name}^ORDERBYDESCsys_recorded_at",
                     fields=["sys_id", "name", "payload", "sys_recorded_at"],
                     limit=2,
-                    order_by="sys_recorded_at",
                 )
 
             versions = [mask_sensitive_fields(v) for v in versions_result["records"]]
@@ -161,10 +160,13 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     indent=2,
                 )
 
-            old_payload = versions[0].get("payload", "")
-            new_payload = versions[1].get("payload", "")
-            old_date = versions[0].get("sys_recorded_at", "unknown")
-            new_date = versions[1].get("sys_recorded_at", "unknown")
+            # versions[0] is newest (DESC order), versions[1] is second-newest
+            old_version = versions[1]
+            new_version = versions[0]
+            old_payload = old_version.get("payload", "")
+            new_payload = new_version.get("payload", "")
+            old_date = old_version.get("sys_recorded_at", "unknown")
+            new_date = new_version.get("sys_recorded_at", "unknown")
 
             diff_lines = list(
                 difflib.unified_diff(

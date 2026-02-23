@@ -38,26 +38,29 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 )
 
                 # Build lookup tasks for each valid reference field
+                sem = asyncio.Semaphore(10)
+
                 async def _lookup_ref(ref_table: str, ref_field: str) -> dict[str, Any] | None:
                     """Look up records referencing the target via a single reference field."""
-                    try:
-                        check_table_access(ref_table)
-                        ref_records = await client.query_records(
-                            ref_table,
-                            f"{ref_field}={sys_id}",
-                            fields=["sys_id", ref_field],
-                            limit=10,
-                        )
-                        if ref_records["records"]:
-                            masked_records = [mask_sensitive_fields(r) for r in ref_records["records"][:5]]
-                            return {
-                                "table": ref_table,
-                                "field": ref_field,
-                                "count": ref_records["count"],
-                                "sample_records": masked_records,
-                            }
-                    except Exception:
-                        pass
+                    async with sem:
+                        try:
+                            check_table_access(ref_table)
+                            ref_records = await client.query_records(
+                                ref_table,
+                                f"{ref_field}={sys_id}",
+                                fields=["sys_id", ref_field],
+                                limit=10,
+                            )
+                            if ref_records["records"]:
+                                masked_records = [mask_sensitive_fields(r) for r in ref_records["records"][:5]]
+                                return {
+                                    "table": ref_table,
+                                    "field": ref_field,
+                                    "count": ref_records["count"],
+                                    "sample_records": masked_records,
+                                }
+                        except Exception:
+                            pass
                     return None
 
                 tasks = []

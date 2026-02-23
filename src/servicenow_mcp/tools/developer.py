@@ -3,6 +3,7 @@
 import asyncio
 import json
 import uuid
+from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
@@ -187,14 +188,21 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             seed_tag = tag if tag else f"seed-{uuid.uuid4().hex[:8]}"
 
             sys_ids: list[str] = []
+            errors: list[str] = []
             async with ServiceNowClient(settings, auth_provider) as client:
-                created_records = await asyncio.gather(
-                    *(client.create_record(table, record_data) for record_data in record_list)
+                results = await asyncio.gather(
+                    *(client.create_record(table, record_data) for record_data in record_list),
+                    return_exceptions=True,
                 )
-                sys_ids = [created["sys_id"] for created in created_records]
+                for result in results:
+                    if isinstance(result, BaseException):
+                        errors.append(str(result))
+                    else:
+                        sys_ids.append(result["sys_id"])
 
-            # Track for cleanup
-            seed_tracker.track(seed_tag, table, sys_ids)
+            # Track only successful creates for cleanup
+            if sys_ids:
+                seed_tracker.track(seed_tag, table, sys_ids)
 
             return json.dumps(
                 format_response(
@@ -203,6 +211,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                         "created_count": len(sys_ids),
                         "sys_ids": sys_ids,
                         "tag": seed_tag,
+                        "failed_count": len(errors),
+                        "errors": errors,
                     },
                     correlation_id=correlation_id,
                 )
@@ -239,23 +249,43 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 )
 
             deleted_count = 0
+            failed_records: list[dict[str, str]] = []
             async with ServiceNowClient(settings, auth_provider) as client:
-                delete_tasks = []
+                delete_tasks: list[tuple[str, str, Any]] = []
                 for entry in entries:
                     table = entry["table"]
                     for sys_id in entry["sys_ids"]:
-                        delete_tasks.append(client.delete_record(table, sys_id))
-                await asyncio.gather(*delete_tasks)
-                deleted_count = len(delete_tasks)
+                        delete_tasks.append((table, sys_id, client.delete_record(table, sys_id)))
+                results = await asyncio.gather(
+                    *(task for _, _, task in delete_tasks),
+                    return_exceptions=True,
+                )
+                for i, result in enumerate(results):
+                    tbl, sid, _ = delete_tasks[i]
+                    if isinstance(result, BaseException):
+                        failed_records.append({"table": tbl, "sys_id": sid, "error": str(result)})
+                    else:
+                        deleted_count += 1
 
-            # Remove from tracker
-            seed_tracker.remove(tag)
+            # Only remove the tag if ALL deletions succeeded
+            if not failed_records:
+                seed_tracker.remove(tag)
+            else:
+                # Update tracker to keep only failed records
+                remaining: dict[str, list[str]] = {}
+                for fr in failed_records:
+                    remaining.setdefault(fr["table"], []).append(fr["sys_id"])
+                seed_tracker.remove(tag)
+                for tbl, sids in remaining.items():
+                    seed_tracker.track(tag, tbl, sids)
 
             return json.dumps(
                 format_response(
                     data={
                         "tag": tag,
                         "deleted_count": deleted_count,
+                        "failed_count": len(failed_records),
+                        "failed_records": failed_records,
                     },
                     correlation_id=correlation_id,
                 )
