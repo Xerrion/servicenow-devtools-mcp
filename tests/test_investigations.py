@@ -331,6 +331,20 @@ class TestTableHealth:
         assert data["automation"]["client_scripts"]["count"] == 1
         assert data["automation"]["acl_count"] == 2
 
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_rejects_invalid_table_identifier(self, settings, auth_provider):
+        """Rejects a table name containing injection characters."""
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["investigate_run"](
+            investigation="table_health",
+            params='{"table": "incident^active=true"}',
+        )
+        result = json.loads(raw)
+
+        assert result["status"] == "error"
+        assert "Invalid identifier" in result["error"]
+
 
 # ── acl_conflicts ─────────────────────────────────────────────────────────
 

@@ -5,6 +5,7 @@ from typing import Any
 
 from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.policy import check_table_access, mask_sensitive_fields
+from servicenow_mcp.utils import validate_identifier
 
 
 async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any]:
@@ -25,6 +26,7 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
             "findings": [],
         }
 
+    validate_identifier(table)
     check_table_access(table)
 
     # Run all 6 health check queries in parallel
@@ -111,6 +113,7 @@ async def explain(client: ServiceNowClient, element_id: str) -> dict[str, Any]:
     element_id is the table name itself.
     """
     # Re-run a lighter query to get basic table info
+    validate_identifier(element_id)
     stats_result = await client.aggregate(element_id, query="")
     record_count = int(stats_result.get("stats", {}).get("count", 0))
 
