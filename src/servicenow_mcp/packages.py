@@ -12,11 +12,13 @@ PACKAGE_REGISTRY: dict[str, list[str]] = {
         "developer",
         "investigations",
         "documentation",
+        "utility",
     ],
     "introspection_only": [
         "introspection",
         "relationships",
         "metadata",
+        "utility",
     ],
     "full": [
         "introspection",
@@ -27,6 +29,7 @@ PACKAGE_REGISTRY: dict[str, list[str]] = {
         "developer",
         "investigations",
         "documentation",
+        "utility",
     ],
     "none": [],
 }
