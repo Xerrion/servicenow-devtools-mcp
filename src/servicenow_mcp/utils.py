@@ -66,3 +66,111 @@ def build_encoded_query(conditions: dict[str, str] | str) -> str:
     if not conditions:
         return ""
     return "^".join(f"{key}={value}" for key, value in conditions.items())
+
+
+class ServiceNowQuery:
+    """Fluent builder for ServiceNow encoded query strings."""
+
+    def __init__(self) -> None:
+        self._parts: list[str] = []
+
+    # --- Comparison operators ---
+
+    def equals(self, field: str, value: str) -> "ServiceNowQuery":
+        """Add field=value condition."""
+        self._parts.append(f"{field}={value}")
+        return self
+
+    def not_equals(self, field: str, value: str) -> "ServiceNowQuery":
+        """Add field!=value condition."""
+        self._parts.append(f"{field}!={value}")
+        return self
+
+    def greater_than(self, field: str, value: str) -> "ServiceNowQuery":
+        """Add field>value condition."""
+        self._parts.append(f"{field}>{value}")
+        return self
+
+    def greater_or_equal(self, field: str, value: str) -> "ServiceNowQuery":
+        """Add field>=value condition."""
+        self._parts.append(f"{field}>={value}")
+        return self
+
+    def less_than(self, field: str, value: str) -> "ServiceNowQuery":
+        """Add field<value condition."""
+        self._parts.append(f"{field}<{value}")
+        return self
+
+    def less_or_equal(self, field: str, value: str) -> "ServiceNowQuery":
+        """Add field<=value condition."""
+        self._parts.append(f"{field}<={value}")
+        return self
+
+    # --- String operators ---
+
+    def contains(self, field: str, value: str) -> "ServiceNowQuery":
+        """Add fieldCONTAINSvalue condition."""
+        self._parts.append(f"{field}CONTAINS{value}")
+        return self
+
+    def starts_with(self, field: str, value: str) -> "ServiceNowQuery":
+        """Add fieldSTARTSWITHvalue condition."""
+        self._parts.append(f"{field}STARTSWITH{value}")
+        return self
+
+    def like(self, field: str, value: str) -> "ServiceNowQuery":
+        """Add fieldLIKEvalue condition."""
+        self._parts.append(f"{field}LIKE{value}")
+        return self
+
+    # --- Null operators ---
+
+    def is_empty(self, field: str) -> "ServiceNowQuery":
+        """Add fieldISEMPTY condition."""
+        self._parts.append(f"{field}ISEMPTY")
+        return self
+
+    def is_not_empty(self, field: str) -> "ServiceNowQuery":
+        """Add fieldISNOTEMPTY condition."""
+        self._parts.append(f"{field}ISNOTEMPTY")
+        return self
+
+    # --- GlideSystem time filters (server-side, timezone-correct) ---
+
+    def hours_ago(self, field: str, hours: int) -> "ServiceNowQuery":
+        """Add field>=javascript:gs.hoursAgoStart(hours) condition."""
+        self._parts.append(f"{field}>=javascript:gs.hoursAgoStart({hours})")
+        return self
+
+    def minutes_ago(self, field: str, minutes: int) -> "ServiceNowQuery":
+        """Add field>=javascript:gs.minutesAgoStart(minutes) condition."""
+        self._parts.append(f"{field}>=javascript:gs.minutesAgoStart({minutes})")
+        return self
+
+    def days_ago(self, field: str, days: int) -> "ServiceNowQuery":
+        """Add field>=javascript:gs.daysAgoStart(days) condition."""
+        self._parts.append(f"{field}>=javascript:gs.daysAgoStart({days})")
+        return self
+
+    def older_than_days(self, field: str, days: int) -> "ServiceNowQuery":
+        """Add field<=javascript:gs.daysAgoEnd(days) condition for records before the cutoff."""
+        self._parts.append(f"{field}<=javascript:gs.daysAgoEnd({days})")
+        return self
+
+    # --- Raw fragment ---
+
+    def raw(self, fragment: str) -> "ServiceNowQuery":
+        """Append a raw encoded query fragment."""
+        if fragment:
+            self._parts.append(fragment)
+        return self
+
+    # --- Build ---
+
+    def build(self) -> str:
+        """Return the joined encoded query string."""
+        return "^".join(self._parts)
+
+    def __str__(self) -> str:
+        """Return the built query string."""
+        return self.build()

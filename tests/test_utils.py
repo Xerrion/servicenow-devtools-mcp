@@ -103,3 +103,117 @@ class TestBuildEncodedQuery:
 
         query = build_encoded_query("active=true^priority=1")
         assert query == "active=true^priority=1"
+
+
+class TestServiceNowQuery:
+    """Tests for the ServiceNowQuery fluent builder."""
+
+    def test_equals(self):
+        from servicenow_mcp.utils import ServiceNowQuery
+
+        assert ServiceNowQuery().equals("active", "true").build() == "active=true"
+
+    def test_not_equals(self):
+        from servicenow_mcp.utils import ServiceNowQuery
+
+        assert ServiceNowQuery().not_equals("state", "6").build() == "state!=6"
+
+    def test_greater_than(self):
+        from servicenow_mcp.utils import ServiceNowQuery
+
+        assert ServiceNowQuery().greater_than("priority", "3").build() == "priority>3"
+
+    def test_greater_or_equal(self):
+        from servicenow_mcp.utils import ServiceNowQuery
+
+        assert ServiceNowQuery().greater_or_equal("http_status", "400").build() == "http_status>=400"
+
+    def test_less_than(self):
+        from servicenow_mcp.utils import ServiceNowQuery
+
+        assert ServiceNowQuery().less_than("priority", "3").build() == "priority<3"
+
+    def test_less_or_equal(self):
+        from servicenow_mcp.utils import ServiceNowQuery
+
+        assert ServiceNowQuery().less_or_equal("priority", "3").build() == "priority<=3"
+
+    def test_contains(self):
+        from servicenow_mcp.utils import ServiceNowQuery
+
+        assert ServiceNowQuery().contains("script", "GlideRecord").build() == "scriptCONTAINSGlideRecord"
+
+    def test_starts_with(self):
+        from servicenow_mcp.utils import ServiceNowQuery
+
+        assert ServiceNowQuery().starts_with("name", "incident").build() == "nameSTARTSWITHincident"
+
+    def test_like(self):
+        from servicenow_mcp.utils import ServiceNowQuery
+
+        assert ServiceNowQuery().like("source", "incident").build() == "sourceLIKEincident"
+
+    def test_is_empty(self):
+        from servicenow_mcp.utils import ServiceNowQuery
+
+        assert ServiceNowQuery().is_empty("window_end").build() == "window_endISEMPTY"
+
+    def test_is_not_empty(self):
+        from servicenow_mcp.utils import ServiceNowQuery
+
+        assert ServiceNowQuery().is_not_empty("assigned_to").build() == "assigned_toISNOTEMPTY"
+
+    def test_hours_ago(self):
+        from servicenow_mcp.utils import ServiceNowQuery
+
+        result = ServiceNowQuery().hours_ago("sys_created_on", 24).build()
+        assert result == "sys_created_on>=javascript:gs.hoursAgoStart(24)"
+
+    def test_minutes_ago(self):
+        from servicenow_mcp.utils import ServiceNowQuery
+
+        result = ServiceNowQuery().minutes_ago("sys_created_on", 60).build()
+        assert result == "sys_created_on>=javascript:gs.minutesAgoStart(60)"
+
+    def test_days_ago(self):
+        from servicenow_mcp.utils import ServiceNowQuery
+
+        result = ServiceNowQuery().days_ago("sys_created_on", 30).build()
+        assert result == "sys_created_on>=javascript:gs.daysAgoStart(30)"
+
+    def test_older_than_days(self):
+        from servicenow_mcp.utils import ServiceNowQuery
+
+        result = ServiceNowQuery().older_than_days("sys_updated_on", 90).build()
+        assert result == "sys_updated_on<=javascript:gs.daysAgoEnd(90)"
+
+    def test_chaining_multiple_conditions(self):
+        from servicenow_mcp.utils import ServiceNowQuery
+
+        result = (
+            ServiceNowQuery().equals("active", "true").equals("priority", "1").hours_ago("sys_created_on", 24).build()
+        )
+        assert result == "active=true^priority=1^sys_created_on>=javascript:gs.hoursAgoStart(24)"
+
+    def test_raw_fragment(self):
+        from servicenow_mcp.utils import ServiceNowQuery
+
+        result = ServiceNowQuery().equals("active", "true").raw("ORpriority=1").build()
+        assert result == "active=true^ORpriority=1"
+
+    def test_raw_empty_string_ignored(self):
+        from servicenow_mcp.utils import ServiceNowQuery
+
+        result = ServiceNowQuery().equals("active", "true").raw("").build()
+        assert result == "active=true"
+
+    def test_empty_build_returns_empty_string(self):
+        from servicenow_mcp.utils import ServiceNowQuery
+
+        assert ServiceNowQuery().build() == ""
+
+    def test_str_equals_build(self):
+        from servicenow_mcp.utils import ServiceNowQuery
+
+        q = ServiceNowQuery().equals("active", "true").equals("state", "1")
+        assert str(q) == q.build()
