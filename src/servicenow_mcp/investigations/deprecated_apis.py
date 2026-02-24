@@ -69,6 +69,7 @@ async def explain(client: ServiceNowClient, element_id: str) -> dict[str, Any]:
     element_id format: "table:sys_id".
     """
     table, sys_id = element_id.split(":", 1)
+    validate_identifier(table)
     if table not in _ALLOWED_TABLES:
         return {
             "element": element_id,
