@@ -193,6 +193,32 @@ class TestStaleAutomations:
         assert result["status"] == "success"
         assert result["data"]["finding_count"] == 0
 
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_uses_gs_days_ago(self, settings, auth_provider):
+        """Queries use gs.daysAgoEnd instead of Python datetime strings."""
+        respx.get(f"{BASE_URL}/api/now/table/flow_context").mock(
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
+        )
+        respx.get(f"{BASE_URL}/api/now/table/sys_script").mock(
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
+        )
+        respx.get(f"{BASE_URL}/api/now/table/sys_script_include").mock(
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
+        )
+        respx.get(f"{BASE_URL}/api/now/table/sysauto_script").mock(
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
+        )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["investigate_run"](
+            investigation="stale_automations",
+            params='{"stale_days": 30}',
+        )
+        result = json.loads(raw)
+        assert result["status"] == "success"
+        assert result["data"]["params"]["stale_days"] == 30
+
 
 # ── deprecated_apis ───────────────────────────────────────────────────────
 
@@ -327,6 +353,28 @@ class TestTableHealth:
         assert data["automation"]["business_rules"]["count"] == 3
         assert data["automation"]["client_scripts"]["count"] == 1
         assert data["automation"]["acl_count"] == 2
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_filters_by_hours(self, settings, auth_provider):
+        """All queries include time filter when hours is specified."""
+        # Aggregate
+        respx.get(f"{BASE_URL}/api/now/stats/incident").mock(
+            return_value=httpx.Response(200, json={"result": {"stats": {"count": "100"}}})
+        )
+        for table in ["sys_script", "sys_script_client", "sys_security_acl", "sys_ui_policy", "syslog"]:
+            respx.get(f"{BASE_URL}/api/now/table/{table}").mock(
+                return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
+            )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["investigate_run"](
+            investigation="table_health",
+            params='{"table": "incident", "hours": 24}',
+        )
+        result = json.loads(raw)
+        assert result["status"] == "success"
+        assert result["data"]["hours"] == 24
 
 
 # ── acl_conflicts ─────────────────────────────────────────────────────────
@@ -479,6 +527,20 @@ class TestErrorAnalysis:
         assert result["status"] == "success"
         assert result["data"]["finding_count"] == 0
 
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_filters_by_hours(self, settings, auth_provider):
+        """syslog query includes time filter."""
+        respx.get(f"{BASE_URL}/api/now/table/syslog").mock(
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
+        )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["investigate_run"](investigation="error_analysis", params='{"hours": 6}')
+        result = json.loads(raw)
+        assert result["status"] == "success"
+        assert result["data"]["params"]["hours"] == 6
+
 
 # ── slow_transactions ─────────────────────────────────────────────────────
 
@@ -528,6 +590,53 @@ class TestSlowTransactions:
         assert result["data"]["finding_count"] >= 1
         assert result["data"]["findings"][0]["category"] == "slow_query"
 
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_filters_by_hours(self, settings, auth_provider):
+        """Queries include gs.hoursAgoStart time filter."""
+        # Mock all 7 pattern tables
+        for table in [
+            "sys_query_pattern",
+            "sys_transaction_pattern",
+            "sys_script_pattern",
+            "sys_mutex_pattern",
+            "sysevent_pattern",
+            "sys_interaction_pattern",
+            "syslog_cancellation",
+        ]:
+            respx.get(f"{BASE_URL}/api/now/table/{table}").mock(
+                return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
+            )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["investigate_run"](investigation="slow_transactions", params='{"hours": 12}')
+        result = json.loads(raw)
+        assert result["status"] == "success"
+        assert result["data"]["params"]["hours"] == 12
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_default_hours_is_24(self, settings, auth_provider):
+        """Default hours is 24 when not specified."""
+        for table in [
+            "sys_query_pattern",
+            "sys_transaction_pattern",
+            "sys_script_pattern",
+            "sys_mutex_pattern",
+            "sysevent_pattern",
+            "sys_interaction_pattern",
+            "syslog_cancellation",
+        ]:
+            respx.get(f"{BASE_URL}/api/now/table/{table}").mock(
+                return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
+            )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["investigate_run"](investigation="slow_transactions")
+        result = json.loads(raw)
+        assert result["status"] == "success"
+        assert result["data"]["params"]["hours"] == 24
+
 
 # ── performance_bottlenecks ───────────────────────────────────────────────
 
@@ -573,3 +682,43 @@ class TestPerformanceBottlenecks:
         assert result["status"] == "success"
         assert result["data"]["finding_count"] >= 1
         assert result["data"]["findings"][0]["category"] == "heavy_automation"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_filters_by_hours(self, settings, auth_provider):
+        """Queries include time filter when hours is specified."""
+        respx.get(f"{BASE_URL}/api/now/table/sys_script").mock(
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
+        )
+        respx.get(f"{BASE_URL}/api/now/table/sysauto_script").mock(
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
+        )
+        respx.get(f"{BASE_URL}/api/now/table/flow_context").mock(
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
+        )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["investigate_run"](investigation="performance_bottlenecks", params='{"hours": 12}')
+        result = json.loads(raw)
+        assert result["status"] == "success"
+        assert result["data"]["params"]["hours"] == 12
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_no_hours_defaults_to_none(self, settings, auth_provider):
+        """Hours defaults to None when not specified."""
+        respx.get(f"{BASE_URL}/api/now/table/sys_script").mock(
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
+        )
+        respx.get(f"{BASE_URL}/api/now/table/sysauto_script").mock(
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
+        )
+        respx.get(f"{BASE_URL}/api/now/table/flow_context").mock(
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
+        )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["investigate_run"](investigation="performance_bottlenecks")
+        result = json.loads(raw)
+        assert result["status"] == "success"
+        assert result["data"]["params"]["hours"] is None

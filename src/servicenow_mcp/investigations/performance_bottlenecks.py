@@ -1,9 +1,10 @@
-"""Investigation: find performance bottlenecks — heavy automation, frequent jobs, long flows."""
+"""Investigation: find performance bottlenecks - heavy automation, frequent jobs, long flows."""
 
 from collections import Counter
 from typing import Any
 
 from servicenow_mcp.client import ServiceNowClient
+from servicenow_mcp.utils import ServiceNowQuery
 
 HEAVY_AUTOMATION_THRESHOLD = 10
 
@@ -17,15 +18,20 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
     - Long-running flow contexts
 
     Params:
+        hours: Optional lookback period in hours (default None, queries all).
         limit: Maximum findings per category (default 20).
     """
     limit = params.get("limit", 20)
+    hours = params.get("hours")
     findings: list[dict[str, Any]] = []
 
     # 1. Active BRs grouped by collection (table)
+    q = ServiceNowQuery().equals("active", "true")
+    if hours is not None:
+        q.hours_ago("sys_updated_on", hours)
     br_result = await client.query_records(
         "sys_script",
-        "active=true",
+        q.build(),
         fields=["sys_id", "name", "collection", "active"],
         limit=500,
     )
@@ -43,15 +49,21 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
                     "category": "heavy_automation",
                     "element_id": table_name,
                     "name": table_name,
-                    "detail": f"Table '{table_name}' has {count} active business rules (threshold: {HEAVY_AUTOMATION_THRESHOLD})",
+                    "detail": (
+                        f"Table '{table_name}' has {count} active business rules"
+                        f" (threshold: {HEAVY_AUTOMATION_THRESHOLD})"
+                    ),
                     "br_count": count,
                 }
             )
 
     # 2. Frequent scheduled jobs
+    sj_query = ServiceNowQuery().equals("active", "true")
+    if hours is not None:
+        sj_query.hours_ago("sys_updated_on", hours)
     sj_result = await client.query_records(
         "sysauto_script",
-        "active=true",
+        sj_query.build(),
         fields=["sys_id", "name", "run_type", "run_dayofweek", "sys_updated_on"],
         limit=limit,
     )
@@ -67,9 +79,12 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
         )
 
     # 3. Long-running flows (still IN_PROGRESS)
+    flow_query = ServiceNowQuery().equals("state", "IN_PROGRESS")
+    if hours is not None:
+        flow_query.hours_ago("sys_created_on", hours)
     flow_result = await client.query_records(
         "flow_context",
-        "state=IN_PROGRESS",
+        flow_query.build(),
         fields=["sys_id", "name", "state", "sys_created_on"],
         limit=limit,
     )
@@ -87,7 +102,7 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
         "investigation": "performance_bottlenecks",
         "finding_count": len(findings),
         "findings": findings,
-        "params": {"limit": limit},
+        "params": {"hours": hours, "limit": limit},
     }
 
 
@@ -114,9 +129,10 @@ async def explain(client: ServiceNowClient, element_id: str) -> dict[str, Any]:
         stats_result = await client.aggregate(element_id, query="")
         record_count = int(stats_result.get("stats", {}).get("count", 0))
 
+        br_query = ServiceNowQuery().equals("collection", element_id).equals("active", "true").build()
         br_result = await client.query_records(
             "sys_script",
-            f"collection={element_id}^active=true",
+            br_query,
             fields=["sys_id", "name", "when"],
             limit=50,
         )

@@ -4,10 +4,11 @@ from collections import defaultdict
 from typing import Any
 
 from servicenow_mcp.client import ServiceNowClient
+from servicenow_mcp.utils import ServiceNowQuery
 
 
 async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any]:
-    """Find ACL conflicts for a table — multiple ACLs with the same name.
+    """Find ACL conflicts for a table -- multiple ACLs with the same name.
 
     Two or more ACLs with the same name and operation but different conditions
     can cause unpredictable access control behavior.
@@ -25,9 +26,10 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
         }
 
     # Query all ACLs that start with the table name
+    acl_query = ServiceNowQuery().starts_with("name", table).build()
     acl_result = await client.query_records(
         "sys_security_acl",
-        f"nameSTARTSWITH{table}",
+        acl_query,
         fields=["sys_id", "name", "operation", "condition", "script", "active"],
         limit=500,
     )

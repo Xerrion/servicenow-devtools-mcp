@@ -3,6 +3,7 @@
 from typing import Any
 
 from servicenow_mcp.client import ServiceNowClient
+from servicenow_mcp.utils import ServiceNowQuery
 
 
 async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any]:
@@ -13,6 +14,7 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
 
     Params:
         table: The table name to analyze (required).
+        hours: Optional lookback period in hours (default None, queries all).
     """
     table = params.get("table")
     if not table:
@@ -23,50 +25,67 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
             "findings": [],
         }
 
+    hours = params.get("hours")
+
     # 1. Record count via aggregate
     stats_result = await client.aggregate(table, query="")
     record_count = int(stats_result.get("stats", {}).get("count", 0))
 
     # 2. Business rules on this table
+    br_q = ServiceNowQuery().equals("collection", table).equals("active", "true")
+    if hours is not None:
+        br_q.hours_ago("sys_updated_on", hours)
     br_result = await client.query_records(
         "sys_script",
-        f"collection={table}^active=true",
+        br_q.build(),
         fields=["sys_id", "name", "when"],
         limit=200,
     )
     br_records = br_result["records"]
 
     # 3. Client scripts on this table
+    cs_q = ServiceNowQuery().equals("table", table).equals("active", "true")
+    if hours is not None:
+        cs_q.hours_ago("sys_updated_on", hours)
     cs_result = await client.query_records(
         "sys_script_client",
-        f"table={table}^active=true",
+        cs_q.build(),
         fields=["sys_id", "name", "type"],
         limit=200,
     )
     cs_records = cs_result["records"]
 
     # 4. ACLs for this table
+    acl_q = ServiceNowQuery().starts_with("name", table)
+    if hours is not None:
+        acl_q.hours_ago("sys_updated_on", hours)
     acl_result = await client.query_records(
         "sys_security_acl",
-        f"nameSTARTSWITH{table}",
+        acl_q.build(),
         fields=["sys_id", "name", "operation"],
         limit=200,
     )
     acl_records = acl_result["records"]
 
     # 5. UI policies on this table
+    uip_q = ServiceNowQuery().equals("table", table).equals("active", "true")
+    if hours is not None:
+        uip_q.hours_ago("sys_updated_on", hours)
     uip_result = await client.query_records(
         "sys_ui_policy",
-        f"table={table}^active=true",
+        uip_q.build(),
         fields=["sys_id", "short_description"],
         limit=200,
     )
     uip_records = uip_result["records"]
 
     # 6. Recent syslog errors mentioning this table
+    syslog_q = ServiceNowQuery().equals("level", "0").like("source", table)
+    if hours is not None:
+        syslog_q.hours_ago("sys_created_on", hours)
     syslog_result = await client.query_records(
         "syslog",
-        f"level=0^sourceLIKE{table}",
+        syslog_q.build(),
         fields=["sys_id", "message", "source", "sys_created_on"],
         limit=20,
         order_by="sys_created_on",
@@ -85,6 +104,7 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
     return {
         "investigation": "table_health",
         "table": table,
+        "hours": hours,
         "record_count": record_count,
         "automation": {
             "business_rules": {

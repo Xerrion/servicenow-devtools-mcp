@@ -4,6 +4,7 @@ from collections import defaultdict
 from typing import Any
 
 from servicenow_mcp.client import ServiceNowClient
+from servicenow_mcp.utils import ServiceNowQuery
 
 
 async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any]:
@@ -21,13 +22,13 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
     source_filter = params.get("source")
     limit = params.get("limit", 100)
 
-    query = "level=0"
+    q = ServiceNowQuery().equals("level", "0").hours_ago("sys_created_on", hours)
     if source_filter:
-        query += f"^sourceLIKE{source_filter}"
+        q.like("source", source_filter)
 
     syslog_result = await client.query_records(
         "syslog",
-        query,
+        q.build(),
         fields=["sys_id", "message", "source", "level", "sys_created_on"],
         limit=limit,
         order_by="sys_created_on",
