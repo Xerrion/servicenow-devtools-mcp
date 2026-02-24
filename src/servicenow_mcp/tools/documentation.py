@@ -10,7 +10,7 @@ from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.config import Settings
 from servicenow_mcp.tools.metadata import ARTIFACT_TABLES
-from servicenow_mcp.utils import format_response, generate_correlation_id
+from servicenow_mcp.utils import ServiceNowQuery, format_response, generate_correlation_id
 
 
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
@@ -32,7 +32,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 # Business rules
                 br_result = await client.query_records(
                     "sys_script",
-                    f"collection={table}^active=true",
+                    ServiceNowQuery().equals("collection", table).equals("active", "true").build(),
                     fields=[
                         "sys_id",
                         "name",
@@ -49,7 +49,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 # Client scripts
                 cs_result = await client.query_records(
                     "sys_script_client",
-                    f"table={table}^active=true",
+                    ServiceNowQuery().equals("table", table).equals("active", "true").build(),
                     fields=["sys_id", "name", "type", "active"],
                     limit=200,
                 )
@@ -57,7 +57,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 # UI policies
                 uip_result = await client.query_records(
                     "sys_ui_policy",
-                    f"table={table}^active=true",
+                    ServiceNowQuery().equals("table", table).equals("active", "true").build(),
                     fields=["sys_id", "short_description", "active"],
                     limit=200,
                 )
@@ -65,7 +65,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 # UI actions
                 uia_result = await client.query_records(
                     "sys_ui_action",
-                    f"table={table}^active=true",
+                    ServiceNowQuery().equals("table", table).equals("active", "true").build(),
                     fields=["sys_id", "name", "action_name", "active"],
                     limit=200,
                 )
