@@ -4,8 +4,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from servicenow_mcp.client import ServiceNowClient
-from servicenow_mcp.policy import check_table_access, mask_sensitive_fields
-from servicenow_mcp.utils import validate_identifier
+from servicenow_mcp.utils import ServiceNowQuery
 
 # ServiceNow performance pattern tables and their finding categories
 PERFORMANCE_TABLES = [
@@ -32,10 +31,7 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
         limit: Maximum findings per table (default 20).
         categories: Optional comma-separated list of categories to filter.
     """
-    try:
-        hours = max(0, int(params.get("hours", 24)))
-    except (TypeError, ValueError):
-        hours = 24
+    hours = params.get("hours", 24)
     limit = params.get("limit", 20)
     categories_filter = params.get("categories")
     allowed_categories: set[str] | None = None
@@ -51,11 +47,17 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
         if allowed_categories and category not in allowed_categories:
             continue
 
-        # Pattern tables use window queries; syslog_cancellation uses time-bounded query
+        # Pattern tables use window queries; syslog_cancellation uses simple time filter
         if table_name == "syslog_cancellation":
-            query = f"sys_created_on>={cutoff_str}"
+            query = ServiceNowQuery().hours_ago("sys_created_on", hours).build()
         else:
-            query = "window_endISEMPTY^window_startISEMPTY"
+            query = (
+                ServiceNowQuery()
+                .is_empty("window_end")
+                .is_empty("window_start")
+                .hours_ago("sys_created_on", hours)
+                .build()
+            )
 
         try:
             result = await client.query_records(
