@@ -27,6 +27,7 @@ def sanitize_query_value(value: str) -> str:
     """
     return value.replace("^", "^^")
 
+
 def generate_correlation_id() -> str:
     """Generate a unique correlation ID for request tracing."""
     return str(uuid.uuid4())

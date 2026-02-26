@@ -1,4 +1,4 @@
-"""Investigation: find performance bottlenecks -- heavy automation, frequent jobs, long flows."""
+"""Investigation: find performance bottlenecks — heavy automation, frequent jobs, long flows."""
 
 from collections import Counter
 from typing import Any

@@ -1,4 +1,4 @@
-"""Investigation: find stale automations -- stuck flows, disabled scripts, stale jobs."""
+"""Investigation: find stale automations — stuck flows, disabled scripts, stale jobs."""
 
 from typing import Any
 

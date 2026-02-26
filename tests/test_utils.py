@@ -217,4 +217,3 @@ class TestServiceNowQuery:
 
         q = ServiceNowQuery().equals("active", "true").equals("state", "1")
         assert str(q) == q.build()
-

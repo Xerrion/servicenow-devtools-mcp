@@ -220,7 +220,6 @@ class TestStaleAutomations:
         assert result["data"]["params"]["stale_days"] == 30
 
 
-
 # ── deprecated_apis ───────────────────────────────────────────────────────
 
 
@@ -747,6 +746,7 @@ class TestPerformanceBottlenecks:
         assert result["status"] == "success"
         assert result["data"]["params"]["hours"] is None
 
+
 # ── explain() tests for all 7 investigation modules ──────────────────────
 
 
@@ -1213,4 +1213,3 @@ class TestExplainSecurityRestrictions:
 
         assert result["status"] == "error"
         assert "Invalid identifier" in result["error"]
-
