@@ -8,7 +8,14 @@ from mcp.server.fastmcp import FastMCP
 from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.config import Settings
-from servicenow_mcp.utils import ServiceNowQuery, format_response, generate_correlation_id
+from servicenow_mcp.policy import check_table_access, mask_sensitive_fields
+from servicenow_mcp.utils import (
+    ServiceNowQuery,
+    format_response,
+    generate_correlation_id,
+    sanitize_query_value,
+    validate_identifier,
+)
 
 # Mapping from human-friendly artifact type names to ServiceNow tables
 ARTIFACT_TABLES: dict[str, str] = {
@@ -169,7 +176,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     # Fallback to per-table scriptCONTAINS search
                     search_method = "table_scan_fallback"
                     for table in SCRIPT_TABLES:
-                        query = ServiceNowQuery().contains("script", target).build()
+                        query = ServiceNowQuery().contains("script", sanitize_query_value(target)).build()
                         try:
                             check_table_access(table)
                             result = await client.query_records(

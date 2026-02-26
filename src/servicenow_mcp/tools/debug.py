@@ -9,7 +9,14 @@ from mcp.server.fastmcp import FastMCP
 from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.config import Settings
-from servicenow_mcp.utils import ServiceNowQuery, format_response, generate_correlation_id
+from servicenow_mcp.policy import check_table_access, mask_audit_entry, mask_sensitive_fields
+from servicenow_mcp.utils import (
+    ServiceNowQuery,
+    format_response,
+    generate_correlation_id,
+    sanitize_query_value,
+    validate_identifier,
+)
 
 
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
@@ -37,27 +44,66 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             safe_record_sys_id = sanitize_query_value(record_sys_id)
 
             async with ServiceNowClient(settings, auth_provider) as client:
-                # Fetch audit entries
+                # Fetch audit, syslog, and journal entries in parallel
                 audit_query = (
                     ServiceNowQuery()
                     .equals("tablename", table)
-                    .equals("documentkey", record_sys_id)
+                    .equals("documentkey", safe_record_sys_id)
                     .minutes_ago("sys_created_on", minutes)
                     .build()
                 )
-                audit_result = await client.query_records(
-                    "sys_audit",
-                    audit_query,
-                    fields=[
-                        "sys_id",
-                        "user",
-                        "fieldname",
-                        "oldvalue",
-                        "newvalue",
-                        "sys_created_on",
-                    ],
-                    limit=200,
-                    order_by="sys_created_on",
+                syslog_query_builder = ServiceNowQuery().equals("source", table)
+                if record_sys_id:
+                    syslog_query_builder = syslog_query_builder.equals("documentkey", safe_record_sys_id)
+                syslog_query = syslog_query_builder.minutes_ago("sys_created_on", minutes).build()
+                journal_query = (
+                    ServiceNowQuery()
+                    .equals("element_id", safe_record_sys_id)
+                    .minutes_ago("sys_created_on", minutes)
+                    .build()
+                )
+
+                audit_result, syslog_result, journal_result = await asyncio.gather(
+                    client.query_records(
+                        "sys_audit",
+                        audit_query,
+                        fields=[
+                            "sys_id",
+                            "user",
+                            "fieldname",
+                            "oldvalue",
+                            "newvalue",
+                            "sys_created_on",
+                        ],
+                        limit=200,
+                        order_by="sys_created_on",
+                    ),
+                    client.query_records(
+                        "syslog",
+                        syslog_query,
+                        fields=[
+                            "sys_id",
+                            "message",
+                            "source",
+                            "level",
+                            "sys_created_on",
+                        ],
+                        limit=100,
+                        order_by="sys_created_on",
+                    ),
+                    client.query_records(
+                        "sys_journal_field",
+                        journal_query,
+                        fields=[
+                            "sys_id",
+                            "element",
+                            "value",
+                            "sys_created_on",
+                            "sys_created_by",
+                        ],
+                        limit=100,
+                        order_by="sys_created_on",
+                    ),
                 )
 
                 for entry in audit_result["records"]:
@@ -75,24 +121,6 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                         }
                     )
 
-                # Fetch syslog entries (keyed by source document)
-                syslog_query_builder = ServiceNowQuery().equals("source", table)
-                if record_sys_id:
-                    syslog_query_builder = syslog_query_builder.equals("documentkey", record_sys_id)
-                syslog_query = syslog_query_builder.minutes_ago("sys_created_on", minutes).build()
-                syslog_result = await client.query_records(
-                    "syslog",
-                    syslog_query,
-                    fields=[
-                        "sys_id",
-                        "message",
-                        "source",
-                        "level",
-                        "sys_created_on",
-                    ],
-                    limit=100,
-                    order_by="sys_created_on",
-                )
                 for entry in syslog_result["records"]:
                     masked_entry = mask_sensitive_fields(entry)
                     timeline.append(
@@ -104,23 +132,6 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                         }
                     )
 
-                # Fetch journal entries (comments, work notes)
-                journal_query = (
-                    ServiceNowQuery().equals("element_id", record_sys_id).minutes_ago("sys_created_on", minutes).build()
-                )
-                journal_result = await client.query_records(
-                    "sys_journal_field",
-                    journal_query,
-                    fields=[
-                        "sys_id",
-                        "element",
-                        "value",
-                        "sys_created_on",
-                        "sys_created_by",
-                    ],
-                    limit=100,
-                    order_by="sys_created_on",
-                )
                 for entry in journal_result["records"]:
                     masked_entry = mask_sensitive_fields(entry)
                     timeline.append(
@@ -241,7 +252,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             async with ServiceNowClient(settings, auth_provider) as client:
                 email_result = await client.query_records(
                     "sys_email",
-                    ServiceNowQuery().equals("instance", record_sys_id).build(),
+                    ServiceNowQuery().equals("instance", safe_record_sys_id).build(),
                     fields=[
                         "sys_id",
                         "type",

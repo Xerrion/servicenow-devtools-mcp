@@ -5,7 +5,8 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from servicenow_mcp.client import ServiceNowClient
-from servicenow_mcp.utils import ServiceNowQuery
+from servicenow_mcp.policy import check_table_access, mask_sensitive_fields
+from servicenow_mcp.utils import ServiceNowQuery, sanitize_query_value
 
 
 async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any]:
@@ -28,7 +29,7 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
 
     q = ServiceNowQuery().equals("level", "0").hours_ago("sys_created_on", hours)
     if source_filter:
-        q.like("source", source_filter)
+        q.like("source", sanitize_query_value(source_filter))
 
     syslog_result = await client.query_records(
         "syslog",
@@ -80,7 +81,6 @@ async def explain(client: ServiceNowClient, element_id: str) -> dict[str, Any]:
             "element": element_id,
             "error": f"Table '{table}' is not allowed for this investigation; expected 'syslog'",
         }
-    validate_identifier(sys_id)
     check_table_access("syslog")
     record = mask_sensitive_fields(await client.get_record(table, sys_id))
 

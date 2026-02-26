@@ -3,7 +3,8 @@
 from typing import Any
 
 from servicenow_mcp.client import ServiceNowClient
-from servicenow_mcp.utils import ServiceNowQuery
+from servicenow_mcp.policy import check_table_access, mask_sensitive_fields
+from servicenow_mcp.utils import ServiceNowQuery, validate_identifier
 
 _ALLOWED_TABLES = {"flow_context", "sys_script", "sys_script_include", "sysauto_script"}
 
@@ -34,34 +35,6 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
         fields=["sys_id", "name", "state", "sys_created_on"],
         limit=limit,
     )
-
-    # 2. Disabled business rules
-    br_query = ServiceNowQuery().equals("active", "false").build()
-    br_result = await client.query_records(
-        "sys_script",
-        br_query,
-        fields=["sys_id", "name", "collection", "sys_updated_on"],
-        limit=limit,
-    )
-
-    # 3. Disabled script includes
-    si_query = ServiceNowQuery().equals("active", "false").build()
-    si_result = await client.query_records(
-        "sys_script_include",
-        si_query,
-        fields=["sys_id", "name", "api_name", "sys_updated_on"],
-        limit=limit,
-    )
-
-    # 4. Stale scheduled jobs (not updated in > stale_days)
-    sj_query = ServiceNowQuery().older_than_days("sys_updated_on", stale_days).build()
-    sj_result = await client.query_records(
-        "sysauto_script",
-        sj_query,
-        fields=["sys_id", "name", "run_type", "sys_updated_on"],
-        limit=limit,
-    )
-
     for rec in flow_result["records"]:
         masked_rec = mask_sensitive_fields(rec)
         findings.append(
@@ -73,6 +46,14 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
             }
         )
 
+    # 2. Disabled business rules
+    br_query = ServiceNowQuery().equals("active", "false").build()
+    br_result = await client.query_records(
+        "sys_script",
+        br_query,
+        fields=["sys_id", "name", "collection", "sys_updated_on"],
+        limit=limit,
+    )
     for rec in br_result["records"]:
         masked_rec = mask_sensitive_fields(rec)
         findings.append(
@@ -84,6 +65,14 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
             }
         )
 
+    # 3. Disabled script includes
+    si_query = ServiceNowQuery().equals("active", "false").build()
+    si_result = await client.query_records(
+        "sys_script_include",
+        si_query,
+        fields=["sys_id", "name", "api_name", "sys_updated_on"],
+        limit=limit,
+    )
     for rec in si_result["records"]:
         masked_rec = mask_sensitive_fields(rec)
         findings.append(
@@ -95,6 +84,14 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
             }
         )
 
+    # 4. Stale scheduled jobs (not run in > stale_days)
+    sj_query = ServiceNowQuery().older_than_days("last_run", stale_days).build()
+    sj_result = await client.query_records(
+        "sysauto_script",
+        sj_query,
+        fields=["sys_id", "name", "run_type", "last_run"],
+        limit=limit,
+    )
     for rec in sj_result["records"]:
         masked_rec = mask_sensitive_fields(rec)
         findings.append(

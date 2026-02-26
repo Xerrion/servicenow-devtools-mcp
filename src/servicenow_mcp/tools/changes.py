@@ -9,7 +9,14 @@ from mcp.server.fastmcp import FastMCP
 from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.config import Settings
-from servicenow_mcp.utils import ServiceNowQuery, format_response, generate_correlation_id
+from servicenow_mcp.policy import check_table_access, mask_audit_entry, mask_sensitive_fields
+from servicenow_mcp.utils import (
+    ServiceNowQuery,
+    format_response,
+    generate_correlation_id,
+    sanitize_query_value,
+    validate_identifier,
+)
 
 # Artifact types that are considered risky when modified
 RISKY_TYPES = {
@@ -141,7 +148,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             async with ServiceNowClient(settings, auth_provider) as client:
                 versions_result = await client.query_records(
                     "sys_update_version",
-                    ServiceNowQuery().equals("name", update_name).build(),
+                    f"name={update_name}^ORDERBYDESCsys_recorded_at",
                     fields=["sys_id", "name", "payload", "sys_recorded_at"],
                     limit=2,
                 )

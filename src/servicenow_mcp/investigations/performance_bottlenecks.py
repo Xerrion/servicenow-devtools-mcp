@@ -1,10 +1,11 @@
-"""Investigation: find performance bottlenecks - heavy automation, frequent jobs, long flows."""
+"""Investigation: find performance bottlenecks — heavy automation, frequent jobs, long flows."""
 
 from collections import Counter
 from typing import Any
 
 from servicenow_mcp.client import ServiceNowClient
-from servicenow_mcp.utils import ServiceNowQuery
+from servicenow_mcp.policy import check_table_access, mask_sensitive_fields
+from servicenow_mcp.utils import ServiceNowQuery, validate_identifier
 
 HEAVY_AUTOMATION_THRESHOLD = 10
 
@@ -49,10 +50,7 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
                     "category": "heavy_automation",
                     "element_id": table_name,
                     "name": table_name,
-                    "detail": (
-                        f"Table '{table_name}' has {count} active business rules"
-                        f" (threshold: {HEAVY_AUTOMATION_THRESHOLD})"
-                    ),
+                    "detail": f"Table '{table_name}' has {count} active business rules (threshold: {HEAVY_AUTOMATION_THRESHOLD})",
                     "br_count": count,
                 }
             )

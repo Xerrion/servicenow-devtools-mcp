@@ -9,8 +9,14 @@ from mcp.server.fastmcp import FastMCP
 from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.config import Settings
-from servicenow_mcp.policy import check_table_access
-from servicenow_mcp.utils import ServiceNowQuery, format_response, generate_correlation_id
+from servicenow_mcp.policy import check_table_access, mask_sensitive_fields
+from servicenow_mcp.utils import (
+    ServiceNowQuery,
+    format_response,
+    generate_correlation_id,
+    sanitize_query_value,
+    validate_identifier,
+)
 
 
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
@@ -36,23 +42,24 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     fields=["name", "element", "column_label"],
                     limit=100,
                 )
-                references: list[dict[str, Any]] = []
-                for field in ref_fields["records"]:
-                    ref_table = field.get("name", "")
-                    ref_field = field.get("element", "")
-                    if not ref_table or not ref_field:
-                        continue
-                    try:
-                        check_table_access(ref_table)
-                        ref_records = await client.query_records(
-                            ref_table,
-                            ServiceNowQuery().equals(ref_field, sys_id).build(),
-                            fields=["sys_id", ref_field],
-                            limit=10,
-                        )
-                        if ref_records["records"]:
-                            references.append(
-                                {
+
+                # Build lookup tasks for each valid reference field
+                sem = asyncio.Semaphore(10)
+
+                async def _lookup_ref(ref_table: str, ref_field: str) -> dict[str, Any] | None:
+                    """Look up records referencing the target via a single reference field."""
+                    async with sem:
+                        try:
+                            check_table_access(ref_table)
+                            ref_records = await client.query_records(
+                                ref_table,
+                                ServiceNowQuery().equals(ref_field, sanitize_query_value(sys_id)).build(),
+                                fields=["sys_id", ref_field],
+                                limit=10,
+                            )
+                            if ref_records["records"]:
+                                masked_records = [mask_sensitive_fields(r) for r in ref_records["records"][:5]]
+                                return {
                                     "table": ref_table,
                                     "field": ref_field,
                                     "count": ref_records["count"],

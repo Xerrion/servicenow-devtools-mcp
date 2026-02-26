@@ -13,7 +13,7 @@ from servicenow_mcp.config import Settings
 from servicenow_mcp.policy import can_write
 from servicenow_mcp.state import PreviewTokenStore, SeededRecordTracker
 from servicenow_mcp.tools.metadata import ARTIFACT_TABLES
-from servicenow_mcp.utils import ServiceNowQuery, format_response, generate_correlation_id
+from servicenow_mcp.utils import ServiceNowQuery, format_response, generate_correlation_id, validate_identifier
 
 
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
