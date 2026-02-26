@@ -326,6 +326,49 @@ class TestChangesDiffArtifact:
         qs = parse_qs(parsed.query)
         assert "sysparm_orderby" not in qs
 
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_caret_in_sys_id_single_sanitized(self, settings, auth_provider):
+        """sys_id with carets produces single-sanitized update_name (^ → ^^), not double (^ → ^^^^)."""
+        route = respx.get(f"{BASE_URL}/api/now/table/sys_update_version").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": [
+                        {
+                            "sys_id": "v2",
+                            "name": "sys_script_include_abc^^def",
+                            "payload": "<new/>",
+                            "sys_recorded_at": "2026-02-21 10:00:00",
+                        },
+                        {
+                            "sys_id": "v1",
+                            "name": "sys_script_include_abc^^def",
+                            "payload": "<old/>",
+                            "sys_recorded_at": "2026-02-20 10:00:00",
+                        },
+                    ]
+                },
+                headers={"X-Total-Count": "2"},
+            )
+        )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["changes_diff_artifact"](table="sys_script_include", sys_id="abc^def")
+        result = json.loads(raw)
+
+        assert result["status"] == "success"
+        # The update_name should be "sys_script_include_abc^def" (unsanitized),
+        # and the builder's .equals() will sanitize ^ to ^^ in the query.
+        request = route.calls[0].request
+        parsed = urlparse(str(request.url))
+        qs = parse_qs(parsed.query)
+        query_str = qs["sysparm_query"][0]
+        # Single sanitization: the query value should contain abc^^def
+        assert "abc^^def" in query_str
+        # Double sanitization would produce abc^^^^def
+        assert "abc^^^^def" not in query_str
+
 
 class TestChangesLastTouched:
     """Tests for the changes_last_touched tool."""

@@ -1,6 +1,7 @@
 """Tests for metadata tools (meta_list_artifacts, meta_get_artifact, meta_find_references, meta_what_writes)."""
 
 import json
+from urllib.parse import parse_qs, urlparse
 
 import httpx
 import pytest
@@ -354,6 +355,42 @@ class TestMetaFindReferences:
             parsed = urlparse(str(request.url))
             qs = parse_qs(parsed.query)
             assert qs["sysparm_limit"] == [str(settings.max_row_limit)], f"Table '{table}' should have capped limit"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_caret_in_target_single_sanitized(self, settings, auth_provider):
+        """Target with carets is single-sanitized (^ → ^^) in fallback CONTAINS queries."""
+        # Code Search API fails → triggers fallback
+        respx.get(f"{BASE_URL}/api/sn_codesearch/code_search/search").mock(
+            return_value=httpx.Response(404, json={"error": {"message": "Not found"}})
+        )
+
+        routes: dict[str, respx.Route] = {}
+        for table in SCRIPT_TABLES:
+            routes[table] = respx.get(f"{BASE_URL}/api/now/table/{table}").mock(
+                return_value=httpx.Response(
+                    200,
+                    json={"result": []},
+                    headers={"X-Total-Count": "0"},
+                )
+            )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["meta_find_references"](target="foo^bar")
+        result = json.loads(raw)
+
+        assert result["status"] == "success"
+        assert result["data"]["search_method"] == "table_scan_fallback"
+
+        # Verify every fallback query uses single-sanitized value (^^ not ^^^^)
+        for table, route in routes.items():
+            assert route.called, f"Expected query to {table}"
+            request = route.calls[0].request
+            parsed = urlparse(str(request.url))
+            qs = parse_qs(parsed.query)
+            query_str = qs["sysparm_query"][0]
+            assert "foo^^bar" in query_str, f"Table '{table}' should have single-sanitized caret"
+            assert "foo^^^^bar" not in query_str, f"Table '{table}' should not have double-sanitized caret"
 
 
 class TestMetaWhatWrites:

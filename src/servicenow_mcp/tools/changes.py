@@ -14,7 +14,6 @@ from servicenow_mcp.utils import (
     ServiceNowQuery,
     format_response,
     generate_correlation_id,
-    sanitize_query_value,
     validate_identifier,
 )
 
@@ -143,7 +142,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             check_table_access(table)
 
             # Build the update name pattern: {table}_{sys_id}
-            update_name = f"{table}_{sanitize_query_value(sys_id)}"
+            update_name = f"{table}_{sys_id}"
 
             async with ServiceNowClient(settings, auth_provider) as client:
                 versions_result = await client.query_records(

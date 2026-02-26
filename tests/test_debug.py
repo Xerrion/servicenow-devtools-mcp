@@ -1,6 +1,7 @@
 """Tests for debug/trace tools."""
 
 import json
+from urllib.parse import parse_qs, urlparse
 
 import httpx
 import pytest
@@ -142,6 +143,33 @@ class TestDebugTrace:
         raw = await tools["debug_trace"](record_sys_id="inc001", table="incident", minutes=30)
         result = json.loads(raw)
         assert result["status"] == "success"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_caret_in_sys_id_single_sanitized(self, settings, auth_provider):
+        """Values with carets are single-sanitized (^ → ^^), not double (^ → ^^^^)."""
+        audit_route = respx.get(f"{BASE_URL}/api/now/table/sys_audit").mock(
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
+        )
+        respx.get(f"{BASE_URL}/api/now/table/syslog").mock(
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
+        )
+        respx.get(f"{BASE_URL}/api/now/table/sys_journal_field").mock(
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
+        )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["debug_trace"](record_sys_id="abc^def", table="incident", minutes=60)
+        result = json.loads(raw)
+
+        assert result["status"] == "success"
+        # Inspect the audit query: should contain abc^^def (single sanitization)
+        request = audit_route.calls[0].request
+        parsed = urlparse(str(request.url))
+        qs = parse_qs(parsed.query)
+        query_str = qs["sysparm_query"][0]
+        assert "abc^^def" in query_str
+        assert "abc^^^^def" not in query_str
 
 
 class TestDebugFlowExecution:

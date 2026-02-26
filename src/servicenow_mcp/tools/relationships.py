@@ -14,7 +14,6 @@ from servicenow_mcp.utils import (
     ServiceNowQuery,
     format_response,
     generate_correlation_id,
-    sanitize_query_value,
     validate_identifier,
 )
 
@@ -53,7 +52,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                             check_table_access(ref_table)
                             ref_records = await client.query_records(
                                 ref_table,
-                                ServiceNowQuery().equals(ref_field, sanitize_query_value(sys_id)).build(),
+                                ServiceNowQuery().equals(ref_field, sys_id).build(),
                                 fields=["sys_id", ref_field],
                                 limit=10,
                             )

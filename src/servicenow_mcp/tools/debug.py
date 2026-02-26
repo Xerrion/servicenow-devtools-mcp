@@ -14,7 +14,6 @@ from servicenow_mcp.utils import (
     ServiceNowQuery,
     format_response,
     generate_correlation_id,
-    sanitize_query_value,
     validate_identifier,
 )
 
@@ -41,26 +40,22 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             check_table_access(table)
 
             timeline = []
-            safe_record_sys_id = sanitize_query_value(record_sys_id)
 
             async with ServiceNowClient(settings, auth_provider) as client:
                 # Fetch audit, syslog, and journal entries in parallel
                 audit_query = (
                     ServiceNowQuery()
                     .equals("tablename", table)
-                    .equals("documentkey", safe_record_sys_id)
+                    .equals("documentkey", record_sys_id)
                     .minutes_ago("sys_created_on", minutes)
                     .build()
                 )
                 syslog_query_builder = ServiceNowQuery().equals("source", table)
                 if record_sys_id:
-                    syslog_query_builder = syslog_query_builder.equals("documentkey", safe_record_sys_id)
+                    syslog_query_builder = syslog_query_builder.equals("documentkey", record_sys_id)
                 syslog_query = syslog_query_builder.minutes_ago("sys_created_on", minutes).build()
                 journal_query = (
-                    ServiceNowQuery()
-                    .equals("element_id", safe_record_sys_id)
-                    .minutes_ago("sys_created_on", minutes)
-                    .build()
+                    ServiceNowQuery().equals("element_id", record_sys_id).minutes_ago("sys_created_on", minutes).build()
                 )
 
                 audit_result, syslog_result, journal_result = await asyncio.gather(
@@ -248,11 +243,10 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         """
         correlation_id = generate_correlation_id()
         try:
-            safe_record_sys_id = sanitize_query_value(record_sys_id)
             async with ServiceNowClient(settings, auth_provider) as client:
                 email_result = await client.query_records(
                     "sys_email",
-                    ServiceNowQuery().equals("instance", safe_record_sys_id).build(),
+                    ServiceNowQuery().equals("instance", record_sys_id).build(),
                     fields=[
                         "sys_id",
                         "type",

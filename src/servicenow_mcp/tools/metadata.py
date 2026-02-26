@@ -13,7 +13,6 @@ from servicenow_mcp.utils import (
     ServiceNowQuery,
     format_response,
     generate_correlation_id,
-    sanitize_query_value,
     validate_identifier,
 )
 
@@ -179,7 +178,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     # Fallback to per-table scriptCONTAINS search
                     search_method = "table_scan_fallback"
                     for table in SCRIPT_TABLES:
-                        query = ServiceNowQuery().contains("script", sanitize_query_value(target)).build()
+                        query = ServiceNowQuery().contains("script", target).build()
                         try:
                             check_table_access(table)
                             result = await client.query_records(
