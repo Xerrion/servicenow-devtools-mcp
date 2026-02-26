@@ -30,7 +30,7 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
     hours: int | None = None
     if raw_hours is not None:
         try:
-            hours = int(raw_hours)
+            hours = max(1, int(raw_hours))
         except (TypeError, ValueError):
             hours = 24
     findings: list[dict[str, Any]] = []

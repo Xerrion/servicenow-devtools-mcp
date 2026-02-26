@@ -23,7 +23,7 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
         limit: Maximum findings per category (default 20).
     """
     try:
-        stale_days = int(params.get("stale_days", 30))
+        stale_days = max(1, int(params.get("stale_days", 30)))
     except (TypeError, ValueError):
         stale_days = 30
     try:

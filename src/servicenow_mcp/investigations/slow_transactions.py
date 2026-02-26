@@ -32,7 +32,7 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
         categories: Optional comma-separated list of categories to filter.
     """
     try:
-        hours = max(0, int(params.get("hours", 24)))
+        hours = max(1, int(params.get("hours", 24)))
     except (TypeError, ValueError):
         hours = 24
     try:

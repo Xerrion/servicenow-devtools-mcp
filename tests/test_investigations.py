@@ -2016,3 +2016,127 @@ class TestTableHealthExplainCheckTableAccess:
 
         assert result["status"] == "error"
         assert "denied" in result["error"].lower()
+
+
+# ── Clamping: hours/stale_days minimum 1 ──────────────────────────────────
+
+
+class TestClampingMinimumOne:
+    """Tests that hours/stale_days are clamped to a minimum of 1."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_error_analysis_clamps_hours_zero_to_one(self, settings, auth_provider):
+        """error_analysis run() with hours=0 clamps to 1."""
+        from urllib.parse import unquote
+
+        from servicenow_mcp.auth import BasicAuthProvider
+        from servicenow_mcp.client import ServiceNowClient
+        from servicenow_mcp.investigations import error_analysis
+
+        route = respx.get(f"{BASE_URL}/api/now/table/syslog").mock(
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
+        )
+
+        auth = BasicAuthProvider(settings)
+        async with ServiceNowClient(settings, auth) as client:
+            result = await error_analysis.run(client, {"hours": 0})
+
+        assert result["params"]["hours"] == 1
+        # Verify the actual query used hours_ago with value 1
+        request_url = unquote(str(route.calls[0].request.url))
+        assert "javascript:gs.hoursAgoStart(1)" in request_url
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_slow_transactions_clamps_hours_zero_to_one(self, settings, auth_provider):
+        """slow_transactions run() with hours=0 clamps to 1."""
+        from urllib.parse import unquote
+
+        from servicenow_mcp.auth import BasicAuthProvider
+        from servicenow_mcp.client import ServiceNowClient
+        from servicenow_mcp.investigations import slow_transactions
+
+        routes: dict[str, respx.Route] = {}
+        for table in [
+            "sys_query_pattern",
+            "sys_transaction_pattern",
+            "sys_script_pattern",
+            "sys_mutex_pattern",
+            "sysevent_pattern",
+            "sys_interaction_pattern",
+            "syslog_cancellation",
+        ]:
+            routes[table] = respx.get(f"{BASE_URL}/api/now/table/{table}").mock(
+                return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
+            )
+
+        auth = BasicAuthProvider(settings)
+        async with ServiceNowClient(settings, auth) as client:
+            result = await slow_transactions.run(client, {"hours": 0})
+
+        assert result["params"]["hours"] == 1
+        # Verify that syslog_cancellation query used hours_ago with value 1
+        cancellation_url = unquote(str(routes["syslog_cancellation"].calls[0].request.url))
+        assert "javascript:gs.hoursAgoStart(1)" in cancellation_url
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_stale_automations_clamps_stale_days_zero_to_one(self, settings, auth_provider):
+        """stale_automations run() with stale_days=0 clamps to 1."""
+        from urllib.parse import unquote
+
+        from servicenow_mcp.auth import BasicAuthProvider
+        from servicenow_mcp.client import ServiceNowClient
+        from servicenow_mcp.investigations import stale_automations
+
+        flow_route = respx.get(f"{BASE_URL}/api/now/table/flow_context").mock(
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
+        )
+        respx.get(f"{BASE_URL}/api/now/table/sys_script").mock(
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
+        )
+        respx.get(f"{BASE_URL}/api/now/table/sys_script_include").mock(
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
+        )
+        respx.get(f"{BASE_URL}/api/now/table/sysauto_script").mock(
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
+        )
+
+        auth = BasicAuthProvider(settings)
+        async with ServiceNowClient(settings, auth) as client:
+            result = await stale_automations.run(client, {"stale_days": 0})
+
+        assert result["params"]["stale_days"] == 1
+        # Verify the flow_context query used older_than_days with value 1
+        flow_url = unquote(str(flow_route.calls[0].request.url))
+        assert "javascript:gs.daysAgoEnd(1)" in flow_url
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_performance_bottlenecks_clamps_negative_hours_to_one(self, settings, auth_provider):
+        """performance_bottlenecks run() with hours=-5 clamps to 1."""
+        from urllib.parse import unquote
+
+        from servicenow_mcp.auth import BasicAuthProvider
+        from servicenow_mcp.client import ServiceNowClient
+        from servicenow_mcp.investigations import performance_bottlenecks
+
+        sys_script_route = respx.get(f"{BASE_URL}/api/now/table/sys_script").mock(
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
+        )
+        respx.get(f"{BASE_URL}/api/now/table/sysauto_script").mock(
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
+        )
+        respx.get(f"{BASE_URL}/api/now/table/flow_context").mock(
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
+        )
+
+        auth = BasicAuthProvider(settings)
+        async with ServiceNowClient(settings, auth) as client:
+            result = await performance_bottlenecks.run(client, {"hours": -5})
+
+        assert result["params"]["hours"] == 1
+        # Verify the sys_script query used hours_ago with value 1
+        script_url = unquote(str(sys_script_route.calls[0].request.url))
+        assert "javascript:gs.hoursAgoStart(1)" in script_url

@@ -20,7 +20,7 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
         limit: Maximum log entries to fetch (default 100).
     """
     try:
-        hours = max(0, int(params.get("hours", 24)))
+        hours = max(1, int(params.get("hours", 24)))
     except (TypeError, ValueError):
         hours = 24
     source_filter = params.get("source")
