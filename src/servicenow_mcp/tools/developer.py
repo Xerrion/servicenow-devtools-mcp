@@ -10,10 +10,25 @@ from mcp.server.fastmcp import FastMCP
 from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.config import Settings
-from servicenow_mcp.policy import MASK_VALUE, _is_sensitive_field, can_write, check_table_access, mask_sensitive_fields
+from servicenow_mcp.policy import (
+    DENIED_TABLES,
+    MASK_VALUE,
+    _is_sensitive_field,
+    check_table_access,
+    mask_sensitive_fields,
+)
 from servicenow_mcp.state import PreviewTokenStore, SeededRecordTracker
 from servicenow_mcp.tools.metadata import ARTIFACT_TABLES
 from servicenow_mcp.utils import ServiceNowQuery, format_response, generate_correlation_id, validate_identifier
+
+
+def _write_blocked_reason(table: str, settings: "Settings") -> str | None:
+    """Return an error message if writes are blocked, or None if allowed."""
+    if table.lower() in DENIED_TABLES:
+        return f"Write operations are blocked for table '{table}' (restricted table)"
+    if settings.is_production:
+        return "Write operations are blocked in production environments"
+    return None
 
 
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
@@ -48,13 +63,14 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 )
 
             # Write gate
-            if not can_write(table, settings):
+            reason = _write_blocked_reason(table, settings)
+            if reason:
                 return json.dumps(
                     format_response(
                         data=None,
                         correlation_id=correlation_id,
                         status="error",
-                        error="Write operations are blocked in production environments",
+                        error=reason,
                     )
                 )
 
@@ -100,13 +116,14 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         correlation_id = generate_correlation_id()
         try:
             # Write gate
-            if not can_write("sys_properties", settings):
+            reason = _write_blocked_reason("sys_properties", settings)
+            if reason:
                 return json.dumps(
                     format_response(
                         data=None,
                         correlation_id=correlation_id,
                         status="error",
-                        error="Write operations are blocked in production environments",
+                        error=reason,
                     )
                 )
 
@@ -176,13 +193,14 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             check_table_access(table)
 
             # Write gate
-            if not can_write(table, settings):
+            reason = _write_blocked_reason(table, settings)
+            if reason:
                 return json.dumps(
                     format_response(
                         data=None,
                         correlation_id=correlation_id,
                         status="error",
-                        error="Write operations are blocked in production environments",
+                        error=reason,
                     )
                 )
 
@@ -259,15 +277,18 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     )
                 )
 
-            # Write gate — check first entry's table (all entries share same seed context)
+            # Write gate — check each entry's table for access and write permissions
             for entry in entries:
-                if not can_write(entry["table"], settings):
+                tbl = entry["table"]
+                check_table_access(tbl)
+                reason = _write_blocked_reason(tbl, settings)
+                if reason:
                     return json.dumps(
                         format_response(
                             data=None,
                             correlation_id=correlation_id,
                             status="error",
-                            error="Write operations are blocked in production environments",
+                            error=reason,
                         )
                     )
 
@@ -277,9 +298,9 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             async with ServiceNowClient(settings, auth_provider) as client:
                 delete_meta: list[tuple[str, str]] = []
                 for entry in entries:
-                    table = entry["table"]
-                    for sys_id in entry["sys_ids"]:
-                        delete_meta.append((table, sys_id))
+                    tbl = entry["table"]
+                    for sid in entry["sys_ids"]:
+                        delete_meta.append((tbl, sid))
 
                 async def _delete_one(tbl: str, sid: str) -> None:
                     async with sem:
@@ -344,13 +365,14 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             check_table_access(table)
 
             # Write gate
-            if not can_write(table, settings):
+            reason = _write_blocked_reason(table, settings)
+            if reason:
                 return json.dumps(
                     format_response(
                         data=None,
                         correlation_id=correlation_id,
                         status="error",
-                        error="Write operations are blocked in production environments",
+                        error=reason,
                     )
                 )
 
@@ -426,13 +448,14 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
 
             check_table_access(table)
 
-            if not can_write(table, settings):
+            reason = _write_blocked_reason(table, settings)
+            if reason:
                 return json.dumps(
                     format_response(
                         data=None,
                         correlation_id=correlation_id,
                         status="error",
-                        error="Write operations are blocked in production environments",
+                        error=reason,
                     )
                 )
 

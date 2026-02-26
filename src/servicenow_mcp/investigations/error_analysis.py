@@ -34,6 +34,7 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
     q = ServiceNowQuery().equals("level", "0").hours_ago("sys_created_on", hours)
     if source_filter:
         q.like("source", sanitize_query_value(source_filter))
+    q.order_by("sys_created_on", descending=True)
 
     syslog_result = await client.query_records(
         "syslog",

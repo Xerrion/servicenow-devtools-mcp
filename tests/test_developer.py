@@ -833,3 +833,67 @@ class TestTablePreviewUpdateSensitiveField:
         assert "password" in diff
         assert diff["password"]["old"] == "***MASKED***"
         assert diff["password"]["new"] == "***MASKED***"
+
+
+# ── Write-gate: denied table vs production ────────────────────────────────
+
+
+class TestWriteBlockedReason:
+    """Tests for _write_blocked_reason() providing accurate error messages."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_denied_table_non_prod(self, settings, auth_provider):
+        """Write tool returns 'restricted table' error for denied table in non-prod."""
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["dev_seed_test_data"](
+            table="sys_user_has_password",
+            records=json.dumps([{"value": "test"}]),
+        )
+        result = json.loads(raw)
+
+        assert result["status"] == "error"
+        assert "restricted table" in result["error"] or "denied by policy" in result["error"]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_dev_cleanup_denied_table(self, settings, auth_provider):
+        """dev_cleanup returns error when tracker contains a denied table."""
+        from unittest.mock import patch as mock_patch
+
+        tools = _register_and_get_tools(settings, auth_provider)
+
+        with mock_patch(
+            "servicenow_mcp.state.SeededRecordTracker.get",
+            return_value=[{"table": "sys_user_token", "sys_ids": ["rec1"]}],
+        ):
+            raw = await tools["dev_cleanup"](tag="denied-table-tag")
+
+        result = json.loads(raw)
+        assert result["status"] == "error"
+        assert "restricted table" in result["error"] or "denied by policy" in result["error"].lower()
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_dev_cleanup_production_block(self, prod_settings):
+        """dev_cleanup returns 'production environments' error in prod."""
+        from unittest.mock import patch as mock_patch
+
+        from mcp.server.fastmcp import FastMCP
+
+        from servicenow_mcp.tools.developer import register_tools
+
+        prod_auth = BasicAuthProvider(prod_settings)
+        mcp = FastMCP("test")
+        register_tools(mcp, prod_settings, prod_auth)
+        tools = {t.name: t.fn for t in mcp._tool_manager._tools.values()}
+
+        with mock_patch(
+            "servicenow_mcp.state.SeededRecordTracker.get",
+            return_value=[{"table": "incident", "sys_ids": ["rec1"]}],
+        ):
+            raw = await tools["dev_cleanup"](tag="prod-tag")
+
+        result = json.loads(raw)
+        assert result["status"] == "error"
+        assert "production environments" in result["error"]

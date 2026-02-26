@@ -14,7 +14,7 @@ from servicenow_mcp.errors import (
     ServerError,
     ServiceNowMCPError,
 )
-from servicenow_mcp.utils import validate_identifier
+from servicenow_mcp.utils import ServiceNowQuery, validate_identifier
 
 
 class ServiceNowClient:
@@ -157,7 +157,7 @@ class ServiceNowClient:
         """Fetch dictionary metadata for a table from sys_dictionary."""
         http = self._ensure_client()
         params = {
-            "sysparm_query": f"name={table}",
+            "sysparm_query": ServiceNowQuery().equals("name", table).build(),
             "sysparm_limit": "500",
         }
 
