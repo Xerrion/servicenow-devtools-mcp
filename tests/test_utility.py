@@ -144,7 +144,7 @@ class TestBuildQuery:
         raw = tools["build_query"](conditions=conditions)
         result = json.loads(raw)
         assert result["status"] == "success"
-        assert result["data"]["query"] == "state=1^^ORstate=2"
+        assert result["data"]["query"] == "state=1^ORstate=2"
 
     def test_or_starts_with_operator(self, settings, auth_provider):
         """Test or_starts_with OR condition."""
@@ -158,7 +158,7 @@ class TestBuildQuery:
         raw = tools["build_query"](conditions=conditions)
         result = json.loads(raw)
         assert result["status"] == "success"
-        assert result["data"]["query"] == "nameSTARTSWITHINC^^ORnameSTARTSWITHREQ"
+        assert result["data"]["query"] == "nameSTARTSWITHINC^ORnameSTARTSWITHREQ"
 
     def test_in_list_operator(self, settings, auth_provider):
         """Test in_list operator with a list of values."""

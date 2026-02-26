@@ -439,19 +439,19 @@ class TestServiceNowQueryOrConditions:
         from servicenow_mcp.utils import ServiceNowQuery
 
         result = ServiceNowQuery().equals("active", "true").or_equals("priority", "1").build()
-        assert result == "active=true^^ORpriority=1"
+        assert result == "active=true^ORpriority=1"
 
     def test_or_starts_with(self):
         from servicenow_mcp.utils import ServiceNowQuery
 
         result = ServiceNowQuery().equals("active", "true").or_starts_with("name", "inc").build()
-        assert result == "active=true^^ORnameSTARTSWITHinc"
+        assert result == "active=true^ORnameSTARTSWITHinc"
 
     def test_or_condition_with_contains(self):
         from servicenow_mcp.utils import ServiceNowQuery
 
         result = ServiceNowQuery().equals("active", "true").or_condition("script", "CONTAINS", "test").build()
-        assert result == "active=true^^ORscriptCONTAINStest"
+        assert result == "active=true^ORscriptCONTAINStest"
 
     def test_or_condition_unknown_operator_raises(self):
         from servicenow_mcp.utils import ServiceNowQuery
@@ -469,7 +469,7 @@ class TestServiceNowQueryOrConditions:
         from servicenow_mcp.utils import ServiceNowQuery
 
         result = ServiceNowQuery().equals("a", "1").or_equals("b", "x^y").build()
-        assert result == "a=1^^ORb=x^^y"
+        assert result == "a=1^ORb=x^^y"
 
 
 class TestServiceNowQueryOrderBy:

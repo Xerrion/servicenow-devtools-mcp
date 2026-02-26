@@ -282,7 +282,7 @@ class ServiceNowQuery:
         if operator not in _ALLOWED_OPERATORS:
             raise ValueError(f"Unknown operator: {operator!r}. Allowed: {sorted(_ALLOWED_OPERATORS)}")
         value = sanitize_query_value(value)
-        self._parts.append(f"^OR{field}{operator}{value}")
+        self._parts.append(f"OR{field}{operator}{value}")
         return self
 
     def or_equals(self, field: str, value: str) -> "ServiceNowQuery":

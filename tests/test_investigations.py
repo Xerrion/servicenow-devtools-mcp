@@ -323,7 +323,7 @@ class TestTableHealth:
         # ACLs — query now includes exact name match OR field-level prefix
         respx.get(
             f"{BASE_URL}/api/now/table/sys_security_acl",
-            params__contains={"sysparm_query": "name=incident^^ORnameSTARTSWITHincident."},
+            params__contains={"sysparm_query": "name=incident^ORnameSTARTSWITHincident."},
         ).mock(
             return_value=httpx.Response(
                 200,
@@ -406,7 +406,7 @@ class TestAclConflicts:
         """Detects two ACLs with the same name but different conditions."""
         respx.get(
             f"{BASE_URL}/api/now/table/sys_security_acl",
-            params__contains={"sysparm_query": "name=incident^^ORnameSTARTSWITHincident."},
+            params__contains={"sysparm_query": "name=incident^ORnameSTARTSWITHincident."},
         ).mock(
             return_value=httpx.Response(
                 200,
@@ -447,7 +447,7 @@ class TestAclConflicts:
         """Unique ACL names produce no conflicts."""
         respx.get(
             f"{BASE_URL}/api/now/table/sys_security_acl",
-            params__contains={"sysparm_query": "name=incident^^ORnameSTARTSWITHincident."},
+            params__contains={"sysparm_query": "name=incident^ORnameSTARTSWITHincident."},
         ).mock(
             return_value=httpx.Response(
                 200,
