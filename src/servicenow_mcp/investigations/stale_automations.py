@@ -34,6 +34,7 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
     findings: list[dict[str, Any]] = []
 
     # 1. Stuck flow contexts (IN_PROGRESS created before cutoff)
+    check_table_access("flow_context")
     flow_query = ServiceNowQuery().equals("state", "IN_PROGRESS").older_than_days("sys_created_on", stale_days).build()
     flow_result = await client.query_records(
         "flow_context",
@@ -53,6 +54,7 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
         )
 
     # 2. Disabled business rules
+    check_table_access("sys_script")
     br_query = ServiceNowQuery().equals("active", "false").build()
     br_result = await client.query_records(
         "sys_script",
@@ -72,6 +74,7 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
         )
 
     # 3. Disabled script includes
+    check_table_access("sys_script_include")
     si_query = ServiceNowQuery().equals("active", "false").build()
     si_result = await client.query_records(
         "sys_script_include",
@@ -91,6 +94,7 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
         )
 
     # 4. Stale scheduled jobs (not run in > stale_days)
+    check_table_access("sysauto_script")
     sj_query = ServiceNowQuery().older_than_days("last_run", stale_days).build()
     sj_result = await client.query_records(
         "sysauto_script",

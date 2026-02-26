@@ -170,6 +170,17 @@ class TestChangesUpdatesetInspect:
         assert result["status"] == "success"
         assert result["data"]["total_members"] == 0
 
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_rejects_invalid_update_set_id(self, settings, auth_provider):
+        """Returns error when update_set_id contains invalid characters."""
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["changes_updateset_inspect"](update_set_id="invalid;id")
+        result = json.loads(raw)
+
+        assert result["status"] == "error"
+        assert "invalid identifier" in result["error"].lower()
+
 
 class TestChangesDiffArtifact:
     """Tests for the changes_diff_artifact tool."""
@@ -520,3 +531,14 @@ class TestChangesReleaseNotes:
 
         assert result["status"] == "success"
         assert "Empty Release" in result["data"]["release_notes"]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_rejects_invalid_update_set_id(self, settings, auth_provider):
+        """Returns error when update_set_id contains invalid characters."""
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["changes_release_notes"](update_set_id="invalid;id")
+        result = json.loads(raw)
+
+        assert result["status"] == "error"
+        assert "invalid identifier" in result["error"].lower()

@@ -102,6 +102,26 @@ class TestDevToggle:
 
         assert result["status"] == "error"
 
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_denied_table_returns_error(self, settings, auth_provider):
+        """Returns error when resolved table is denied by policy."""
+        from unittest.mock import patch as mock_patch
+
+        from servicenow_mcp.errors import ForbiddenError
+
+        tools = _register_and_get_tools(settings, auth_provider)
+
+        with mock_patch(
+            "servicenow_mcp.tools.developer.check_table_access",
+            side_effect=ForbiddenError("Access forbidden"),
+        ):
+            raw = await tools["dev_toggle"](artifact_type="business_rule", sys_id="br001", active=False)
+
+        result = json.loads(raw)
+        assert result["status"] == "error"
+        assert "forbidden" in result["error"].lower()
+
 
 # ── dev_set_property ──────────────────────────────────────────────────────
 
@@ -617,6 +637,20 @@ class TestTablePreviewUpdateSecurity:
         result = json.loads(raw)
         assert result["status"] == "error"
         assert "denied" in result["error"].lower()
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_table_preview_update_invalid_sys_id(self, settings, auth_provider):
+        """Preview returns error when sys_id contains invalid characters."""
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["table_preview_update"](
+            table="incident",
+            sys_id="invalid;id",
+            changes=json.dumps({"state": "2"}),
+        )
+        result = json.loads(raw)
+        assert result["status"] == "error"
+        assert "invalid identifier" in result["error"].lower()
 
 
 class TestDevSeedTestDataSecurity:

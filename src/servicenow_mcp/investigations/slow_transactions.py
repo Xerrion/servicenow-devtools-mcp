@@ -51,6 +51,7 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
             continue
 
         # Pattern tables use window queries; syslog_cancellation uses time-bounded query
+        check_table_access(table_name)
         if table_name == "syslog_cancellation":
             query = ServiceNowQuery().hours_ago("sys_created_on", hours).build()
         else:

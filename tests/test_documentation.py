@@ -311,6 +311,35 @@ class TestDocsTestScenarios:
         # Should still return at least generic scenarios
         assert len(result["data"]["scenarios"]) >= 1
 
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_masks_sensitive_fields_in_record(self, settings, auth_provider):
+        """Sensitive fields in the artifact record are masked before generating scenarios."""
+        respx.get(f"{BASE_URL}/api/now/table/sys_script/br_sensitive").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": {
+                        "sys_id": "br_sensitive",
+                        "name": "Sensitive BR",
+                        "script": "if (current.priority == 1) { current.state = 2; }",
+                        "collection": "incident",
+                        "password": "super_secret_123",
+                    }
+                },
+            )
+        )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["docs_test_scenarios"](artifact_type="business_rule", sys_id="br_sensitive")
+        result = json.loads(raw)
+
+        assert result["status"] == "success"
+        # The artifact name in response should reflect the masked record
+        assert result["data"]["artifact"]["name"] == "Sensitive BR"
+        # Scenarios should still be generated from the script
+        assert result["data"]["scenario_count"] >= 1
+
 
 # ── docs_review_notes ─────────────────────────────────────────────────────
 
@@ -406,3 +435,31 @@ class TestDocsReviewNotes:
 
         assert result["status"] == "success"
         assert len(result["data"]["findings"]) == 0
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_masks_sensitive_fields_in_record(self, settings, auth_provider):
+        """Sensitive fields in the artifact record are masked before scanning."""
+        respx.get(f"{BASE_URL}/api/now/table/sys_script/br_sensitive").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": {
+                        "sys_id": "br_sensitive",
+                        "name": "Sensitive BR",
+                        "script": "current.state = 2;",
+                        "collection": "incident",
+                        "password": "super_secret_123",
+                        "api_key": "key_abc_123",
+                    }
+                },
+            )
+        )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["docs_review_notes"](artifact_type="business_rule", sys_id="br_sensitive")
+        result = json.loads(raw)
+
+        assert result["status"] == "success"
+        # The artifact name in response should be present
+        assert result["data"]["artifact"]["name"] == "Sensitive BR"

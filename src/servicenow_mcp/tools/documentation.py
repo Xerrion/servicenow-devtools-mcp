@@ -256,6 +256,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             async with ServiceNowClient(settings, auth_provider) as client:
                 record = await client.get_record(table, sys_id)
 
+            record = mask_sensitive_fields(record)
             script = record.get("script", "")
             scenarios = _generate_test_scenarios(script, record)
 
@@ -313,6 +314,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             async with ServiceNowClient(settings, auth_provider) as client:
                 record = await client.get_record(table, sys_id)
 
+            record = mask_sensitive_fields(record)
             script = record.get("script", "")
             findings = _scan_for_anti_patterns(script)
 

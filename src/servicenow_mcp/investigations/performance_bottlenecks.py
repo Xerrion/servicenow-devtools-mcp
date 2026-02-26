@@ -36,6 +36,7 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
     findings: list[dict[str, Any]] = []
 
     # 1. Active BRs grouped by collection (table)
+    check_table_access("sys_script")
     q = ServiceNowQuery().equals("active", "true")
     if hours is not None:
         q.hours_ago("sys_updated_on", hours)
@@ -65,6 +66,7 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
             )
 
     # 2. Frequent scheduled jobs
+    check_table_access("sysauto_script")
     sj_query = ServiceNowQuery().equals("active", "true")
     if hours is not None:
         sj_query.hours_ago("sys_updated_on", hours)
@@ -87,6 +89,7 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
         )
 
     # 3. Long-running flows (still IN_PROGRESS)
+    check_table_access("flow_context")
     flow_query = ServiceNowQuery().equals("state", "IN_PROGRESS")
     if hours is not None:
         flow_query.hours_ago("sys_created_on", hours)

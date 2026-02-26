@@ -42,6 +42,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         """
         correlation_id = generate_correlation_id()
         try:
+            validate_identifier(update_set_id)
+
             async with ServiceNowClient(settings, auth_provider) as client:
                 # Fetch update set metadata
                 update_set = await client.get_record(
@@ -289,6 +291,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         """
         correlation_id = generate_correlation_id()
         try:
+            validate_identifier(update_set_id)
+
             async with ServiceNowClient(settings, auth_provider) as client:
                 # Fetch update set metadata
                 update_set = await client.get_record(

@@ -138,6 +138,7 @@ async def explain(client: ServiceNowClient, element_id: str) -> dict[str, Any]:
     """
     # Re-run a lighter query to get basic table info
     validate_identifier(element_id)
+    check_table_access(element_id)
     stats_result = await client.aggregate(element_id, query="")
     record_count = int(stats_result.get("stats", {}).get("count", 0))
 

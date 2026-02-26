@@ -62,6 +62,9 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     )
                 )
 
+            check_table_access(table)
+            validate_identifier(sys_id)
+
             # Write gate
             reason = _write_blocked_reason(table, settings)
             if reason:
@@ -116,6 +119,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         correlation_id = generate_correlation_id()
         try:
             # Write gate
+            check_table_access("sys_properties")
             reason = _write_blocked_reason("sys_properties", settings)
             if reason:
                 return json.dumps(
@@ -362,6 +366,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         correlation_id = generate_correlation_id()
         try:
             validate_identifier(table)
+            validate_identifier(sys_id)
             check_table_access(table)
 
             # Write gate

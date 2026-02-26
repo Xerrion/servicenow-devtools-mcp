@@ -1906,3 +1906,113 @@ class TestTableHealthCoverage:
         assert "business rule" in indicators_text.lower()
         assert "acl" in indicators_text.lower()
         assert "errors" in indicators_text.lower()
+
+
+# ── check_table_access enforcement in run() functions ─────────────────────
+
+
+class TestPerformanceBottlenecksCheckTableAccess:
+    """Tests that performance_bottlenecks run() calls check_table_access for each queried table."""
+
+    @pytest.mark.asyncio
+    async def test_run_raises_on_denied_sys_script(self, settings, auth_provider):
+        """run() raises PolicyError when sys_script is denied."""
+        from unittest.mock import patch
+
+        from servicenow_mcp.errors import PolicyError
+
+        tools = _register_and_get_tools(settings, auth_provider)
+
+        def deny_sys_script(table: str) -> None:
+            if table == "sys_script":
+                raise PolicyError(f"Access to table '{table}' is denied by policy")
+
+        with patch(
+            "servicenow_mcp.investigations.performance_bottlenecks.check_table_access",
+            side_effect=deny_sys_script,
+        ):
+            raw = await tools["investigate_run"](investigation="performance_bottlenecks")
+            result = json.loads(raw)
+
+        assert result["status"] == "error"
+        assert "denied" in result["error"].lower()
+
+
+class TestSlowTransactionsCheckTableAccess:
+    """Tests that slow_transactions run() calls check_table_access for each queried table."""
+
+    @pytest.mark.asyncio
+    async def test_run_raises_on_denied_table(self, settings, auth_provider):
+        """run() raises PolicyError when a performance pattern table is denied."""
+        from unittest.mock import patch
+
+        from servicenow_mcp.errors import PolicyError
+
+        tools = _register_and_get_tools(settings, auth_provider)
+
+        def deny_first_table(table: str) -> None:
+            if table == "sys_query_pattern":
+                raise PolicyError(f"Access to table '{table}' is denied by policy")
+
+        with patch(
+            "servicenow_mcp.investigations.slow_transactions.check_table_access",
+            side_effect=deny_first_table,
+        ):
+            raw = await tools["investigate_run"](investigation="slow_transactions")
+            result = json.loads(raw)
+
+        assert result["status"] == "error"
+        assert "denied" in result["error"].lower()
+
+
+class TestStaleAutomationsCheckTableAccess:
+    """Tests that stale_automations run() calls check_table_access for each queried table."""
+
+    @pytest.mark.asyncio
+    async def test_run_raises_on_denied_flow_context(self, settings, auth_provider):
+        """run() raises PolicyError when flow_context is denied."""
+        from unittest.mock import patch
+
+        from servicenow_mcp.errors import PolicyError
+
+        tools = _register_and_get_tools(settings, auth_provider)
+
+        def deny_flow_context(table: str) -> None:
+            if table == "flow_context":
+                raise PolicyError(f"Access to table '{table}' is denied by policy")
+
+        with patch(
+            "servicenow_mcp.investigations.stale_automations.check_table_access",
+            side_effect=deny_flow_context,
+        ):
+            raw = await tools["investigate_run"](investigation="stale_automations")
+            result = json.loads(raw)
+
+        assert result["status"] == "error"
+        assert "denied" in result["error"].lower()
+
+
+class TestTableHealthExplainCheckTableAccess:
+    """Tests that table_health explain() calls check_table_access."""
+
+    @pytest.mark.asyncio
+    async def test_explain_raises_on_denied_table(self, settings, auth_provider):
+        """explain() raises PolicyError when the element_id table is denied."""
+        from unittest.mock import patch
+
+        from servicenow_mcp.errors import PolicyError
+
+        tools = _register_and_get_tools(settings, auth_provider)
+
+        with patch(
+            "servicenow_mcp.investigations.table_health.check_table_access",
+            side_effect=PolicyError("Access to table 'incident' is denied by policy"),
+        ):
+            raw = await tools["investigate_explain"](
+                investigation="table_health",
+                element_id="incident",
+            )
+            result = json.loads(raw)
+
+        assert result["status"] == "error"
+        assert "denied" in result["error"].lower()
