@@ -323,7 +323,7 @@ class TestTableHealth:
         # ACLs — query now includes exact name match OR field-level prefix
         respx.get(
             f"{BASE_URL}/api/now/table/sys_security_acl",
-            params__contains={"sysparm_query": "name=incident^ORnameSTARTSWITHincident."},
+            params__contains={"sysparm_query": "name=incident^^ORnameSTARTSWITHincident."},
         ).mock(
             return_value=httpx.Response(
                 200,
@@ -406,7 +406,7 @@ class TestAclConflicts:
         """Detects two ACLs with the same name but different conditions."""
         respx.get(
             f"{BASE_URL}/api/now/table/sys_security_acl",
-            params__contains={"sysparm_query": "name=incident^ORnameSTARTSWITHincident."},
+            params__contains={"sysparm_query": "name=incident^^ORnameSTARTSWITHincident."},
         ).mock(
             return_value=httpx.Response(
                 200,
@@ -447,7 +447,7 @@ class TestAclConflicts:
         """Unique ACL names produce no conflicts."""
         respx.get(
             f"{BASE_URL}/api/now/table/sys_security_acl",
-            params__contains={"sysparm_query": "name=incident^ORnameSTARTSWITHincident."},
+            params__contains={"sysparm_query": "name=incident^^ORnameSTARTSWITHincident."},
         ).mock(
             return_value=httpx.Response(
                 200,
@@ -1213,3 +1213,252 @@ class TestExplainSecurityRestrictions:
 
         assert result["status"] == "error"
         assert "Invalid identifier" in result["error"]
+
+
+# ── WP5: element_id split guard tests ────────────────────────────────────
+
+
+class TestExplainElementIdSplitGuard:
+    """Tests that explain() returns an error dict for element_ids with no colon."""
+
+    @pytest.mark.asyncio
+    async def test_deprecated_apis_no_colon(self, settings, auth_provider):
+        """deprecated_apis explain() returns error for element_id without colon."""
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["investigate_explain"](
+            investigation="deprecated_apis",
+            element_id="invalid_no_colon",
+        )
+        result = json.loads(raw)
+
+        assert result["status"] == "success"
+        assert "error" in result["data"]
+        assert "expected 'table:sys_id'" in result["data"]["error"]
+
+    @pytest.mark.asyncio
+    async def test_error_analysis_no_colon(self, settings, auth_provider):
+        """error_analysis explain() returns error for element_id without colon."""
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["investigate_explain"](
+            investigation="error_analysis",
+            element_id="invalid_no_colon",
+        )
+        result = json.loads(raw)
+
+        assert result["status"] == "success"
+        assert "error" in result["data"]
+        assert "expected 'table:sys_id'" in result["data"]["error"]
+
+    @pytest.mark.asyncio
+    async def test_slow_transactions_no_colon(self, settings, auth_provider):
+        """slow_transactions explain() returns error for element_id without colon."""
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["investigate_explain"](
+            investigation="slow_transactions",
+            element_id="invalid_no_colon",
+        )
+        result = json.loads(raw)
+
+        assert result["status"] == "success"
+        assert "error" in result["data"]
+        assert "expected 'table:sys_id'" in result["data"]["error"]
+
+    @pytest.mark.asyncio
+    async def test_stale_automations_no_colon(self, settings, auth_provider):
+        """stale_automations explain() returns error for element_id without colon."""
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["investigate_explain"](
+            investigation="stale_automations",
+            element_id="invalid_no_colon",
+        )
+        result = json.loads(raw)
+
+        assert result["status"] == "success"
+        assert "error" in result["data"]
+        assert "expected 'table:sys_id'" in result["data"]["error"]
+
+
+# ── WP5: Type coercion tests ─────────────────────────────────────────────
+
+
+class TestTypeCoercion:
+    """Tests that numeric params passed as strings are properly coerced."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_slow_transactions_string_limit(self, settings, auth_provider):
+        """slow_transactions run() accepts limit as a string."""
+        for table in [
+            "sys_query_pattern",
+            "sys_transaction_pattern",
+            "sys_script_pattern",
+            "sys_mutex_pattern",
+            "sysevent_pattern",
+            "sys_interaction_pattern",
+            "syslog_cancellation",
+        ]:
+            respx.get(f"{BASE_URL}/api/now/table/{table}").mock(
+                return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
+            )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["investigate_run"](
+            investigation="slow_transactions",
+            params='{"limit": "50"}',
+        )
+        result = json.loads(raw)
+        assert result["status"] == "success"
+        assert result["data"]["params"]["limit"] == 50
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_stale_automations_string_stale_days(self, settings, auth_provider):
+        """stale_automations run() accepts stale_days as a string."""
+        for table in ["flow_context", "sys_script", "sys_script_include", "sysauto_script"]:
+            respx.get(f"{BASE_URL}/api/now/table/{table}").mock(
+                return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
+            )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["investigate_run"](
+            investigation="stale_automations",
+            params='{"stale_days": "30", "limit": "10"}',
+        )
+        result = json.loads(raw)
+        assert result["status"] == "success"
+        assert result["data"]["params"]["stale_days"] == 30
+        assert result["data"]["params"]["limit"] == 10
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_performance_bottlenecks_string_hours_and_limit(self, settings, auth_provider):
+        """performance_bottlenecks run() accepts hours and limit as strings."""
+        respx.get(f"{BASE_URL}/api/now/table/sys_script").mock(
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
+        )
+        respx.get(f"{BASE_URL}/api/now/table/sysauto_script").mock(
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
+        )
+        respx.get(f"{BASE_URL}/api/now/table/flow_context").mock(
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
+        )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["investigate_run"](
+            investigation="performance_bottlenecks",
+            params='{"hours": "12", "limit": "5"}',
+        )
+        result = json.loads(raw)
+        assert result["status"] == "success"
+        assert result["data"]["params"]["hours"] == 12
+        assert result["data"]["params"]["limit"] == 5
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_table_health_string_hours(self, settings, auth_provider):
+        """table_health run() accepts hours as a string."""
+        respx.get(f"{BASE_URL}/api/now/stats/incident").mock(
+            return_value=httpx.Response(200, json={"result": {"stats": {"count": "100"}}})
+        )
+        for table in ["sys_script", "sys_script_client", "sys_security_acl", "sys_ui_policy", "syslog"]:
+            respx.get(f"{BASE_URL}/api/now/table/{table}").mock(
+                return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
+            )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["investigate_run"](
+            investigation="table_health",
+            params='{"table": "incident", "hours": "48"}',
+        )
+        result = json.loads(raw)
+        assert result["status"] == "success"
+        assert result["data"]["hours"] == 48
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_deprecated_apis_string_limit(self, settings, auth_provider):
+        """deprecated_apis run() accepts limit as a string."""
+        respx.get(f"{BASE_URL}/api/sn_codesearch/code_search/search").mock(
+            return_value=httpx.Response(200, json={"result": {"search_results": []}})
+        )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["investigate_run"](
+            investigation="deprecated_apis",
+            params='{"limit": "50"}',
+        )
+        result = json.loads(raw)
+        assert result["status"] == "success"
+        assert result["data"]["params"]["limit"] == 50
+
+
+# ── WP5: check_table_access test for error_analysis ──────────────────────
+
+
+class TestErrorAnalysisCheckTableAccess:
+    """Tests that error_analysis run() calls check_table_access."""
+
+    @pytest.mark.asyncio
+    async def test_check_table_access_propagates_through_dispatcher(self, settings, auth_provider):
+        """error_analysis run() propagates PolicyError through the dispatcher."""
+        from unittest.mock import patch
+
+        from servicenow_mcp.errors import PolicyError
+
+        tools = _register_and_get_tools(settings, auth_provider)
+
+        with patch(
+            "servicenow_mcp.investigations.error_analysis.check_table_access",
+            side_effect=PolicyError("Access to table 'syslog' is denied by policy"),
+        ):
+            raw = await tools["investigate_run"](investigation="error_analysis")
+            result = json.loads(raw)
+
+        assert result["status"] == "error"
+        assert "denied" in result["error"].lower()
+
+
+# ── WP5: validate_identifier + check_table_access for perf bottlenecks ───
+
+
+class TestPerformanceBottlenecksElseBranch:
+    """Tests for performance_bottlenecks explain() else-branch (table name only)."""
+
+    @pytest.mark.asyncio
+    async def test_explain_invalid_table_chars(self, settings, auth_provider):
+        """explain() with invalid chars in table name raises ValueError."""
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["investigate_explain"](
+            investigation="performance_bottlenecks",
+            element_id="INVALID_TABLE",
+        )
+        result = json.loads(raw)
+
+        assert result["status"] == "error"
+        assert "Invalid identifier" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_explain_special_chars_table(self, settings, auth_provider):
+        """explain() with special chars in table name (no colon) raises ValueError."""
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["investigate_explain"](
+            investigation="performance_bottlenecks",
+            element_id="my-table!",
+        )
+        result = json.loads(raw)
+
+        assert result["status"] == "error"
+        assert "Invalid identifier" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_explain_denied_table_else_branch(self, settings, auth_provider):
+        """explain() with a denied table name in the else-branch returns error."""
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["investigate_explain"](
+            investigation="performance_bottlenecks",
+            element_id="sys_user_token",
+        )
+        result = json.loads(raw)
+
+        assert result["status"] == "error"
+        assert "denied" in result["error"].lower()

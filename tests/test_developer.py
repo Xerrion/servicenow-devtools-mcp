@@ -517,3 +517,219 @@ class TestDeveloperErrorHandling:
         retry_result = json.loads(retry_raw)
         assert retry_result["status"] == "success"
         assert retry_result["data"]["deleted_count"] == 1
+
+
+# ── Security: write gating & table access ────────────────────────────────
+
+
+class TestDevCleanupWriteGate:
+    """Tests for write-gate enforcement on dev_cleanup."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_dev_cleanup_blocked_in_production(self, prod_settings):
+        """Cleanup returns error when environment is production."""
+        from unittest.mock import patch as mock_patch
+
+        from mcp.server.fastmcp import FastMCP
+
+        from servicenow_mcp.tools.developer import register_tools
+
+        prod_auth = BasicAuthProvider(prod_settings)
+        mcp = FastMCP("test")
+        register_tools(mcp, prod_settings, prod_auth)
+        tools = {t.name: t.fn for t in mcp._tool_manager._tools.values()}
+
+        # Patch SeededRecordTracker.get to return a fake entry so the tag lookup succeeds
+        with mock_patch(
+            "servicenow_mcp.state.SeededRecordTracker.get",
+            return_value=[{"table": "incident", "sys_ids": ["rec1"]}],
+        ):
+            raw = await tools["dev_cleanup"](tag="test-tag")
+
+        result = json.loads(raw)
+        assert result["status"] == "error"
+        assert "blocked" in result["error"].lower() or "production" in result["error"].lower()
+
+
+class TestTableApplyUpdateSecurity:
+    """Tests for write-gate and table-access enforcement on table_apply_update."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_table_apply_update_blocked_in_production(self, prod_settings):
+        """Apply returns error when environment is production."""
+        from unittest.mock import patch as mock_patch
+
+        from mcp.server.fastmcp import FastMCP
+
+        from servicenow_mcp.tools.developer import register_tools
+
+        prod_auth = BasicAuthProvider(prod_settings)
+        mcp = FastMCP("test")
+        register_tools(mcp, prod_settings, prod_auth)
+        tools = {t.name: t.fn for t in mcp._tool_manager._tools.values()}
+
+        # Patch the preview store to return a valid payload
+        with mock_patch(
+            "servicenow_mcp.state.PreviewTokenStore.consume",
+            return_value={"table": "incident", "sys_id": "inc001", "changes": {"state": "2"}},
+        ):
+            raw = await tools["table_apply_update"](preview_token="fake-token")
+
+        result = json.loads(raw)
+        assert result["status"] == "error"
+        assert "blocked" in result["error"].lower() or "production" in result["error"].lower()
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_table_apply_update_denied_table(self, settings, auth_provider):
+        """Apply returns error when token references a denied table."""
+        from unittest.mock import patch as mock_patch
+
+        tools = _register_and_get_tools(settings, auth_provider)
+
+        # Patch the preview store to return a payload with a denied table
+        with mock_patch(
+            "servicenow_mcp.state.PreviewTokenStore.consume",
+            return_value={"table": "sys_user_has_password", "sys_id": "x", "changes": {"value": "y"}},
+        ):
+            raw = await tools["table_apply_update"](preview_token="fake-token")
+
+        result = json.loads(raw)
+        assert result["status"] == "error"
+        assert "denied" in result["error"].lower()
+
+
+class TestTablePreviewUpdateSecurity:
+    """Tests for table-access enforcement on table_preview_update."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_table_preview_update_denied_table(self, settings, auth_provider):
+        """Preview returns error when table is on the deny list."""
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["table_preview_update"](
+            table="sys_user_has_password",
+            sys_id="x",
+            changes=json.dumps({"value": "y"}),
+        )
+        result = json.loads(raw)
+        assert result["status"] == "error"
+        assert "denied" in result["error"].lower()
+
+
+class TestDevSeedTestDataSecurity:
+    """Tests for table-access enforcement on dev_seed_test_data."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_dev_seed_test_data_denied_table(self, settings, auth_provider):
+        """Seed returns error when table is on the deny list."""
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["dev_seed_test_data"](
+            table="sys_user_has_password",
+            records=json.dumps([{"value": "test"}]),
+        )
+        result = json.loads(raw)
+        assert result["status"] == "error"
+        assert "denied" in result["error"].lower()
+
+
+# ── Security: sensitive field masking ─────────────────────────────────────
+
+
+class TestSensitiveFieldMasking:
+    """Tests for sensitive field masking in developer tool responses."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_table_apply_update_masks_sensitive_fields(self, settings, auth_provider):
+        """Apply update masks sensitive fields like 'password' in the returned record."""
+        # Step 1: Create a preview
+        respx.get(f"{BASE_URL}/api/now/table/sys_user/u001").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": {
+                        "sys_id": "u001",
+                        "user_name": "admin",
+                        "password": "old_secret",
+                    }
+                },
+            )
+        )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        preview_raw = await tools["table_preview_update"](
+            table="sys_user",
+            sys_id="u001",
+            changes=json.dumps({"user_name": "new_admin"}),
+        )
+        preview_result = json.loads(preview_raw)
+        token = preview_result["data"]["token"]
+
+        # Step 2: Apply — response includes a password field
+        respx.patch(f"{BASE_URL}/api/now/table/sys_user/u001").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": {
+                        "sys_id": "u001",
+                        "user_name": "new_admin",
+                        "password": "still_secret",
+                    }
+                },
+            )
+        )
+
+        raw = await tools["table_apply_update"](preview_token=token)
+        result = json.loads(raw)
+
+        assert result["status"] == "success"
+        assert result["data"]["record"]["user_name"] == "new_admin"
+        assert result["data"]["record"]["password"] == "***MASKED***"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_dev_set_property_masks_sensitive_value(self, settings, auth_provider):
+        """Setting a property with a sensitive name masks old/new values in response."""
+        # Mock query to find the property
+        respx.get(f"{BASE_URL}/api/now/table/sys_properties").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": [
+                        {
+                            "sys_id": "prop002",
+                            "name": "my.api_key_token",
+                            "value": "old_secret_key",
+                        }
+                    ]
+                },
+                headers={"X-Total-Count": "1"},
+            )
+        )
+        # Mock PATCH to update value
+        respx.patch(f"{BASE_URL}/api/now/table/sys_properties/prop002").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": {
+                        "sys_id": "prop002",
+                        "name": "my.api_key_token",
+                        "value": "new_secret_key",
+                    }
+                },
+            )
+        )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["dev_set_property"](name="my.api_key_token", value="new_secret_key")
+        result = json.loads(raw)
+
+        assert result["status"] == "success"
+        assert result["data"]["old_value"] == "***MASKED***"
+        assert result["data"]["new_value"] == "***MASKED***"
+        # Name should still be visible
+        assert result["data"]["name"] == "my.api_key_token"
