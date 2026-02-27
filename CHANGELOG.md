@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/Xerrion/servicenow-devtools-mcp/compare/v0.2.4...v0.3.0) (2026-02-27)
+
+
+### Features
+
+* add ServiceNowQuery builder and wire time-filtering across all modules ([#35](https://github.com/Xerrion/servicenow-devtools-mcp/issues/35)) ([eae49eb](https://github.com/Xerrion/servicenow-devtools-mcp/commit/eae49ebb316949f02042fc56521f34c17bf69d4b))
+
 ## [0.2.4](https://github.com/Xerrion/servicenow-devtools-mcp/compare/v0.2.3...v0.2.4) (2026-02-24)
 
 
