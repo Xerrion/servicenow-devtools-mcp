@@ -6,7 +6,7 @@
   <a href="https://pypi.org/project/servicenow-devtools-mcp/"><img src="https://img.shields.io/pypi/v/servicenow-devtools-mcp?color=00c9a7&style=flat-square" alt="PyPI version"></a>
   <a href="https://pypi.org/project/servicenow-devtools-mcp/"><img src="https://img.shields.io/pypi/pyversions/servicenow-devtools-mcp?style=flat-square" alt="Python versions"></a>
   <a href="https://github.com/xerrion/servicenow-devtools-mcp/blob/main/LICENSE"><img src="https://img.shields.io/github/license/xerrion/servicenow-devtools-mcp?style=flat-square" alt="License"></a>
-  <img src="https://img.shields.io/badge/tools-33-00d4ff?style=flat-square" alt="Tool count">
+  <img src="https://img.shields.io/badge/tools-36-00d4ff?style=flat-square" alt="Tool count">
 </p>
 
 # servicenow-devtools-mcp
@@ -19,7 +19,8 @@ A developer & debug-focused [Model Context Protocol (MCP)](https://modelcontextp
 - :link: **Relationship Mapping** -- find incoming and outgoing references for any record
 - :package: **Change Intelligence** -- inspect update sets, diff artifact versions, audit trails, generate release notes
 - :bug: **Debug & Trace** -- trace record timelines, flow executions, email chains, integration errors, import set runs
-- :test_tube: **Developer Actions** -- toggle artifacts, set properties, seed test data, preview-then-apply updates
+- :test_tube: **Record CRUD** -- create, update, delete records with direct or preview-then-apply patterns
+- :wrench: **Developer Utilities** -- toggle artifacts on/off, set system properties
 - :mag_right: **Investigations** -- 7 built-in analysis modules (stale automations, deprecated APIs, table health, ACL conflicts, error analysis, slow transactions, performance bottlenecks)
 - :page_facing_up: **Documentation** -- generate logic maps, artifact summaries, test scenarios, code review notes
 - :shield: **Safety** -- table deny lists, sensitive field masking, row limit caps, write gating in production
@@ -130,7 +131,7 @@ uvx servicenow-devtools-mcp
 ## ServiceNow MCP Server Setup
 
 You have access to a ServiceNow MCP server (`servicenow-devtools-mcp`) that provides
-33 tools for interacting with a ServiceNow instance.
+36 tools for interacting with a ServiceNow instance.
 
 ### Installation
 
@@ -169,7 +170,7 @@ uvx servicenow-devtools-mcp
 }
 ```
 
-### Available Tools (33 total)
+### Available Tools (36 total)
 
 **Introspection (4):** table_describe, table_get, table_query, table_aggregate
   - Describe table schema, fetch records by sys_id, query with encoded queries, compute stats
@@ -186,8 +187,11 @@ uvx servicenow-devtools-mcp
 **Debug & Trace (6):** debug_trace, debug_flow_execution, debug_email_trace, debug_integration_health, debug_importset_run, debug_field_mutation_story
   - Build event timelines, inspect flow executions, trace emails, check integration errors, inspect import sets, trace field mutations
 
-**Developer Actions (6):** dev_toggle, dev_set_property, dev_seed_test_data, dev_cleanup, table_preview_update, table_apply_update
-  - Toggle artifacts on/off, set system properties, seed/cleanup test data, preview and apply record updates (two-step confirmation)
+**Record CRUD (7):** record_create, record_preview_create, record_update, record_preview_update, record_delete, record_preview_delete, record_apply
+  - Create, update, delete records directly or via preview-then-apply confirmation pattern
+
+**Developer Utilities (2):** dev_toggle, dev_set_property
+  - Toggle artifacts on/off, set system properties
 
 **Investigations (2 dispatchers, 7 modules):** investigate_run, investigate_explain
   - Modules: stale_automations, deprecated_apis, table_health, acl_conflicts, error_analysis, slow_transactions, performance_bottlenecks
@@ -280,16 +284,24 @@ The server reads from `.env` and `.env.local` files automatically (`.env.local` 
 | `debug_importset_run` | Inspect import set run with row-level results | `import_set_sys_id` |
 | `debug_field_mutation_story` | Chronological mutation history of a single field | `table`, `sys_id`, `field`, `limit?` |
 
-### :test_tube: Developer Actions
+### :test_tube: Record CRUD
+
+| Tool | Description | Key Parameters |
+|---|---|---|
+| `record_create` | Create a new record in a table | `table`, `data` (JSON string) |
+| `record_preview_create` | Preview a record creation and get a confirmation token | `table`, `data` (JSON string) |
+| `record_update` | Update an existing record | `table`, `sys_id`, `changes` (JSON string) |
+| `record_preview_update` | Preview a record update with field-level diff | `table`, `sys_id`, `changes` (JSON string) |
+| `record_delete` | Delete a record | `table`, `sys_id` |
+| `record_preview_delete` | Preview a deletion showing the record to be removed | `table`, `sys_id` |
+| `record_apply` | Apply a previously previewed action (create, update, or delete) | `preview_token` |
+
+### :wrench: Developer Utilities
 
 | Tool | Description | Key Parameters |
 |---|---|---|
 | `dev_toggle` | Toggle active/inactive on a platform artifact | `artifact_type`, `sys_id`, `active` |
 | `dev_set_property` | Set a system property value (returns old value) | `name`, `value` |
-| `dev_seed_test_data` | Create test data records with cleanup tracking | `table`, `records` (JSON string), `tag?` |
-| `dev_cleanup` | Delete all records previously seeded with a tag | `tag` |
-| `table_preview_update` | Preview a record update with field-level diff | `table`, `sys_id`, `changes` (JSON string) |
-| `table_apply_update` | Apply a previously previewed update | `preview_token` |
 
 ### :mag_right: Investigations
 
@@ -327,8 +339,8 @@ Control which tools are loaded using the `MCP_TOOL_PACKAGE` environment variable
 
 | Package | Tools Loaded | Use Case |
 |---|---|---|
-| `full` (default) | All 33 tools | Full development and debugging |
-| `introspection_only` | Introspection + Relationships + Metadata (10 tools) | Read-only exploration |
+| `full` (default) | All 36 tools | Full development and debugging |
+| `introspection_only` | Introspection + Relationships + Metadata + Utility (11 tools) | Read-only exploration |
 | `none` | Only `list_tool_packages` | Minimal / testing |
 
 ---
@@ -341,7 +353,7 @@ The server includes built-in guardrails that are always active:
 - **Sensitive field masking** -- Fields whose names contain patterns like `password`, `token`, `secret`, `credential`, `api_key`, or `private_key` are masked with the literal value `***MASKED***` in responses
 - **Row limit caps** -- User-supplied `limit` parameters are capped at `MAX_ROW_LIMIT` (default 100). If a larger value is requested, the limit is reduced and a warning is included in the response
 - **Large table protection** -- Tables listed in `LARGE_TABLE_NAMES_CSV` require date-bounded filters in queries to prevent full-table scans
-- **Write gating** -- All write operations (`dev_toggle`, `dev_set_property`, `dev_seed_test_data`, `table_preview_update`, etc.) are blocked when `SERVICENOW_ENV=prod`
+- **Write gating** -- All write operations (`record_*`, `dev_toggle`, `dev_set_property`) are blocked when `SERVICENOW_ENV=prod`
 - **Standardized responses** -- Every tool returns a JSON envelope with `correlation_id`, `status`, and `data`, and may include `pagination` and `warnings` when applicable, for consistent error handling
 
 ---
@@ -362,7 +374,7 @@ Here are some real-world prompts you can use with an AI agent that has this MCP 
 
 > Find all scripts that reference the "cmdb_ci_server" table and check them for anti-patterns.
 
-> Seed 3 test incidents with different priorities, verify they were created, then clean them up.
+> Create a new incident with priority 1 and short description "Server outage". Show me a preview first.
 
 > Show me the performance bottlenecks investigation and explain any slow transactions found.
 
@@ -378,7 +390,7 @@ cd servicenow-devtools-mcp
 # Install dependencies
 uv sync
 
-# Run unit tests (207 tests)
+# Run unit tests (464 tests)
 uv run pytest
 
 # Run integration tests (requires .env.local with real credentials)
