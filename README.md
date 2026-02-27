@@ -209,6 +209,7 @@ uvx servicenow-devtools-mcp
 - Row limits: User-supplied limit parameters capped at MAX_ROW_LIMIT (default 100)
 - Large tables: syslog, sys_audit, etc. require date-bounded filters
 - Write gating: All write operations blocked when SERVICENOW_ENV=prod (unless explicitly overridden)
+- Mandatory field validation: record creation validates all required fields are present before submission
 - Standardized responses: Tools return JSON with correlation_id, status, data, and optionally pagination and warnings when relevant
 ````
 
@@ -288,8 +289,8 @@ The server reads from `.env` and `.env.local` files automatically (`.env.local` 
 
 | Tool | Description | Key Parameters |
 |---|---|---|
-| `record_create` | Create a new record in a table | `table`, `data` (JSON string) |
-| `record_preview_create` | Preview a record creation and get a confirmation token | `table`, `data` (JSON string) |
+| `record_create` | Create a new record in a table (validates mandatory fields) | `table`, `data` (JSON string) |
+| `record_preview_create` | Preview a record creation with mandatory field check and get a confirmation token | `table`, `data` (JSON string) |
 | `record_update` | Update an existing record | `table`, `sys_id`, `changes` (JSON string) |
 | `record_preview_update` | Preview a record update with field-level diff | `table`, `sys_id`, `changes` (JSON string) |
 | `record_delete` | Delete a record | `table`, `sys_id` |
@@ -354,6 +355,7 @@ The server includes built-in guardrails that are always active:
 - **Row limit caps** -- User-supplied `limit` parameters are capped at `MAX_ROW_LIMIT` (default 100). If a larger value is requested, the limit is reduced and a warning is included in the response
 - **Large table protection** -- Tables listed in `LARGE_TABLE_NAMES_CSV` require date-bounded filters in queries to prevent full-table scans
 - **Write gating** -- All write operations (`record_*`, `dev_toggle`, `dev_set_property`) are blocked when `SERVICENOW_ENV=prod`
+- **Mandatory field validation** -- Record creation tools (`record_create`, `record_preview_create`, `record_apply`) pre-flight check that all mandatory fields (from sys_dictionary) are provided, returning a clear error listing any missing fields before the API call is made
 - **Standardized responses** -- Every tool returns a JSON envelope with `correlation_id`, `status`, and `data`, and may include `pagination` and `warnings` when applicable, for consistent error handling
 
 ---
@@ -390,7 +392,7 @@ cd servicenow-devtools-mcp
 # Install dependencies
 uv sync
 
-# Run unit tests (464 tests)
+# Run unit tests (474 tests)
 uv run pytest
 
 # Run integration tests (requires .env.local with real credentials)
