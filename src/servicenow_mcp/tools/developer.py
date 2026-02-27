@@ -10,10 +10,25 @@ from mcp.server.fastmcp import FastMCP
 from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.config import Settings
-from servicenow_mcp.policy import can_write
+from servicenow_mcp.policy import (
+    DENIED_TABLES,
+    MASK_VALUE,
+    _is_sensitive_field,
+    check_table_access,
+    mask_sensitive_fields,
+)
 from servicenow_mcp.state import PreviewTokenStore, SeededRecordTracker
 from servicenow_mcp.tools.metadata import ARTIFACT_TABLES
-from servicenow_mcp.utils import format_response, generate_correlation_id, validate_identifier
+from servicenow_mcp.utils import ServiceNowQuery, format_response, generate_correlation_id, validate_identifier
+
+
+def _write_blocked_reason(table: str, settings: "Settings") -> str | None:
+    """Return an error message if writes are blocked, or None if allowed."""
+    if table.lower() in DENIED_TABLES:
+        return f"Write operations are blocked for table '{table}' (restricted table)"
+    if settings.is_production:
+        return "Write operations are blocked in production environments"
+    return None
 
 
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
@@ -47,14 +62,18 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     )
                 )
 
+            check_table_access(table)
+            validate_identifier(sys_id)
+
             # Write gate
-            if not can_write(table, settings):
+            reason = _write_blocked_reason(table, settings)
+            if reason:
                 return json.dumps(
                     format_response(
                         data=None,
                         correlation_id=correlation_id,
                         status="error",
-                        error="Write operations are blocked in production environments",
+                        error=reason,
                     )
                 )
 
@@ -100,13 +119,15 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         correlation_id = generate_correlation_id()
         try:
             # Write gate
-            if not can_write("sys_properties", settings):
+            check_table_access("sys_properties")
+            reason = _write_blocked_reason("sys_properties", settings)
+            if reason:
                 return json.dumps(
                     format_response(
                         data=None,
                         correlation_id=correlation_id,
                         status="error",
-                        error="Write operations are blocked in production environments",
+                        error=reason,
                     )
                 )
 
@@ -114,7 +135,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 # Find the property by name
                 result = await client.query_records(
                     "sys_properties",
-                    f"name={name}",
+                    ServiceNowQuery().equals("name", name).build(),
                     limit=1,
                 )
                 records = result["records"]
@@ -136,13 +157,17 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 updated = await client.update_record("sys_properties", prop_sys_id, {"value": value})
                 new_value = updated.get("value", value)
 
+            # Mask values for sensitive property names
+            display_old = MASK_VALUE if _is_sensitive_field(name) else old_value
+            display_new = MASK_VALUE if _is_sensitive_field(name) else new_value
+
             return json.dumps(
                 format_response(
                     data={
                         "name": name,
                         "sys_id": prop_sys_id,
-                        "old_value": old_value,
-                        "new_value": new_value,
+                        "old_value": display_old,
+                        "new_value": display_new,
                     },
                     correlation_id=correlation_id,
                 )
@@ -169,15 +194,17 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         correlation_id = generate_correlation_id()
         try:
             validate_identifier(table)
+            check_table_access(table)
 
             # Write gate
-            if not can_write(table, settings):
+            reason = _write_blocked_reason(table, settings)
+            if reason:
                 return json.dumps(
                     format_response(
                         data=None,
                         correlation_id=correlation_id,
                         status="error",
-                        error="Write operations are blocked in production environments",
+                        error=reason,
                     )
                 )
 
@@ -254,15 +281,30 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     )
                 )
 
+            # Write gate — check each entry's table for access and write permissions
+            for entry in entries:
+                tbl = entry["table"]
+                check_table_access(tbl)
+                reason = _write_blocked_reason(tbl, settings)
+                if reason:
+                    return json.dumps(
+                        format_response(
+                            data=None,
+                            correlation_id=correlation_id,
+                            status="error",
+                            error=reason,
+                        )
+                    )
+
             deleted_count = 0
             failed_records: list[dict[str, str]] = []
             sem = asyncio.Semaphore(10)
             async with ServiceNowClient(settings, auth_provider) as client:
                 delete_meta: list[tuple[str, str]] = []
                 for entry in entries:
-                    table = entry["table"]
-                    for sys_id in entry["sys_ids"]:
-                        delete_meta.append((table, sys_id))
+                    tbl = entry["table"]
+                    for sid in entry["sys_ids"]:
+                        delete_meta.append((tbl, sid))
 
                 async def _delete_one(tbl: str, sid: str) -> None:
                     async with sem:
@@ -324,15 +366,18 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         correlation_id = generate_correlation_id()
         try:
             validate_identifier(table)
+            validate_identifier(sys_id)
+            check_table_access(table)
 
             # Write gate
-            if not can_write(table, settings):
+            reason = _write_blocked_reason(table, settings)
+            if reason:
                 return json.dumps(
                     format_response(
                         data=None,
                         correlation_id=correlation_id,
                         status="error",
-                        error="Write operations are blocked in production environments",
+                        error=reason,
                     )
                 )
 
@@ -346,7 +391,10 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             diff: dict[str, dict[str, str]] = {}
             for field, new_value in changes_dict.items():
                 old_value = current.get(field, "")
-                diff[field] = {"old": old_value, "new": new_value}
+                if _is_sensitive_field(field):
+                    diff[field] = {"old": MASK_VALUE, "new": MASK_VALUE}
+                else:
+                    diff[field] = {"old": old_value, "new": new_value}
 
             # Store preview for later apply
             token = preview_store.create(
@@ -403,6 +451,19 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             sys_id = payload["sys_id"]
             changes = payload["changes"]
 
+            check_table_access(table)
+
+            reason = _write_blocked_reason(table, settings)
+            if reason:
+                return json.dumps(
+                    format_response(
+                        data=None,
+                        correlation_id=correlation_id,
+                        status="error",
+                        error=reason,
+                    )
+                )
+
             async with ServiceNowClient(settings, auth_provider) as client:
                 updated = await client.update_record(table, sys_id, changes)
 
@@ -411,7 +472,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     data={
                         "table": table,
                         "sys_id": sys_id,
-                        "record": updated,
+                        "record": mask_sensitive_fields(updated),
                     },
                     correlation_id=correlation_id,
                 )

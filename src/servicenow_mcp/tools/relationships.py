@@ -10,7 +10,12 @@ from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.config import Settings
 from servicenow_mcp.policy import check_table_access, mask_sensitive_fields
-from servicenow_mcp.utils import format_response, generate_correlation_id, sanitize_query_value, validate_identifier
+from servicenow_mcp.utils import (
+    ServiceNowQuery,
+    format_response,
+    generate_correlation_id,
+    validate_identifier,
+)
 
 
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
@@ -32,7 +37,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             async with ServiceNowClient(settings, auth_provider) as client:
                 ref_fields = await client.query_records(
                     "sys_dictionary",
-                    f"internal_type=reference^reference={table}",
+                    ServiceNowQuery().equals("internal_type", "reference").equals("reference", table).build(),
                     fields=["name", "element", "column_label"],
                     limit=100,
                 )
@@ -47,7 +52,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                             check_table_access(ref_table)
                             ref_records = await client.query_records(
                                 ref_table,
-                                f"{ref_field}={sanitize_query_value(sys_id)}",
+                                ServiceNowQuery().equals(ref_field, sys_id).build(),
                                 fields=["sys_id", ref_field],
                                 limit=10,
                             )
@@ -113,7 +118,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 # Get reference fields for this table
                 ref_fields = await client.query_records(
                     "sys_dictionary",
-                    f"name={table}^internal_type=reference",
+                    ServiceNowQuery().equals("name", table).equals("internal_type", "reference").build(),
                     fields=["element", "reference", "column_label"],
                     limit=100,
                 )

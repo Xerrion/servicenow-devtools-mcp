@@ -10,7 +10,12 @@ from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.config import Settings
 from servicenow_mcp.policy import check_table_access, mask_audit_entry, mask_sensitive_fields
-from servicenow_mcp.utils import format_response, generate_correlation_id, sanitize_query_value, validate_identifier
+from servicenow_mcp.utils import (
+    ServiceNowQuery,
+    format_response,
+    generate_correlation_id,
+    validate_identifier,
+)
 
 
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
@@ -35,14 +40,28 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             check_table_access(table)
 
             timeline = []
-            safe_record_sys_id = sanitize_query_value(record_sys_id)
 
             async with ServiceNowClient(settings, auth_provider) as client:
                 # Fetch audit, syslog, and journal entries in parallel
+                audit_query = (
+                    ServiceNowQuery()
+                    .equals("tablename", table)
+                    .equals("documentkey", record_sys_id)
+                    .minutes_ago("sys_created_on", minutes)
+                    .build()
+                )
+                syslog_query_builder = ServiceNowQuery().equals("source", table)
+                if record_sys_id:
+                    syslog_query_builder = syslog_query_builder.equals("documentkey", record_sys_id)
+                syslog_query = syslog_query_builder.minutes_ago("sys_created_on", minutes).build()
+                journal_query = (
+                    ServiceNowQuery().equals("element_id", record_sys_id).minutes_ago("sys_created_on", minutes).build()
+                )
+
                 audit_result, syslog_result, journal_result = await asyncio.gather(
                     client.query_records(
                         "sys_audit",
-                        f"tablename={table}^documentkey={safe_record_sys_id}",
+                        audit_query,
                         fields=[
                             "sys_id",
                             "user",
@@ -56,7 +75,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     ),
                     client.query_records(
                         "syslog",
-                        f"source={table}^documentkey={safe_record_sys_id}" if record_sys_id else f"source={table}",
+                        syslog_query,
                         fields=[
                             "sys_id",
                             "message",
@@ -69,7 +88,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     ),
                     client.query_records(
                         "sys_journal_field",
-                        f"element_id={safe_record_sys_id}",
+                        journal_query,
                         fields=[
                             "sys_id",
                             "element",
@@ -161,7 +180,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 # Fetch flow log entries
                 log_result = await client.query_records(
                     "sys_flow_log",
-                    f"context={context_id}",
+                    ServiceNowQuery().equals("context", context_id).build(),
                     fields=[
                         "sys_id",
                         "step_label",
@@ -224,11 +243,10 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         """
         correlation_id = generate_correlation_id()
         try:
-            safe_record_sys_id = sanitize_query_value(record_sys_id)
             async with ServiceNowClient(settings, auth_provider) as client:
                 email_result = await client.query_records(
                     "sys_email",
-                    f"instance={safe_record_sys_id}",
+                    ServiceNowQuery().equals("instance", record_sys_id).build(),
                     fields=[
                         "sys_id",
                         "type",
@@ -295,9 +313,10 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
 
             async with ServiceNowClient(settings, auth_provider) as client:
                 if kind == "ecc_queue":
+                    ecc_query = ServiceNowQuery().equals("state", "error").hours_ago("sys_created_on", hours).build()
                     result = await client.query_records(
                         "ecc_queue",
-                        "state=error",
+                        ecc_query,
                         fields=[
                             "sys_id",
                             "name",
@@ -321,9 +340,15 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                             }
                         )
                 elif kind == "rest_message":
+                    rest_query = (
+                        ServiceNowQuery()
+                        .greater_or_equal("http_status", "400")
+                        .hours_ago("sys_created_on", hours)
+                        .build()
+                    )
                     result = await client.query_records(
                         "sys_rest_transaction",
-                        "http_status>=400",
+                        rest_query,
                         fields=[
                             "sys_id",
                             "rest_message",
@@ -396,7 +421,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 # Fetch import set rows
                 rows_result = await client.query_records(
                     "sys_import_set_row",
-                    f"sys_import_set={import_set_sys_id}",
+                    ServiceNowQuery().equals("sys_import_set", import_set_sys_id).build(),
                     fields=[
                         "sys_id",
                         "sys_import_state",
@@ -476,9 +501,16 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             check_table_access(table)
 
             async with ServiceNowClient(settings, auth_provider) as client:
+                audit_query = (
+                    ServiceNowQuery()
+                    .equals("tablename", table)
+                    .equals("documentkey", sys_id)
+                    .equals("fieldname", field)
+                    .build()
+                )
                 audit_result = await client.query_records(
                     "sys_audit",
-                    f"tablename={table}^documentkey={sys_id}^fieldname={field}",
+                    audit_query,
                     fields=[
                         "sys_id",
                         "user",

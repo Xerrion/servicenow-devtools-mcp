@@ -8,8 +8,13 @@ from mcp.server.fastmcp import FastMCP
 from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.config import Settings
-from servicenow_mcp.policy import check_table_access, mask_sensitive_fields
-from servicenow_mcp.utils import format_response, generate_correlation_id, sanitize_query_value, validate_identifier
+from servicenow_mcp.policy import check_table_access, enforce_query_safety, mask_sensitive_fields
+from servicenow_mcp.utils import (
+    ServiceNowQuery,
+    format_response,
+    generate_correlation_id,
+    validate_identifier,
+)
 
 # Mapping from human-friendly artifact type names to ServiceNow tables
 ARTIFACT_TABLES: dict[str, str] = {
@@ -59,12 +64,14 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             check_table_access(table)
 
             encoded_query = query if query else ""
+            safety = enforce_query_safety(table, encoded_query, limit, settings)
+            effective_limit = safety["limit"]
 
             async with ServiceNowClient(settings, auth_provider) as client:
                 result = await client.query_records(
                     table,
                     encoded_query,
-                    limit=limit,
+                    limit=effective_limit,
                 )
 
             return json.dumps(
@@ -146,11 +153,12 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         try:
             matches: list[dict[str, Any]] = []
             search_method = "code_search_api"
+            effective_limit = min(limit, settings.max_row_limit)
 
             async with ServiceNowClient(settings, auth_provider) as client:
                 # Try Code Search API first (indexed, single call)
                 try:
-                    cs_result = await client.code_search(term=target, limit=limit * len(SCRIPT_TABLES))
+                    cs_result = await client.code_search(term=target, limit=effective_limit * len(SCRIPT_TABLES))
                     search_results = cs_result.get("search_results", [])
                     for sr in search_results:
                         result_table = sr.get("className", "")
@@ -170,14 +178,14 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     # Fallback to per-table scriptCONTAINS search
                     search_method = "table_scan_fallback"
                     for table in SCRIPT_TABLES:
-                        query = f"scriptCONTAINS{sanitize_query_value(target)}"
+                        query = ServiceNowQuery().contains("script", target).build()
                         try:
                             check_table_access(table)
                             result = await client.query_records(
                                 table,
                                 query,
                                 fields=["sys_id", "name", "sys_class_name"],
-                                limit=limit,
+                                limit=effective_limit,
                             )
                             for record in result["records"]:
                                 matches.append(
@@ -239,7 +247,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 # Query business rules for the target table
                 result = await client.query_records(
                     "sys_script",
-                    f"collection={table}",
+                    ServiceNowQuery().equals("collection", table).build(),
                     limit=200,
                 )
 

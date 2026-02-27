@@ -5,7 +5,7 @@ from typing import Any
 
 from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.policy import check_table_access, mask_sensitive_fields
-from servicenow_mcp.utils import validate_identifier
+from servicenow_mcp.utils import ServiceNowQuery, validate_identifier
 
 
 async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any]:
@@ -16,6 +16,7 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
 
     Params:
         table: The table name to analyze (required).
+        hours: Optional lookback period in hours (default None, queries all).
     """
     table = params.get("table")
     if not table:
@@ -29,36 +30,58 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
     validate_identifier(table)
     check_table_access(table)
 
+    raw_hours = params.get("hours")
+    hours: int | None = None
+    if raw_hours is not None:
+        try:
+            hours = int(raw_hours)
+        except (TypeError, ValueError):
+            hours = 24
+
+    # Build time-filtered query fragments for each query
+    br_q = ServiceNowQuery().equals("collection", table).equals("active", "true")
+    cs_q = ServiceNowQuery().equals("table", table).equals("active", "true")
+    acl_q = ServiceNowQuery().equals("name", table).or_starts_with("name", f"{table}.")
+    uip_q = ServiceNowQuery().equals("table", table).equals("active", "true")
+    syslog_q = ServiceNowQuery().equals("level", "0").like("source", table)
+
+    if hours is not None:
+        br_q.hours_ago("sys_updated_on", hours)
+        cs_q.hours_ago("sys_updated_on", hours)
+        acl_q.hours_ago("sys_updated_on", hours)
+        uip_q.hours_ago("sys_updated_on", hours)
+        syslog_q.hours_ago("sys_created_on", hours)
+
     # Run all 6 health check queries in parallel
     stats_result, br_result, cs_result, acl_result, uip_result, syslog_result = await asyncio.gather(
         client.aggregate(table, query=""),
         client.query_records(
             "sys_script",
-            f"collection={table}^active=true",
+            br_q.build(),
             fields=["sys_id", "name", "when"],
             limit=200,
         ),
         client.query_records(
             "sys_script_client",
-            f"table={table}^active=true",
+            cs_q.build(),
             fields=["sys_id", "name", "type"],
             limit=200,
         ),
         client.query_records(
             "sys_security_acl",
-            f"name={table}^ORnameSTARTSWITH{table}.",
+            acl_q.build(),
             fields=["sys_id", "name", "operation"],
             limit=200,
         ),
         client.query_records(
             "sys_ui_policy",
-            f"table={table}^active=true",
+            uip_q.build(),
             fields=["sys_id", "short_description"],
             limit=200,
         ),
         client.query_records(
             "syslog",
-            f"level=0^sourceLIKE{table}",
+            syslog_q.build(),
             fields=["sys_id", "message", "source", "sys_created_on"],
             limit=20,
             order_by="sys_created_on",
@@ -84,6 +107,7 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
     return {
         "investigation": "table_health",
         "table": table,
+        "hours": hours,
         "record_count": record_count,
         "automation": {
             "business_rules": {
@@ -114,6 +138,7 @@ async def explain(client: ServiceNowClient, element_id: str) -> dict[str, Any]:
     """
     # Re-run a lighter query to get basic table info
     validate_identifier(element_id)
+    check_table_access(element_id)
     stats_result = await client.aggregate(element_id, query="")
     record_count = int(stats_result.get("stats", {}).get("count", 0))
 

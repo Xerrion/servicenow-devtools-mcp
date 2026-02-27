@@ -90,6 +90,14 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     )
                 )
 
+            # Validate element_id components to prevent injection
+            if ":" in element_id:
+                table_part, sys_id_part = element_id.split(":", 1)
+                validate_identifier(table_part)
+                validate_identifier(sys_id_part)
+            else:
+                validate_identifier(element_id)
+
             async with ServiceNowClient(settings, auth_provider) as client:
                 result = await module.explain(client, element_id)
 
