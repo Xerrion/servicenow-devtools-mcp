@@ -10,9 +10,9 @@ from mcp.server.fastmcp import FastMCP
 from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.config import Settings
-from servicenow_mcp.policy import check_table_access
+from servicenow_mcp.policy import check_table_access, mask_sensitive_fields
 from servicenow_mcp.tools.metadata import ARTIFACT_TABLES
-from servicenow_mcp.utils import format_response, generate_correlation_id, validate_identifier
+from servicenow_mcp.utils import ServiceNowQuery, format_response, generate_correlation_id, validate_identifier
 
 
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
@@ -38,7 +38,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 br_result, cs_result, uip_result, uia_result = await asyncio.gather(
                     client.query_records(
                         "sys_script",
-                        f"collection={table}^active=true",
+                        ServiceNowQuery().equals("collection", table).equals("active", "true").build(),
                         fields=[
                             "sys_id",
                             "name",
@@ -53,19 +53,19 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     ),
                     client.query_records(
                         "sys_script_client",
-                        f"table={table}^active=true",
+                        ServiceNowQuery().equals("table", table).equals("active", "true").build(),
                         fields=["sys_id", "name", "type", "active"],
                         limit=200,
                     ),
                     client.query_records(
                         "sys_ui_policy",
-                        f"table={table}^active=true",
+                        ServiceNowQuery().equals("table", table).equals("active", "true").build(),
                         fields=["sys_id", "short_description", "active"],
                         limit=200,
                     ),
                     client.query_records(
                         "sys_ui_action",
-                        f"table={table}^active=true",
+                        ServiceNowQuery().equals("table", table).equals("active", "true").build(),
                         fields=["sys_id", "name", "action_name", "active"],
                         limit=200,
                     ),
@@ -188,7 +188,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             check_table_access(table)
 
             async with ServiceNowClient(settings, auth_provider) as client:
-                record = await client.get_record(table, sys_id)
+                record = mask_sensitive_fields(await client.get_record(table, sys_id))
 
                 # Parse script for GlideRecord('table_name') references
                 script = record.get("script", "")
@@ -256,6 +256,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             async with ServiceNowClient(settings, auth_provider) as client:
                 record = await client.get_record(table, sys_id)
 
+            record = mask_sensitive_fields(record)
             script = record.get("script", "")
             scenarios = _generate_test_scenarios(script, record)
 
@@ -313,6 +314,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             async with ServiceNowClient(settings, auth_provider) as client:
                 record = await client.get_record(table, sys_id)
 
+            record = mask_sensitive_fields(record)
             script = record.get("script", "")
             findings = _scan_for_anti_patterns(script)
 

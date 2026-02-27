@@ -1,12 +1,11 @@
 """Investigation: analyze and cluster syslog errors."""
 
 from collections import defaultdict
-from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.policy import check_table_access, mask_sensitive_fields
-from servicenow_mcp.utils import sanitize_query_value, validate_identifier
+from servicenow_mcp.utils import ServiceNowQuery, validate_identifier
 
 
 async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any]:
@@ -21,23 +20,25 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
         limit: Maximum log entries to fetch (default 100).
     """
     try:
-        hours = max(0, int(params.get("hours", 24)))
+        hours = max(1, int(params.get("hours", 24)))
     except (TypeError, ValueError):
         hours = 24
     source_filter = params.get("source")
-    limit = params.get("limit", 100)
+    try:
+        limit = int(params.get("limit", 100))
+    except (TypeError, ValueError):
+        limit = 100
 
-    cutoff = datetime.now(tz=UTC) - timedelta(hours=hours)
-    cutoff_str = cutoff.strftime("%Y-%m-%d %H:%M:%S")
+    check_table_access("syslog")
 
-    query = f"level=0^sys_created_on>={cutoff_str}"
+    q = ServiceNowQuery().equals("level", "0").hours_ago("sys_created_on", hours)
     if source_filter:
-        query += f"^sourceLIKE{sanitize_query_value(source_filter)}"
-    query += "^ORDERBYDESCsys_created_on"
+        q.like("source", source_filter)
+    q.order_by("sys_created_on", descending=True)
 
     syslog_result = await client.query_records(
         "syslog",
-        query,
+        q.build(),
         fields=["sys_id", "message", "source", "level", "sys_created_on"],
         limit=limit,
     )
@@ -79,13 +80,16 @@ async def explain(client: ServiceNowClient, element_id: str) -> dict[str, Any]:
 
     element_id format: "syslog:sys_id".
     """
+    if ":" not in element_id:
+        return {"error": f"Invalid element_id format: expected 'table:sys_id', got '{element_id}'"}
     table, sys_id = element_id.split(":", 1)
+    validate_identifier(table)
+    validate_identifier(sys_id)
     if table != "syslog":
         return {
             "element": element_id,
             "error": f"Table '{table}' is not allowed for this investigation; expected 'syslog'",
         }
-    validate_identifier(sys_id)
     check_table_access("syslog")
     record = mask_sensitive_fields(await client.get_record(table, sys_id))
 

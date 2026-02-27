@@ -1,11 +1,10 @@
 """Investigation: find stale automations — stuck flows, disabled scripts, stale jobs."""
 
-from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.policy import check_table_access, mask_sensitive_fields
-from servicenow_mcp.utils import validate_identifier
+from servicenow_mcp.utils import ServiceNowQuery, validate_identifier
 
 _ALLOWED_TABLES = {"flow_context", "sys_script", "sys_script_include", "sysauto_script"}
 
@@ -23,17 +22,23 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
         stale_days: Number of days to consider stale (default 30).
         limit: Maximum findings per category (default 20).
     """
-    stale_days = params.get("stale_days", 30)
-    limit = params.get("limit", 20)
-    cutoff = datetime.now(tz=UTC) - timedelta(days=stale_days)
-    cutoff_str = cutoff.strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        stale_days = max(1, int(params.get("stale_days", 30)))
+    except (TypeError, ValueError):
+        stale_days = 30
+    try:
+        limit = int(params.get("limit", 20))
+    except (TypeError, ValueError):
+        limit = 20
 
     findings: list[dict[str, Any]] = []
 
     # 1. Stuck flow contexts (IN_PROGRESS created before cutoff)
+    check_table_access("flow_context")
+    flow_query = ServiceNowQuery().equals("state", "IN_PROGRESS").older_than_days("sys_created_on", stale_days).build()
     flow_result = await client.query_records(
         "flow_context",
-        f"state=IN_PROGRESS^sys_created_on<{cutoff_str}",
+        flow_query,
         fields=["sys_id", "name", "state", "sys_created_on"],
         limit=limit,
     )
@@ -49,9 +54,11 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
         )
 
     # 2. Disabled business rules
+    check_table_access("sys_script")
+    br_query = ServiceNowQuery().equals("active", "false").build()
     br_result = await client.query_records(
         "sys_script",
-        "active=false",
+        br_query,
         fields=["sys_id", "name", "collection", "sys_updated_on"],
         limit=limit,
     )
@@ -67,9 +74,11 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
         )
 
     # 3. Disabled script includes
+    check_table_access("sys_script_include")
+    si_query = ServiceNowQuery().equals("active", "false").build()
     si_result = await client.query_records(
         "sys_script_include",
-        "active=false",
+        si_query,
         fields=["sys_id", "name", "api_name", "sys_updated_on"],
         limit=limit,
     )
@@ -85,9 +94,11 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
         )
 
     # 4. Stale scheduled jobs (not run in > stale_days)
+    check_table_access("sysauto_script")
+    sj_query = ServiceNowQuery().older_than_days("last_run", stale_days).build()
     sj_result = await client.query_records(
         "sysauto_script",
-        f"last_run<{cutoff_str}",
+        sj_query,
         fields=["sys_id", "name", "run_type", "last_run"],
         limit=limit,
     )
@@ -115,6 +126,8 @@ async def explain(client: ServiceNowClient, element_id: str) -> dict[str, Any]:
 
     element_id format: "table:sys_id" (e.g. "flow_context:fc001").
     """
+    if ":" not in element_id:
+        return {"error": f"Invalid element_id format: expected 'table:sys_id', got '{element_id}'"}
     table, sys_id = element_id.split(":", 1)
     if table not in _ALLOWED_TABLES:
         return {
