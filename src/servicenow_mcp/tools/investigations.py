@@ -10,7 +10,7 @@ from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.config import Settings
 from servicenow_mcp.investigations import INVESTIGATION_REGISTRY
 from servicenow_mcp.policy import check_table_access
-from servicenow_mcp.utils import format_response, generate_correlation_id, validate_identifier
+from servicenow_mcp.utils import format_response, generate_correlation_id, safe_tool_call, validate_identifier
 
 
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
@@ -31,7 +31,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             params: JSON string of parameters for the investigation.
         """
         correlation_id = generate_correlation_id()
-        try:
+
+        async def _run() -> str:
             module = INVESTIGATION_REGISTRY.get(investigation)
             if module is None:
                 available = ", ".join(sorted(INVESTIGATION_REGISTRY.keys()))
@@ -55,15 +56,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 result = await module.run(client, params_dict)
 
             return json.dumps(format_response(data=result, correlation_id=correlation_id))
-        except Exception as exc:
-            return json.dumps(
-                format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error=str(exc),
-                )
-            )
+
+        return await safe_tool_call(_run, correlation_id)
 
     @mcp.tool()
     async def investigate_explain(
@@ -77,7 +71,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             element_id: The element identifier (e.g. "flow_context:fc001" or a table name).
         """
         correlation_id = generate_correlation_id()
-        try:
+
+        async def _run() -> str:
             module = INVESTIGATION_REGISTRY.get(investigation)
             if module is None:
                 available = ", ".join(sorted(INVESTIGATION_REGISTRY.keys()))
@@ -102,12 +97,5 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 result = await module.explain(client, element_id)
 
             return json.dumps(format_response(data=result, correlation_id=correlation_id))
-        except Exception as exc:
-            return json.dumps(
-                format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error=str(exc),
-                )
-            )
+
+        return await safe_tool_call(_run, correlation_id)

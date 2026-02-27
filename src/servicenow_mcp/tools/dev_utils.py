@@ -7,15 +7,20 @@ from mcp.server.fastmcp import FastMCP
 from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.config import Settings
-from servicenow_mcp.errors import ForbiddenError
 from servicenow_mcp.policy import (
     MASK_VALUE,
-    _is_sensitive_field,
     check_table_access,
+    is_sensitive_field,
     write_blocked_reason,
 )
 from servicenow_mcp.tools.metadata import ARTIFACT_TABLES
-from servicenow_mcp.utils import ServiceNowQuery, format_response, generate_correlation_id, validate_identifier
+from servicenow_mcp.utils import (
+    ServiceNowQuery,
+    format_response,
+    generate_correlation_id,
+    safe_tool_call,
+    validate_identifier,
+)
 
 
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
@@ -31,7 +36,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             active: Whether to set the artifact active (true) or inactive (false).
         """
         correlation_id = generate_correlation_id()
-        try:
+
+        async def _run() -> str:
             # Resolve artifact type to table name
             table = ARTIFACT_TABLES.get(artifact_type)
             if table is None:
@@ -81,24 +87,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     correlation_id=correlation_id,
                 )
             )
-        except ForbiddenError as e:
-            return json.dumps(
-                format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error=f"Access denied by ServiceNow ACL: {e}",
-                )
-            )
-        except Exception as e:
-            return json.dumps(
-                format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error=str(e),
-                )
-            )
+
+        return await safe_tool_call(_run, correlation_id)
 
     @mcp.tool()
     async def dev_set_property(name: str, value: str) -> str:
@@ -109,7 +99,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             value: The new value to set.
         """
         correlation_id = generate_correlation_id()
-        try:
+
+        async def _run() -> str:
             # Write gate
             check_table_access("sys_properties")
             reason = write_blocked_reason("sys_properties", settings)
@@ -150,8 +141,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 new_value = updated.get("value", value)
 
             # Mask values for sensitive property names
-            display_old = MASK_VALUE if _is_sensitive_field(name) else old_value
-            display_new = MASK_VALUE if _is_sensitive_field(name) else new_value
+            display_old = MASK_VALUE if is_sensitive_field(name) else old_value
+            display_new = MASK_VALUE if is_sensitive_field(name) else new_value
 
             return json.dumps(
                 format_response(
@@ -164,21 +155,5 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     correlation_id=correlation_id,
                 )
             )
-        except ForbiddenError as e:
-            return json.dumps(
-                format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error=f"Access denied by ServiceNow ACL: {e}",
-                )
-            )
-        except Exception as e:
-            return json.dumps(
-                format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error=str(e),
-                )
-            )
+
+        return await safe_tool_call(_run, correlation_id)

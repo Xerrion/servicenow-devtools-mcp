@@ -12,7 +12,7 @@ from servicenow_mcp.policy import (
     enforce_query_safety,
     mask_sensitive_fields,
 )
-from servicenow_mcp.utils import format_response, generate_correlation_id, validate_identifier
+from servicenow_mcp.utils import format_response, generate_correlation_id, safe_tool_call, validate_identifier
 
 
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
@@ -26,7 +26,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             table: The ServiceNow table name (e.g., 'incident', 'sys_user').
         """
         correlation_id = generate_correlation_id()
-        try:
+
+        async def _run() -> str:
             validate_identifier(table)
             check_table_access(table)
             async with ServiceNowClient(settings, auth_provider) as client:
@@ -50,16 +51,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 ),
                 indent=2,
             )
-        except Exception as e:
-            return json.dumps(
-                format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error=str(e),
-                ),
-                indent=2,
-            )
+
+        return await safe_tool_call(_run, correlation_id)
 
     @mcp.tool()
     async def table_get(
@@ -77,7 +70,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             display_values: If True, return display values instead of raw values.
         """
         correlation_id = generate_correlation_id()
-        try:
+
+        async def _run() -> str:
             validate_identifier(table)
             check_table_access(table)
             field_list = [f.strip() for f in fields.split(",") if f.strip()] if fields else None
@@ -88,16 +82,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 format_response(data=record, correlation_id=correlation_id),
                 indent=2,
             )
-        except Exception as e:
-            return json.dumps(
-                format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error=str(e),
-                ),
-                indent=2,
-            )
+
+        return await safe_tool_call(_run, correlation_id)
 
     @mcp.tool()
     async def table_query(
@@ -120,7 +106,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         """
         correlation_id = generate_correlation_id()
         warnings: list[str] = []
-        try:
+
+        async def _run() -> str:
             validate_identifier(table)
             check_table_access(table)
             safety = enforce_query_safety(table, query, limit, settings)
@@ -157,16 +144,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 ),
                 indent=2,
             )
-        except Exception as e:
-            return json.dumps(
-                format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error=str(e),
-                ),
-                indent=2,
-            )
+
+        return await safe_tool_call(_run, correlation_id)
 
     @mcp.tool()
     async def table_aggregate(
@@ -193,7 +172,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             sum_fields: Comma-separated fields to compute sum for.
         """
         correlation_id = generate_correlation_id()
-        try:
+
+        async def _run() -> str:
             validate_identifier(table)
             check_table_access(table)
             enforce_query_safety(table, query, None, settings)
@@ -218,13 +198,5 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 format_response(data=result, correlation_id=correlation_id),
                 indent=2,
             )
-        except Exception as e:
-            return json.dumps(
-                format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error=str(e),
-                ),
-                indent=2,
-            )
+
+        return await safe_tool_call(_run, correlation_id)

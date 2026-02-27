@@ -13,6 +13,7 @@ from servicenow_mcp.utils import (
     ServiceNowQuery,
     format_response,
     generate_correlation_id,
+    safe_tool_call,
     validate_identifier,
 )
 
@@ -55,7 +56,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             limit: Maximum number of artifacts to return.
         """
         correlation_id = generate_correlation_id()
-        try:
+
+        async def _run() -> str:
             table = ARTIFACT_TABLES.get(artifact_type)
             if table is None:
                 valid_types = ", ".join(sorted(ARTIFACT_TABLES.keys()))
@@ -86,16 +88,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 ),
                 indent=2,
             )
-        except Exception as e:
-            return json.dumps(
-                format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error=str(e),
-                ),
-                indent=2,
-            )
+
+        return await safe_tool_call(_run, correlation_id)
 
     @mcp.tool()
     async def meta_get_artifact(
@@ -109,7 +103,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             sys_id: The sys_id of the artifact to retrieve.
         """
         correlation_id = generate_correlation_id()
-        try:
+
+        async def _run() -> str:
             table = ARTIFACT_TABLES.get(artifact_type)
             if table is None:
                 valid_types = ", ".join(sorted(ARTIFACT_TABLES.keys()))
@@ -124,16 +119,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 format_response(data=record, correlation_id=correlation_id),
                 indent=2,
             )
-        except Exception as e:
-            return json.dumps(
-                format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error=str(e),
-                ),
-                indent=2,
-            )
+
+        return await safe_tool_call(_run, correlation_id)
 
     @mcp.tool()
     async def meta_find_references(
@@ -150,7 +137,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             limit: Maximum number of matches to return per table.
         """
         correlation_id = generate_correlation_id()
-        try:
+
+        async def _run() -> str:
             matches: list[dict[str, Any]] = []
             search_method = "code_search_api"
             effective_limit = min(limit, settings.max_row_limit)
@@ -212,16 +200,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 ),
                 indent=2,
             )
-        except Exception as e:
-            return json.dumps(
-                format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error=str(e),
-                ),
-                indent=2,
-            )
+
+        return await safe_tool_call(_run, correlation_id)
 
     @mcp.tool()
     async def meta_what_writes(
@@ -235,7 +215,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             field: Optional field name to narrow results. When provided, only returns writers whose script references this field.
         """
         correlation_id = generate_correlation_id()
-        try:
+
+        async def _run() -> str:
             validate_identifier(table)
             if field:
                 validate_identifier(field)
@@ -270,13 +251,5 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 ),
                 indent=2,
             )
-        except Exception as e:
-            return json.dumps(
-                format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error=str(e),
-                ),
-                indent=2,
-            )
+
+        return await safe_tool_call(_run, correlation_id)

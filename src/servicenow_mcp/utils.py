@@ -1,9 +1,16 @@
 """Utility functions for correlation IDs, response formatting and query building."""
 
+import json
+import logging
 import re
 import uuid
 import warnings
+from collections.abc import Awaitable, Callable
 from typing import Any
+
+from servicenow_mcp.errors import ForbiddenError
+
+logger = logging.getLogger(__name__)
 
 _IDENTIFIER_RE = re.compile(r"^[a-z0-9_]+$")
 
@@ -342,3 +349,34 @@ class ServiceNowQuery:
     def __str__(self) -> str:
         """Return the built query string."""
         return self.build()
+
+
+async def safe_tool_call(
+    fn: Callable[[], Awaitable[str]],
+    correlation_id: str,
+) -> str:
+    """Wrap an MCP tool body with standard error handling.
+
+    Catches ForbiddenError (ACL denial) and generic exceptions,
+    returning consistent JSON error envelopes via format_response.
+    """
+    try:
+        return await fn()
+    except ForbiddenError as e:
+        return json.dumps(
+            format_response(
+                data=None,
+                correlation_id=correlation_id,
+                status="error",
+                error=f"Access denied by ServiceNow ACL: {e}",
+            )
+        )
+    except Exception as e:
+        return json.dumps(
+            format_response(
+                data=None,
+                correlation_id=correlation_id,
+                status="error",
+                error=str(e),
+            )
+        )

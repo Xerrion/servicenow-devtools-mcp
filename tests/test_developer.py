@@ -728,3 +728,194 @@ class TestRecordApply:
 
         assert result["status"] == "error"
         assert "acl" in result["error"].lower()
+
+
+# -- mandatory field validation ------------------------------------------------
+
+METADATA_URL = f"{BASE_URL}/api/now/table/sys_dictionary"
+
+METADATA_WITH_TWO_MANDATORY = {
+    "result": [
+        {"element": "short_description", "mandatory": "true", "internal_type": "string"},
+        {"element": "category", "mandatory": "true", "internal_type": "string"},
+        {"element": "description", "mandatory": "false", "internal_type": "string"},
+    ]
+}
+
+METADATA_NO_MANDATORY = {
+    "result": [
+        {"element": "short_description", "mandatory": "false", "internal_type": "string"},
+        {"element": "description", "mandatory": "false", "internal_type": "string"},
+    ]
+}
+
+
+class TestMandatoryFieldValidation:
+    """Tests for mandatory field pre-flight validation on record creation."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_record_create_missing_mandatory_fields(self, settings, auth_provider):
+        """Returns error when mandatory fields are missing from create data."""
+        respx.get(METADATA_URL).mock(return_value=httpx.Response(200, json=METADATA_WITH_TWO_MANDATORY))
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["record_create"](
+            table="incident",
+            data=json.dumps({"short_description": "Test incident"}),
+        )
+        result = json.loads(raw)
+
+        assert result["status"] == "error"
+        assert "missing_fields" in result["data"]
+        assert "category" in result["data"]["missing_fields"]
+        assert "Missing mandatory fields" in result["error"]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_record_create_all_mandatory_present(self, settings, auth_provider):
+        """Proceeds with create when all mandatory fields are present."""
+        respx.get(METADATA_URL).mock(return_value=httpx.Response(200, json=METADATA_WITH_TWO_MANDATORY))
+        respx.post(f"{BASE_URL}/api/now/table/incident").mock(
+            return_value=httpx.Response(
+                201,
+                json={
+                    "result": {
+                        "sys_id": "new001",
+                        "short_description": "Test",
+                        "category": "software",
+                    }
+                },
+            )
+        )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["record_create"](
+            table="incident",
+            data=json.dumps({"short_description": "Test", "category": "software"}),
+        )
+        result = json.loads(raw)
+
+        assert result["status"] == "success"
+        assert result["data"]["sys_id"] == "new001"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_record_preview_create_missing_mandatory_fields(self, settings, auth_provider):
+        """Returns error when mandatory fields are missing from preview create data."""
+        respx.get(METADATA_URL).mock(return_value=httpx.Response(200, json=METADATA_WITH_TWO_MANDATORY))
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["record_preview_create"](
+            table="incident",
+            data=json.dumps({"short_description": "Test"}),
+        )
+        result = json.loads(raw)
+
+        assert result["status"] == "error"
+        assert "category" in result["data"]["missing_fields"]
+        assert "Missing mandatory fields" in result["error"]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_record_preview_create_all_mandatory_present(self, settings, auth_provider):
+        """Returns preview token when all mandatory fields are present."""
+        respx.get(METADATA_URL).mock(return_value=httpx.Response(200, json=METADATA_WITH_TWO_MANDATORY))
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["record_preview_create"](
+            table="incident",
+            data=json.dumps({"short_description": "Test", "category": "software"}),
+        )
+        result = json.loads(raw)
+
+        assert result["status"] == "success"
+        assert "token" in result["data"]
+        assert result["data"]["action"] == "create"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_record_apply_create_missing_mandatory_fields(self, settings, auth_provider):
+        """record_apply catches newly mandatory fields at apply time."""
+        # Phase 1: Preview succeeds - metadata has only 1 mandatory field
+        respx.get(METADATA_URL).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": [
+                        {"element": "short_description", "mandatory": "true", "internal_type": "string"},
+                    ]
+                },
+            )
+        )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        preview_raw = await tools["record_preview_create"](
+            table="incident",
+            data=json.dumps({"short_description": "Test"}),
+        )
+        token = json.loads(preview_raw)["data"]["token"]
+
+        # Phase 2: Apply - metadata now returns a NEW mandatory field
+        respx.get(METADATA_URL).mock(return_value=httpx.Response(200, json=METADATA_WITH_TWO_MANDATORY))
+
+        raw = await tools["record_apply"](preview_token=token)
+        result = json.loads(raw)
+
+        assert result["status"] == "error"
+        assert "category" in result["data"]["missing_fields"]
+        assert "Missing mandatory fields" in result["error"]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_record_create_no_mandatory_fields(self, settings, auth_provider):
+        """Proceeds normally when table has no mandatory fields."""
+        respx.get(METADATA_URL).mock(return_value=httpx.Response(200, json=METADATA_NO_MANDATORY))
+        respx.post(f"{BASE_URL}/api/now/table/incident").mock(
+            return_value=httpx.Response(
+                201,
+                json={
+                    "result": {
+                        "sys_id": "new002",
+                        "short_description": "Test",
+                    }
+                },
+            )
+        )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["record_create"](
+            table="incident",
+            data=json.dumps({"short_description": "Test"}),
+        )
+        result = json.loads(raw)
+
+        assert result["status"] == "success"
+        assert result["data"]["sys_id"] == "new002"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_record_create_metadata_unavailable(self, settings, auth_provider):
+        """Create proceeds when metadata endpoint returns 500 (best-effort)."""
+        respx.get(METADATA_URL).mock(return_value=httpx.Response(500, json={"error": {"message": "Internal error"}}))
+        respx.post(f"{BASE_URL}/api/now/table/incident").mock(
+            return_value=httpx.Response(
+                201,
+                json={
+                    "result": {
+                        "sys_id": "new003",
+                        "short_description": "Test",
+                    }
+                },
+            )
+        )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["record_create"](
+            table="incident",
+            data=json.dumps({"short_description": "Test"}),
+        )
+        result = json.loads(raw)
+
+        assert result["status"] == "success"
+        assert result["data"]["sys_id"] == "new003"
