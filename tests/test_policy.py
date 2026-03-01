@@ -325,7 +325,7 @@ class TestWriteGating:
         with caplog.at_level(logging.WARNING, logger="servicenow_mcp.policy"):
             can_write("sys_user_has_password", settings)
 
-        assert any("deny list" in record.message for record in caplog.records)
+        assert any("restricted table" in record.message for record in caplog.records)
 
     def test_write_blocked_in_prod_logs_warning(self, prod_settings, caplog):
         """Write blocked in production logs a warning."""
