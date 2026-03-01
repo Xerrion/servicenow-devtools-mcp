@@ -16,6 +16,7 @@ PACKAGE_REGISTRY: dict[str, list[str]] = {
         "changes",
         "debug",
         "developer",
+        "dev_utils",
         "investigations",
         "documentation",
         "utility",

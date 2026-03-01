@@ -14,6 +14,7 @@ from servicenow_mcp.utils import (
     ServiceNowQuery,
     format_response,
     generate_correlation_id,
+    safe_tool_call,
     validate_identifier,
 )
 
@@ -35,7 +36,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             minutes: How many minutes of history to include (default 60).
         """
         correlation_id = generate_correlation_id()
-        try:
+
+        async def _run() -> str:
             validate_identifier(table)
             check_table_access(table)
 
@@ -153,16 +155,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 ),
                 indent=2,
             )
-        except Exception as e:
-            return json.dumps(
-                format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error=str(e),
-                ),
-                indent=2,
-            )
+
+        return await safe_tool_call(_run, correlation_id)
 
     @mcp.tool()
     async def debug_flow_execution(context_id: str) -> str:
@@ -172,7 +166,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             context_id: The sys_id of the flow context (sys_flow_context).
         """
         correlation_id = generate_correlation_id()
-        try:
+
+        async def _run() -> str:
             async with ServiceNowClient(settings, auth_provider) as client:
                 # Fetch flow context
                 context = mask_sensitive_fields(await client.get_record("sys_flow_context", context_id))
@@ -223,16 +218,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 ),
                 indent=2,
             )
-        except Exception as e:
-            return json.dumps(
-                format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error=str(e),
-                ),
-                indent=2,
-            )
+
+        return await safe_tool_call(_run, correlation_id)
 
     @mcp.tool()
     async def debug_email_trace(record_sys_id: str) -> str:
@@ -242,7 +229,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             record_sys_id: The sys_id of the record whose emails to trace.
         """
         correlation_id = generate_correlation_id()
-        try:
+
+        async def _run() -> str:
             async with ServiceNowClient(settings, auth_provider) as client:
                 email_result = await client.query_records(
                     "sys_email",
@@ -285,16 +273,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 ),
                 indent=2,
             )
-        except Exception as e:
-            return json.dumps(
-                format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error=str(e),
-                ),
-                indent=2,
-            )
+
+        return await safe_tool_call(_run, correlation_id)
 
     @mcp.tool()
     async def debug_integration_health(
@@ -308,7 +288,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             hours: How many hours of history to review (default 24).
         """
         correlation_id = generate_correlation_id()
-        try:
+
+        async def _run() -> str:
             errors = []
 
             async with ServiceNowClient(settings, auth_provider) as client:
@@ -394,16 +375,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 ),
                 indent=2,
             )
-        except Exception as e:
-            return json.dumps(
-                format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error=str(e),
-                ),
-                indent=2,
-            )
+
+        return await safe_tool_call(_run, correlation_id)
 
     @mcp.tool()
     async def debug_importset_run(import_set_sys_id: str) -> str:
@@ -413,7 +386,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             import_set_sys_id: The sys_id of the import set (sys_import_set).
         """
         correlation_id = generate_correlation_id()
-        try:
+
+        async def _run() -> str:
             async with ServiceNowClient(settings, auth_provider) as client:
                 # Fetch import set header
                 import_set = mask_sensitive_fields(await client.get_record("sys_import_set", import_set_sys_id))
@@ -468,16 +442,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 ),
                 indent=2,
             )
-        except Exception as e:
-            return json.dumps(
-                format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error=str(e),
-                ),
-                indent=2,
-            )
+
+        return await safe_tool_call(_run, correlation_id)
 
     @mcp.tool()
     async def debug_field_mutation_story(
@@ -495,7 +461,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             limit: Maximum number of audit entries to return (default 50).
         """
         correlation_id = generate_correlation_id()
-        try:
+
+        async def _run() -> str:
             validate_identifier(table)
             validate_identifier(field)
             check_table_access(table)
@@ -548,13 +515,5 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 ),
                 indent=2,
             )
-        except Exception as e:
-            return json.dumps(
-                format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error=str(e),
-                ),
-                indent=2,
-            )
+
+        return await safe_tool_call(_run, correlation_id)

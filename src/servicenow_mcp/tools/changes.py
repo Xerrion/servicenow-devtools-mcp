@@ -14,6 +14,7 @@ from servicenow_mcp.utils import (
     ServiceNowQuery,
     format_response,
     generate_correlation_id,
+    safe_tool_call,
     validate_identifier,
 )
 
@@ -41,7 +42,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             update_set_id: The sys_id of the update set to inspect.
         """
         correlation_id = generate_correlation_id()
-        try:
+
+        async def _run() -> str:
             validate_identifier(update_set_id)
 
             async with ServiceNowClient(settings, auth_provider) as client:
@@ -116,16 +118,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 ),
                 indent=2,
             )
-        except Exception as e:
-            return json.dumps(
-                format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error=str(e),
-                ),
-                indent=2,
-            )
+
+        return await safe_tool_call(_run, correlation_id)
 
     @mcp.tool()
     async def changes_diff_artifact(table: str, sys_id: str) -> str:
@@ -139,7 +133,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             sys_id: The sys_id of the artifact record.
         """
         correlation_id = generate_correlation_id()
-        try:
+
+        async def _run() -> str:
             validate_identifier(table)
             check_table_access(table)
 
@@ -196,16 +191,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 ),
                 indent=2,
             )
-        except Exception as e:
-            return json.dumps(
-                format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error=str(e),
-                ),
-                indent=2,
-            )
+
+        return await safe_tool_call(_run, correlation_id)
 
     @mcp.tool()
     async def changes_last_touched(
@@ -221,7 +208,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             limit: Maximum number of audit entries to return (default 20).
         """
         correlation_id = generate_correlation_id()
-        try:
+
+        async def _run() -> str:
             validate_identifier(table)
             check_table_access(table)
 
@@ -267,16 +255,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 ),
                 indent=2,
             )
-        except Exception as e:
-            return json.dumps(
-                format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error=str(e),
-                ),
-                indent=2,
-            )
+
+        return await safe_tool_call(_run, correlation_id)
 
     @mcp.tool()
     async def changes_release_notes(
@@ -290,7 +270,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             format: Output format (currently only 'markdown' supported).
         """
         correlation_id = generate_correlation_id()
-        try:
+
+        async def _run() -> str:
             validate_identifier(update_set_id)
 
             async with ServiceNowClient(settings, auth_provider) as client:
@@ -364,13 +345,5 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 ),
                 indent=2,
             )
-        except Exception as e:
-            return json.dumps(
-                format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error=str(e),
-                ),
-                indent=2,
-            )
+
+        return await safe_tool_call(_run, correlation_id)

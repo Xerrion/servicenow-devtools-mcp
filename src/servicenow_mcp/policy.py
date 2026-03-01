@@ -59,7 +59,7 @@ def check_table_access(table: str) -> None:
         raise PolicyError(f"Access to table '{table}' is denied by policy")
 
 
-def _is_sensitive_field(field_name: str) -> bool:
+def is_sensitive_field(field_name: str) -> bool:
     """Check if a field name matches sensitive patterns."""
     return any(pattern.search(field_name) for pattern in _SENSITIVE_PATTERNS)
 
@@ -68,7 +68,7 @@ def mask_sensitive_fields(record: dict[str, Any]) -> dict[str, Any]:
     """Return a copy of the record with sensitive fields masked."""
     masked = dict(record)
     for key in masked:
-        if _is_sensitive_field(key):
+        if is_sensitive_field(key):
             masked[key] = MASK_VALUE
     return masked
 
@@ -88,7 +88,7 @@ def mask_audit_entry(entry: dict[str, Any]) -> dict[str, Any]:
     # Determine the field name from whichever key is present
     field_name = masked.get("fieldname") or masked.get("field") or ""
 
-    if _is_sensitive_field(field_name):
+    if is_sensitive_field(field_name):
         for key in ("oldvalue", "newvalue", "old_value", "new_value"):
             if key in masked:
                 masked[key] = MASK_VALUE
@@ -141,14 +141,26 @@ def can_write(
     override: bool = False,
 ) -> bool:
     """Check if write operations are allowed for the given table and environment."""
-    # Always block writes to denied tables
-    if table.lower() in DENIED_TABLES:
-        logger.warning("Write blocked: table '%s' is on deny list", table)
+    if override:
+        return True
+    reason = write_blocked_reason(table, settings)
+    if reason is not None:
+        logger.warning("Write blocked: %s", reason)
         return False
-
-    # In production, require explicit override
-    if settings.is_production and not override:
-        logger.warning("Write blocked: table '%s' in production environment '%s'", table, settings.servicenow_env)
-        return False
-
     return True
+
+
+def write_blocked_reason(table: str, settings: Settings) -> str | None:
+    """Pre-flight local policy check for write operations.
+
+    Checks local policy only (denied tables, production env).
+    ServiceNow-side ACL denials will surface as ForbiddenError
+    from the HTTP layer and should be handled by callers.
+
+    Returns a reason string if writes are blocked, or None if allowed.
+    """
+    if table.lower() in DENIED_TABLES:
+        return f"Write operations are blocked for table '{table}' (restricted table)"
+    if settings.is_production:
+        return "Write operations are blocked in production environments"
+    return None

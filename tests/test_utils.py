@@ -1,9 +1,13 @@
 """Tests for utility functions."""
 
+import json
 import uuid
 import warnings
 
 import pytest
+
+from servicenow_mcp.errors import ForbiddenError
+from servicenow_mcp.utils import safe_tool_call
 
 
 class TestCorrelationId:
@@ -556,3 +560,41 @@ class TestServiceNowQueryInList:
 
         result = ServiceNowQuery().in_list("state", []).build()
         assert result == "stateIN"
+
+
+class TestSafeToolCall:
+    """Tests for the safe_tool_call error-handling wrapper."""
+
+    async def test_success_passthrough(self):
+        """Successful fn return passes through unchanged."""
+
+        async def fn() -> str:
+            return '{"status": "ok"}'
+
+        result = await safe_tool_call(fn, "test-corr-id")
+        assert result == '{"status": "ok"}'
+
+    async def test_forbidden_error_returns_acl_envelope(self):
+        """ForbiddenError is caught and formatted as ACL denial."""
+
+        async def fn() -> str:
+            raise ForbiddenError("no access to incident")
+
+        result = await safe_tool_call(fn, "test-corr-id")
+        parsed = json.loads(result)
+        assert parsed["status"] == "error"
+        assert "Access denied by ServiceNow ACL" in parsed["error"]
+        assert "no access to incident" in parsed["error"]
+        assert parsed["correlation_id"] == "test-corr-id"
+
+    async def test_generic_exception_returns_error_envelope(self):
+        """Generic exceptions are caught and formatted as error envelope."""
+
+        async def fn() -> str:
+            raise ValueError("something broke")
+
+        result = await safe_tool_call(fn, "test-corr-id")
+        parsed = json.loads(result)
+        assert parsed["status"] == "error"
+        assert "something broke" in parsed["error"]
+        assert parsed["correlation_id"] == "test-corr-id"

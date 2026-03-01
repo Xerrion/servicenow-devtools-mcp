@@ -12,7 +12,13 @@ from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.config import Settings
 from servicenow_mcp.policy import check_table_access, mask_sensitive_fields
 from servicenow_mcp.tools.metadata import ARTIFACT_TABLES
-from servicenow_mcp.utils import ServiceNowQuery, format_response, generate_correlation_id, validate_identifier
+from servicenow_mcp.utils import (
+    ServiceNowQuery,
+    format_response,
+    generate_correlation_id,
+    safe_tool_call,
+    validate_identifier,
+)
 
 
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
@@ -29,7 +35,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             table: The table name to map.
         """
         correlation_id = generate_correlation_id()
-        try:
+
+        async def _run() -> str:
             validate_identifier(table)
             check_table_access(table)
 
@@ -150,15 +157,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     correlation_id=correlation_id,
                 )
             )
-        except Exception as exc:
-            return json.dumps(
-                format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error=str(exc),
-                )
-            )
+
+        return await safe_tool_call(_run, correlation_id)
 
     @mcp.tool()
     async def docs_artifact_summary(artifact_type: str, sys_id: str) -> str:
@@ -172,7 +172,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             sys_id: The sys_id of the artifact.
         """
         correlation_id = generate_correlation_id()
-        try:
+
+        async def _run() -> str:
             table = ARTIFACT_TABLES.get(artifact_type)
             if not table:
                 valid_types = ", ".join(sorted(ARTIFACT_TABLES.keys()))
@@ -216,15 +217,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     correlation_id=correlation_id,
                 )
             )
-        except Exception as exc:
-            return json.dumps(
-                format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error=str(exc),
-                )
-            )
+
+        return await safe_tool_call(_run, correlation_id)
 
     @mcp.tool()
     async def docs_test_scenarios(artifact_type: str, sys_id: str) -> str:
@@ -238,7 +232,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             sys_id: The sys_id of the artifact.
         """
         correlation_id = generate_correlation_id()
-        try:
+
+        async def _run() -> str:
             table = ARTIFACT_TABLES.get(artifact_type)
             if not table:
                 valid_types = ", ".join(sorted(ARTIFACT_TABLES.keys()))
@@ -274,15 +269,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     correlation_id=correlation_id,
                 )
             )
-        except Exception as exc:
-            return json.dumps(
-                format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error=str(exc),
-                )
-            )
+
+        return await safe_tool_call(_run, correlation_id)
 
     @mcp.tool()
     async def docs_review_notes(artifact_type: str, sys_id: str) -> str:
@@ -296,7 +284,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             sys_id: The sys_id of the artifact.
         """
         correlation_id = generate_correlation_id()
-        try:
+
+        async def _run() -> str:
             table = ARTIFACT_TABLES.get(artifact_type)
             if not table:
                 valid_types = ", ".join(sorted(ARTIFACT_TABLES.keys()))
@@ -332,15 +321,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     correlation_id=correlation_id,
                 )
             )
-        except Exception as exc:
-            return json.dumps(
-                format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error=str(exc),
-                )
-            )
+
+        return await safe_tool_call(_run, correlation_id)
 
 
 # ── Helper functions ──────────────────────────────────────────────────────

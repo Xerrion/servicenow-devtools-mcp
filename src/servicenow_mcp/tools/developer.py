@@ -1,8 +1,7 @@
-"""Developer action tools for toggling artifacts, managing properties, seeding data, and preview/apply workflows."""
+"""Record CRUD tools for creating, reading, updating, and deleting ServiceNow records."""
 
-import asyncio
 import json
-import uuid
+import logging
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
@@ -11,351 +10,201 @@ from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.config import Settings
 from servicenow_mcp.policy import (
-    DENIED_TABLES,
     MASK_VALUE,
-    _is_sensitive_field,
     check_table_access,
+    is_sensitive_field,
     mask_sensitive_fields,
+    write_blocked_reason,
 )
-from servicenow_mcp.state import PreviewTokenStore, SeededRecordTracker
-from servicenow_mcp.tools.metadata import ARTIFACT_TABLES
-from servicenow_mcp.utils import ServiceNowQuery, format_response, generate_correlation_id, validate_identifier
+from servicenow_mcp.state import PreviewTokenStore
+from servicenow_mcp.utils import format_response, generate_correlation_id, safe_tool_call, validate_identifier
+
+logger = logging.getLogger(__name__)
 
 
-def _write_blocked_reason(table: str, settings: "Settings") -> str | None:
-    """Return an error message if writes are blocked, or None if allowed."""
-    if table.lower() in DENIED_TABLES:
-        return f"Write operations are blocked for table '{table}' (restricted table)"
-    if settings.is_production:
-        return "Write operations are blocked in production environments"
+def _write_gate(table: str, settings: Settings, correlation_id: str) -> str | None:
+    """Check write access and return a JSON error envelope if blocked, or None if allowed."""
+    reason = write_blocked_reason(table, settings)
+    if reason:
+        return json.dumps(
+            format_response(
+                data=None,
+                correlation_id=correlation_id,
+                status="error",
+                error=reason,
+            )
+        )
     return None
 
 
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
-    """Register developer action tools on the MCP server."""
+    """Register record CRUD tools on the MCP server."""
 
-    # In-memory state stores, shared across tools via closure
+    # In-memory preview token store, shared across preview/apply tools via closure
     preview_store = PreviewTokenStore()
-    seed_tracker = SeededRecordTracker()
+
+    async def _check_mandatory_fields(
+        client: ServiceNowClient,
+        table: str,
+        data: dict[str, Any],
+    ) -> list[str]:
+        """Return list of mandatory field names missing from data.
+
+        Best-effort: if metadata fetch fails, logs a warning and returns
+        an empty list so the create can proceed (ServiceNow will still
+        validate server-side).
+        """
+        try:
+            metadata = await client.get_metadata(table)
+        except Exception:
+            logger.warning("Failed to fetch metadata for mandatory field check on table '%s'", table)
+            return []
+        mandatory_fields = [
+            entry["element"] for entry in metadata if entry.get("mandatory") == "true" and entry.get("element")
+        ]
+        return [f for f in mandatory_fields if f not in data]
 
     @mcp.tool()
-    async def dev_toggle(artifact_type: str, sys_id: str, active: bool) -> str:
-        """Toggle the active field on a ServiceNow artifact (business rule, script include, etc.).
+    async def record_create(table: str, data: str) -> str:
+        """Create a new record in a ServiceNow table.
 
         Args:
-            artifact_type: The type of artifact (e.g. 'business_rule', 'script_include').
-            sys_id: The sys_id of the artifact record.
-            active: Whether to set the artifact active (true) or inactive (false).
+            table: The table to create the record in (e.g. 'incident').
+            data: A JSON string of field-value pairs for the new record.
         """
         correlation_id = generate_correlation_id()
-        try:
-            # Resolve artifact type to table name
-            table = ARTIFACT_TABLES.get(artifact_type)
-            if table is None:
-                return json.dumps(
-                    format_response(
-                        data=None,
-                        correlation_id=correlation_id,
-                        status="error",
-                        error=f"Unknown artifact type: '{artifact_type}'. "
-                        f"Valid types: {', '.join(sorted(ARTIFACT_TABLES.keys()))}",
-                    )
-                )
 
-            check_table_access(table)
-            validate_identifier(sys_id)
-
-            # Write gate
-            reason = _write_blocked_reason(table, settings)
-            if reason:
-                return json.dumps(
-                    format_response(
-                        data=None,
-                        correlation_id=correlation_id,
-                        status="error",
-                        error=reason,
-                    )
-                )
-
-            async with ServiceNowClient(settings, auth_provider) as client:
-                # Read current state
-                current = await client.get_record(table, sys_id)
-                old_active = current.get("active", "unknown")
-
-                # Update active field
-                updated = await client.update_record(table, sys_id, {"active": str(active).lower()})
-                new_active = updated.get("active", "unknown")
-
-            return json.dumps(
-                format_response(
-                    data={
-                        "sys_id": sys_id,
-                        "artifact_type": artifact_type,
-                        "table": table,
-                        "old_active": old_active,
-                        "new_active": new_active,
-                    },
-                    correlation_id=correlation_id,
-                )
-            )
-        except Exception as e:
-            return json.dumps(
-                format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error=str(e),
-                )
-            )
-
-    @mcp.tool()
-    async def dev_set_property(name: str, value: str) -> str:
-        """Set a ServiceNow system property value. Returns the old value.
-
-        Args:
-            name: The property name (e.g. 'glide.ui.session_timeout').
-            value: The new value to set.
-        """
-        correlation_id = generate_correlation_id()
-        try:
-            # Write gate
-            check_table_access("sys_properties")
-            reason = _write_blocked_reason("sys_properties", settings)
-            if reason:
-                return json.dumps(
-                    format_response(
-                        data=None,
-                        correlation_id=correlation_id,
-                        status="error",
-                        error=reason,
-                    )
-                )
-
-            async with ServiceNowClient(settings, auth_provider) as client:
-                # Find the property by name
-                result = await client.query_records(
-                    "sys_properties",
-                    ServiceNowQuery().equals("name", name).build(),
-                    limit=1,
-                )
-                records = result["records"]
-                if not records:
-                    return json.dumps(
-                        format_response(
-                            data=None,
-                            correlation_id=correlation_id,
-                            status="error",
-                            error=f"Property '{name}' not found",
-                        )
-                    )
-
-                prop = records[0]
-                prop_sys_id = prop["sys_id"]
-                old_value = prop.get("value", "")
-
-                # Update the property value
-                updated = await client.update_record("sys_properties", prop_sys_id, {"value": value})
-                new_value = updated.get("value", value)
-
-            # Mask values for sensitive property names
-            display_old = MASK_VALUE if _is_sensitive_field(name) else old_value
-            display_new = MASK_VALUE if _is_sensitive_field(name) else new_value
-
-            return json.dumps(
-                format_response(
-                    data={
-                        "name": name,
-                        "sys_id": prop_sys_id,
-                        "old_value": display_old,
-                        "new_value": display_new,
-                    },
-                    correlation_id=correlation_id,
-                )
-            )
-        except Exception as e:
-            return json.dumps(
-                format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error=str(e),
-                )
-            )
-
-    @mcp.tool()
-    async def dev_seed_test_data(table: str, records: str, tag: str | None = None) -> str:
-        """Create test data records in a ServiceNow table. Returns sys_ids and a cleanup tag.
-
-        Args:
-            table: The table to insert records into (e.g. 'incident').
-            records: A JSON string containing an array of record objects to create.
-            tag: Optional tag for grouping seeded records for cleanup. Auto-generated if omitted.
-        """
-        correlation_id = generate_correlation_id()
-        try:
+        async def _run() -> str:
             validate_identifier(table)
             check_table_access(table)
 
-            # Write gate
-            reason = _write_blocked_reason(table, settings)
-            if reason:
-                return json.dumps(
-                    format_response(
-                        data=None,
-                        correlation_id=correlation_id,
-                        status="error",
-                        error=reason,
-                    )
-                )
+            blocked = _write_gate(table, settings, correlation_id)
+            if blocked:
+                return blocked
 
-            # Parse records JSON string
-            record_list = json.loads(records)
+            record_data = json.loads(data)
 
-            # Auto-generate tag if not provided
-            seed_tag = tag if tag else f"seed-{uuid.uuid4().hex[:8]}"
-
-            sys_ids: list[str] = []
-            errors: list[str] = []
-            sem = asyncio.Semaphore(10)
             async with ServiceNowClient(settings, auth_provider) as client:
-
-                async def _create_one(record_data: dict[str, Any]) -> dict[str, Any]:
-                    async with sem:
-                        return await client.create_record(table, record_data)
-
-                results = await asyncio.gather(
-                    *(_create_one(record_data) for record_data in record_list),
-                    return_exceptions=True,
-                )
-                for result in results:
-                    if isinstance(result, BaseException):
-                        errors.append(str(result))
-                    else:
-                        sys_ids.append(result["sys_id"])
-
-            # Track only successful creates for cleanup
-            if sys_ids:
-                seed_tracker.track(seed_tag, table, sys_ids)
+                missing = await _check_mandatory_fields(client, table, record_data)
+                if missing:
+                    return json.dumps(
+                        format_response(
+                            data={"table": table, "missing_fields": missing},
+                            correlation_id=correlation_id,
+                            status="error",
+                            error=f"Missing mandatory fields for table '{table}': {', '.join(missing)}",
+                        )
+                    )
+                created = await client.create_record(table, record_data)
 
             return json.dumps(
                 format_response(
                     data={
                         "table": table,
-                        "created_count": len(sys_ids),
-                        "sys_ids": sys_ids,
-                        "tag": seed_tag,
-                        "failed_count": len(errors),
-                        "errors": errors,
+                        "sys_id": created["sys_id"],
+                        "record": mask_sensitive_fields(created),
                     },
                     correlation_id=correlation_id,
                 )
             )
-        except Exception as e:
-            return json.dumps(
-                format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error=str(e),
-                )
-            )
+
+        return await safe_tool_call(_run, correlation_id)
 
     @mcp.tool()
-    async def dev_cleanup(tag: str) -> str:
-        """Delete all records previously seeded with the given tag.
+    async def record_preview_create(table: str, data: str) -> str:
+        """Preview a record creation without executing it. Returns a token to apply later.
 
         Args:
-            tag: The seed tag returned by dev_seed_test_data.
+            table: The table to create the record in (e.g. 'incident').
+            data: A JSON string of field-value pairs for the new record.
         """
         correlation_id = generate_correlation_id()
-        try:
-            # Look up tracked records
-            entries = seed_tracker.get(tag)
-            if entries is None:
-                return json.dumps(
-                    format_response(
-                        data=None,
-                        correlation_id=correlation_id,
-                        status="error",
-                        error=f"No records found for tag '{tag}'",
-                    )
-                )
 
-            # Write gate — check each entry's table for access and write permissions
-            for entry in entries:
-                tbl = entry["table"]
-                check_table_access(tbl)
-                reason = _write_blocked_reason(tbl, settings)
-                if reason:
+        async def _run() -> str:
+            validate_identifier(table)
+            check_table_access(table)
+
+            blocked = _write_gate(table, settings, correlation_id)
+            if blocked:
+                return blocked
+
+            record_data = json.loads(data)
+
+            async with ServiceNowClient(settings, auth_provider) as client:
+                missing = await _check_mandatory_fields(client, table, record_data)
+                if missing:
                     return json.dumps(
                         format_response(
-                            data=None,
+                            data={"table": table, "missing_fields": missing},
                             correlation_id=correlation_id,
                             status="error",
-                            error=reason,
+                            error=f"Missing mandatory fields for table '{table}': {', '.join(missing)}",
                         )
                     )
 
-            deleted_count = 0
-            failed_records: list[dict[str, str]] = []
-            sem = asyncio.Semaphore(10)
-            async with ServiceNowClient(settings, auth_provider) as client:
-                delete_meta: list[tuple[str, str]] = []
-                for entry in entries:
-                    tbl = entry["table"]
-                    for sid in entry["sys_ids"]:
-                        delete_meta.append((tbl, sid))
-
-                async def _delete_one(tbl: str, sid: str) -> None:
-                    async with sem:
-                        await client.delete_record(tbl, sid)
-
-                results = await asyncio.gather(
-                    *(_delete_one(tbl, sid) for tbl, sid in delete_meta),
-                    return_exceptions=True,
-                )
-                for i, result in enumerate(results):
-                    tbl, sid = delete_meta[i]
-                    if isinstance(result, BaseException):
-                        failed_records.append({"table": tbl, "sys_id": sid, "error": str(result)})
-                    else:
-                        deleted_count += 1
-
-            # Only remove the tag if ALL deletions succeeded
-            if not failed_records:
-                seed_tracker.remove(tag)
-            else:
-                # Update tracker to keep only failed records
-                remaining: dict[str, list[str]] = {}
-                for fr in failed_records:
-                    remaining.setdefault(fr["table"], []).append(fr["sys_id"])
-                seed_tracker.remove(tag)
-                for tbl, sids in remaining.items():
-                    seed_tracker.track(tag, tbl, sids)
+            # Store for later apply - no further HTTP call needed
+            token = preview_store.create(
+                {
+                    "action": "create",
+                    "table": table,
+                    "data": record_data,
+                }
+            )
 
             return json.dumps(
                 format_response(
                     data={
-                        "tag": tag,
-                        "deleted_count": deleted_count,
-                        "failed_count": len(failed_records),
-                        "failed_records": failed_records,
+                        "token": token,
+                        "table": table,
+                        "action": "create",
+                        "data": mask_sensitive_fields(record_data),
                     },
                     correlation_id=correlation_id,
                 )
             )
-        except Exception as e:
+
+        return await safe_tool_call(_run, correlation_id)
+
+    @mcp.tool()
+    async def record_update(table: str, sys_id: str, changes: str) -> str:
+        """Update an existing record in a ServiceNow table.
+
+        Args:
+            table: The table containing the record (e.g. 'incident').
+            sys_id: The sys_id of the record to update.
+            changes: A JSON string of field-value pairs to update.
+        """
+        correlation_id = generate_correlation_id()
+
+        async def _run() -> str:
+            validate_identifier(table)
+            validate_identifier(sys_id)
+            check_table_access(table)
+
+            blocked = _write_gate(table, settings, correlation_id)
+            if blocked:
+                return blocked
+
+            changes_dict = json.loads(changes)
+
+            async with ServiceNowClient(settings, auth_provider) as client:
+                updated = await client.update_record(table, sys_id, changes_dict)
+
             return json.dumps(
                 format_response(
-                    data=None,
+                    data={
+                        "table": table,
+                        "sys_id": sys_id,
+                        "record": mask_sensitive_fields(updated),
+                    },
                     correlation_id=correlation_id,
-                    status="error",
-                    error=str(e),
                 )
             )
 
+        return await safe_tool_call(_run, correlation_id)
+
     @mcp.tool()
-    async def table_preview_update(table: str, sys_id: str, changes: str) -> str:
+    async def record_preview_update(table: str, sys_id: str, changes: str) -> str:
         """Preview an update to a record: shows field-level diff and returns a token to apply.
 
         Args:
@@ -364,24 +213,16 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             changes: A JSON string of field-value pairs to change.
         """
         correlation_id = generate_correlation_id()
-        try:
+
+        async def _run() -> str:
             validate_identifier(table)
             validate_identifier(sys_id)
             check_table_access(table)
 
-            # Write gate
-            reason = _write_blocked_reason(table, settings)
-            if reason:
-                return json.dumps(
-                    format_response(
-                        data=None,
-                        correlation_id=correlation_id,
-                        status="error",
-                        error=reason,
-                    )
-                )
+            blocked = _write_gate(table, settings, correlation_id)
+            if blocked:
+                return blocked
 
-            # Parse changes JSON string
             changes_dict = json.loads(changes)
 
             async with ServiceNowClient(settings, auth_provider) as client:
@@ -391,7 +232,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             diff: dict[str, dict[str, str]] = {}
             for field, new_value in changes_dict.items():
                 old_value = current.get(field, "")
-                if _is_sensitive_field(field):
+                if is_sensitive_field(field):
                     diff[field] = {"old": MASK_VALUE, "new": MASK_VALUE}
                 else:
                     diff[field] = {"old": old_value, "new": new_value}
@@ -399,6 +240,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             # Store preview for later apply
             token = preview_store.create(
                 {
+                    "action": "update",
                     "table": table,
                     "sys_id": sys_id,
                     "changes": changes_dict,
@@ -416,25 +258,100 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     correlation_id=correlation_id,
                 )
             )
-        except Exception as e:
+
+        return await safe_tool_call(_run, correlation_id)
+
+    @mcp.tool()
+    async def record_delete(table: str, sys_id: str) -> str:
+        """Delete a record from a ServiceNow table.
+
+        Args:
+            table: The table containing the record (e.g. 'incident').
+            sys_id: The sys_id of the record to delete.
+        """
+        correlation_id = generate_correlation_id()
+
+        async def _run() -> str:
+            validate_identifier(table)
+            validate_identifier(sys_id)
+            check_table_access(table)
+
+            blocked = _write_gate(table, settings, correlation_id)
+            if blocked:
+                return blocked
+
+            async with ServiceNowClient(settings, auth_provider) as client:
+                await client.delete_record(table, sys_id)
+
             return json.dumps(
                 format_response(
-                    data=None,
+                    data={
+                        "table": table,
+                        "sys_id": sys_id,
+                        "deleted": True,
+                    },
                     correlation_id=correlation_id,
-                    status="error",
-                    error=str(e),
                 )
             )
 
+        return await safe_tool_call(_run, correlation_id)
+
     @mcp.tool()
-    async def table_apply_update(preview_token: str) -> str:
-        """Apply a previously previewed update using the preview token.
+    async def record_preview_delete(table: str, sys_id: str) -> str:
+        """Preview a record deletion: shows the record that will be deleted and returns a token to confirm.
 
         Args:
-            preview_token: The token returned by table_preview_update.
+            table: The table containing the record (e.g. 'incident').
+            sys_id: The sys_id of the record to delete.
         """
         correlation_id = generate_correlation_id()
-        try:
+
+        async def _run() -> str:
+            validate_identifier(table)
+            validate_identifier(sys_id)
+            check_table_access(table)
+
+            blocked = _write_gate(table, settings, correlation_id)
+            if blocked:
+                return blocked
+
+            async with ServiceNowClient(settings, auth_provider) as client:
+                record = await client.get_record(table, sys_id)
+
+            # Store preview for later apply
+            token = preview_store.create(
+                {
+                    "action": "delete",
+                    "table": table,
+                    "sys_id": sys_id,
+                    "record_snapshot": record,
+                }
+            )
+
+            return json.dumps(
+                format_response(
+                    data={
+                        "token": token,
+                        "table": table,
+                        "sys_id": sys_id,
+                        "record_snapshot": mask_sensitive_fields(record),
+                    },
+                    correlation_id=correlation_id,
+                )
+            )
+
+        return await safe_tool_call(_run, correlation_id)
+
+    @mcp.tool()
+    async def record_apply(preview_token: str) -> str:
+        """Apply a previously previewed action (create, update, or delete) using the preview token.
+
+        Args:
+            preview_token: The single-use token returned by record_preview_create, record_preview_update, or record_preview_delete.
+        """
+        correlation_id = generate_correlation_id()
+
+        async def _run() -> str:
             # Consume the token (single-use)
             payload = preview_store.consume(preview_token)
             if payload is None:
@@ -447,42 +364,78 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     )
                 )
 
+            action = payload["action"]
             table = payload["table"]
-            sys_id = payload["sys_id"]
-            changes = payload["changes"]
 
+            # Defense in depth - re-check access and write gate
             check_table_access(table)
-
-            reason = _write_blocked_reason(table, settings)
-            if reason:
-                return json.dumps(
-                    format_response(
-                        data=None,
-                        correlation_id=correlation_id,
-                        status="error",
-                        error=reason,
-                    )
-                )
+            blocked = _write_gate(table, settings, correlation_id)
+            if blocked:
+                return blocked
 
             async with ServiceNowClient(settings, auth_provider) as client:
-                updated = await client.update_record(table, sys_id, changes)
+                if action == "create":
+                    missing = await _check_mandatory_fields(client, payload["table"], payload["data"])
+                    if missing:
+                        return json.dumps(
+                            format_response(
+                                data={"table": payload["table"], "missing_fields": missing},
+                                correlation_id=correlation_id,
+                                status="error",
+                                error=f"Missing mandatory fields for table '{payload['table']}': {', '.join(missing)}",
+                            )
+                        )
+                    result = await client.create_record(table, payload["data"])
+                    return json.dumps(
+                        format_response(
+                            data={
+                                "action": "create",
+                                "table": table,
+                                "sys_id": result["sys_id"],
+                                "record": mask_sensitive_fields(result),
+                            },
+                            correlation_id=correlation_id,
+                        )
+                    )
 
-            return json.dumps(
-                format_response(
-                    data={
-                        "table": table,
-                        "sys_id": sys_id,
-                        "record": mask_sensitive_fields(updated),
-                    },
-                    correlation_id=correlation_id,
-                )
-            )
-        except Exception as e:
-            return json.dumps(
-                format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error=str(e),
-                )
-            )
+                elif action == "update":
+                    sys_id = payload["sys_id"]
+                    result = await client.update_record(table, sys_id, payload["changes"])
+                    return json.dumps(
+                        format_response(
+                            data={
+                                "action": "update",
+                                "table": table,
+                                "sys_id": sys_id,
+                                "record": mask_sensitive_fields(result),
+                            },
+                            correlation_id=correlation_id,
+                        )
+                    )
+
+                elif action == "delete":
+                    sys_id = payload["sys_id"]
+                    await client.delete_record(table, sys_id)
+                    return json.dumps(
+                        format_response(
+                            data={
+                                "action": "delete",
+                                "table": table,
+                                "sys_id": sys_id,
+                                "deleted": True,
+                            },
+                            correlation_id=correlation_id,
+                        )
+                    )
+
+                else:
+                    return json.dumps(
+                        format_response(
+                            data=None,
+                            correlation_id=correlation_id,
+                            status="error",
+                            error=f"Unknown preview action: '{action}'",
+                        )
+                    )
+
+        return await safe_tool_call(_run, correlation_id)

@@ -14,6 +14,7 @@ from servicenow_mcp.utils import (
     ServiceNowQuery,
     format_response,
     generate_correlation_id,
+    safe_tool_call,
     validate_identifier,
 )
 
@@ -30,7 +31,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             sys_id: The sys_id of the target record.
         """
         correlation_id = generate_correlation_id()
-        try:
+
+        async def _run() -> str:
             validate_identifier(table)
             check_table_access(table)
             # Query sys_dictionary for reference fields pointing to this table
@@ -88,16 +90,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 ),
                 indent=2,
             )
-        except Exception as e:
-            return json.dumps(
-                format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error=str(e),
-                ),
-                indent=2,
-            )
+
+        return await safe_tool_call(_run, correlation_id)
 
     @mcp.tool()
     async def rel_references_from(table: str, sys_id: str) -> str:
@@ -108,7 +102,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             sys_id: The sys_id of the source record.
         """
         correlation_id = generate_correlation_id()
-        try:
+
+        async def _run() -> str:
             validate_identifier(table)
             check_table_access(table)
             async with ServiceNowClient(settings, auth_provider) as client:
@@ -147,13 +142,5 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 ),
                 indent=2,
             )
-        except Exception as e:
-            return json.dumps(
-                format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error=str(e),
-                ),
-                indent=2,
-            )
+
+        return await safe_tool_call(_run, correlation_id)
