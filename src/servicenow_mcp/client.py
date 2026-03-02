@@ -14,6 +14,7 @@ from servicenow_mcp.errors import (
     ServerError,
     ServiceNowMCPError,
 )
+from servicenow_mcp.policy import INTERNAL_QUERY_LIMIT
 from servicenow_mcp.utils import ServiceNowQuery, validate_identifier
 
 
@@ -126,6 +127,7 @@ class ServiceNowClient:
         limit: int = 100,
         offset: int = 0,
         order_by: str | None = None,
+        display_values: bool = False,
     ) -> dict[str, Any]:
         """Query records with encoded query string."""
         http = self._ensure_client()
@@ -138,6 +140,8 @@ class ServiceNowClient:
             params["sysparm_fields"] = ",".join(fields)
         if order_by:
             params["sysparm_orderby"] = order_by
+        if display_values:
+            params["sysparm_display_value"] = "true"
 
         response = await http.get(
             self._table_url(table),
@@ -158,7 +162,7 @@ class ServiceNowClient:
         http = self._ensure_client()
         params = {
             "sysparm_query": ServiceNowQuery().equals("name", table).build(),
-            "sysparm_limit": "500",
+            "sysparm_limit": str(INTERNAL_QUERY_LIMIT),
         }
 
         response = await http.get(

@@ -4,7 +4,7 @@ import asyncio
 from typing import Any
 
 from servicenow_mcp.client import ServiceNowClient
-from servicenow_mcp.policy import check_table_access, mask_sensitive_fields
+from servicenow_mcp.policy import INTERNAL_QUERY_LIMIT, check_table_access, mask_sensitive_fields
 from servicenow_mcp.utils import ServiceNowQuery, validate_identifier
 
 
@@ -59,25 +59,25 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
             "sys_script",
             br_q.build(),
             fields=["sys_id", "name", "when"],
-            limit=200,
+            limit=INTERNAL_QUERY_LIMIT,
         ),
         client.query_records(
             "sys_script_client",
             cs_q.build(),
             fields=["sys_id", "name", "type"],
-            limit=200,
+            limit=INTERNAL_QUERY_LIMIT,
         ),
         client.query_records(
             "sys_security_acl",
             acl_q.build(),
             fields=["sys_id", "name", "operation"],
-            limit=200,
+            limit=INTERNAL_QUERY_LIMIT,
         ),
         client.query_records(
             "sys_ui_policy",
             uip_q.build(),
             fields=["sys_id", "short_description"],
-            limit=200,
+            limit=INTERNAL_QUERY_LIMIT,
         ),
         client.query_records(
             "syslog",

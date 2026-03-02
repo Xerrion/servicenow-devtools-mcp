@@ -8,7 +8,7 @@ from mcp.server.fastmcp import FastMCP
 from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.config import Settings
-from servicenow_mcp.policy import check_table_access, enforce_query_safety, mask_sensitive_fields
+from servicenow_mcp.policy import INTERNAL_QUERY_LIMIT, check_table_access, enforce_query_safety, mask_sensitive_fields
 from servicenow_mcp.utils import (
     ServiceNowQuery,
     format_response,
@@ -229,7 +229,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 result = await client.query_records(
                     "sys_script",
                     ServiceNowQuery().equals("collection", table).build(),
-                    limit=200,
+                    limit=INTERNAL_QUERY_LIMIT,
                 )
 
                 for record in result["records"]:
