@@ -248,6 +248,34 @@ class TestTableQuery:
         assert result["status"] == "error"
         assert "denied" in result["error"].lower()
 
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_display_values_passed_to_client(self, settings, auth_provider):
+        """When display_values=True, sysparm_display_value=true is sent to the API."""
+        route = respx.get(f"{BASE_URL}/api/now/table/incident").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": [
+                        {"sys_id": "1", "number": "INC0001", "priority": "1 - Critical"},
+                    ]
+                },
+                headers={"X-Total-Count": "1"},
+            )
+        )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["table_query"](table="incident", query="active=true", display_values=True)
+        result = json.loads(raw)
+
+        assert result["status"] == "success"
+        assert len(result["data"]) == 1
+
+        # Verify the request included sysparm_display_value=true
+        assert route.called
+        request = route.calls.last.request
+        assert "sysparm_display_value=true" in str(request.url)
+
 
 class TestTableAggregate:
     """Tests for the table_aggregate tool."""

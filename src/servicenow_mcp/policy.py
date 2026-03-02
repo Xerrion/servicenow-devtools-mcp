@@ -33,6 +33,9 @@ _SENSITIVE_PATTERNS: list[re.Pattern[str]] = [
 
 MASK_VALUE = "***MASKED***"
 
+# Standard limit for internal/metadata queries (not user-facing)
+INTERNAL_QUERY_LIMIT: int = 1000
+
 # Date field patterns used to detect date-bounded filters
 _DATE_FIELD_PATTERNS: list[str] = [
     "sys_created_on",

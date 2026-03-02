@@ -10,7 +10,7 @@ from mcp.server.fastmcp import FastMCP
 from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.config import Settings
-from servicenow_mcp.policy import check_table_access, mask_sensitive_fields
+from servicenow_mcp.policy import INTERNAL_QUERY_LIMIT, check_table_access, mask_sensitive_fields
 from servicenow_mcp.tools.metadata import ARTIFACT_TABLES
 from servicenow_mcp.utils import (
     ServiceNowQuery,
@@ -56,25 +56,25 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                             "order",
                             "active",
                         ],
-                        limit=200,
+                        limit=INTERNAL_QUERY_LIMIT,
                     ),
                     client.query_records(
                         "sys_script_client",
                         ServiceNowQuery().equals("table", table).equals("active", "true").build(),
                         fields=["sys_id", "name", "type", "active"],
-                        limit=200,
+                        limit=INTERNAL_QUERY_LIMIT,
                     ),
                     client.query_records(
                         "sys_ui_policy",
                         ServiceNowQuery().equals("table", table).equals("active", "true").build(),
                         fields=["sys_id", "short_description", "active"],
-                        limit=200,
+                        limit=INTERNAL_QUERY_LIMIT,
                     ),
                     client.query_records(
                         "sys_ui_action",
                         ServiceNowQuery().equals("table", table).equals("active", "true").build(),
                         fields=["sys_id", "name", "action_name", "active"],
-                        limit=200,
+                        limit=INTERNAL_QUERY_LIMIT,
                     ),
                 )
 

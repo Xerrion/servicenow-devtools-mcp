@@ -108,6 +108,131 @@ class TestRelReferencesTo:
         assert result["status"] == "error"
         assert "denied" in result["error"].lower()
 
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_paginates_all_dictionary_entries(self, settings, auth_provider):
+        """Paginated sys_dictionary fetches collect fields across all pages."""
+        page_size = 1000
+
+        # Build two pages: first page has exactly page_size entries, second has 2
+        page1_fields = [
+            {"name": f"table_p1_{i}", "element": "ref_field", "reference": "sys_user", "column_label": f"Ref {i}"}
+            for i in range(page_size)
+        ]
+        page2_fields = [
+            {"name": "task", "element": "assigned_to", "reference": "sys_user", "column_label": "Assigned to"},
+            {"name": "task", "element": "opened_by", "reference": "sys_user", "column_label": "Opened by"},
+        ]
+
+        dict_route = respx.get(f"{BASE_URL}/api/now/table/sys_dictionary")
+        dict_route.side_effect = [
+            # First page: full page_size records -> triggers next page fetch
+            httpx.Response(
+                200,
+                json={"result": page1_fields},
+                headers={"X-Total-Count": str(page_size + 2)},
+            ),
+            # Second page: fewer than page_size -> pagination stops
+            httpx.Response(
+                200,
+                json={"result": page2_fields},
+                headers={"X-Total-Count": str(page_size + 2)},
+            ),
+        ]
+
+        # Mock all referencing tables to return empty results (page 1 tables)
+        for i in range(page_size):
+            respx.get(f"{BASE_URL}/api/now/table/table_p1_{i}").mock(
+                return_value=httpx.Response(
+                    200,
+                    json={"result": []},
+                    headers={"X-Total-Count": "0"},
+                )
+            )
+
+        # Mock the page 2 table (task) - returns a matching record for assigned_to
+        respx.get(f"{BASE_URL}/api/now/table/task").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": [{"sys_id": "task1", "assigned_to": "user123"}]},
+                headers={"X-Total-Count": "1"},
+            )
+        )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["rel_references_to"](table="sys_user", sys_id="user123")
+        result = json.loads(raw)
+
+        assert result["status"] == "success"
+        refs = result["data"]["incoming_references"]
+        # The task table entries from page 2 should be present in results
+        task_refs = [r for r in refs if r["table"] == "task"]
+        assert len(task_refs) >= 1, "Fields from page 2 should be processed"
+        task_fields = {r["field"] for r in task_refs}
+        assert "assigned_to" in task_fields or "opened_by" in task_fields
+
+        # Verify that two sys_dictionary pages were fetched
+        assert dict_route.call_count == 2
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_filters_denied_and_internal_tables(self, settings, auth_provider):
+        """Denied tables and system-internal var__m_ entries are skipped."""
+        denied = next(iter(DENIED_TABLES))
+        respx.get(f"{BASE_URL}/api/now/table/sys_dictionary").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": [
+                        # Denied table entry - should be skipped
+                        {"name": denied, "element": "user", "reference": "sys_user", "column_label": "User"},
+                        # var__m_ internal entry - should be skipped
+                        {
+                            "name": "var__m_some_table",
+                            "element": "ref",
+                            "reference": "sys_user",
+                            "column_label": "Ref",
+                        },
+                        # sys_variable_value entry - should be skipped
+                        {
+                            "name": "sys_variable_value",
+                            "element": "ref",
+                            "reference": "sys_user",
+                            "column_label": "Ref",
+                        },
+                        # Valid entry - should be processed
+                        {
+                            "name": "incident",
+                            "element": "caller_id",
+                            "reference": "sys_user",
+                            "column_label": "Caller",
+                        },
+                    ]
+                },
+                headers={"X-Total-Count": "4"},
+            )
+        )
+
+        # Only incident should be queried (the rest are filtered out)
+        respx.get(f"{BASE_URL}/api/now/table/incident").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": [{"sys_id": "inc1", "caller_id": "user1"}]},
+                headers={"X-Total-Count": "1"},
+            )
+        )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["rel_references_to"](table="sys_user", sys_id="user1")
+        result = json.loads(raw)
+
+        assert result["status"] == "success"
+        refs = result["data"]["incoming_references"]
+        # Only the incident entry should survive filtering
+        assert len(refs) == 1
+        assert refs[0]["table"] == "incident"
+        assert refs[0]["field"] == "caller_id"
+
 
 class TestRelReferencesFrom:
     """Tests for the rel_references_from tool."""
@@ -128,6 +253,14 @@ class TestRelReferencesFrom:
                         "state": "1",
                     }
                 },
+            )
+        )
+        # Mock: hierarchy lookup -- incident has no parent
+        respx.get(f"{BASE_URL}/api/now/table/sys_db_object").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": [{"super_class": ""}]},
+                headers={"X-Total-Count": "1"},
             )
         )
         # Mock: query sys_dictionary for reference fields on 'incident'
@@ -166,12 +299,159 @@ class TestRelReferencesFrom:
 
     @pytest.mark.asyncio
     @respx.mock
+    async def test_finds_inherited_reference_fields(self, settings, auth_provider):
+        """Inherited reference fields from parent tables are included."""
+        # Mock: get the incident record -- has fields from both incident and task
+        respx.get(f"{BASE_URL}/api/now/table/incident/inc001").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": {
+                        "sys_id": "inc001",
+                        "caller_id": "user1",
+                        "assigned_to": "user2",
+                        "opened_by": "user3",
+                        "state": "1",
+                    }
+                },
+            )
+        )
+
+        # Mock: hierarchy -- incident -> task (then task has no parent)
+        hierarchy_route = respx.get(f"{BASE_URL}/api/now/table/sys_db_object")
+        hierarchy_route.side_effect = [
+            # First call: lookup incident -> returns super_class pointing to task
+            httpx.Response(
+                200,
+                json={"result": [{"super_class": {"value": "task_sys_id", "link": ""}}]},
+                headers={"X-Total-Count": "1"},
+            ),
+            # Third call: lookup task -> no super_class
+            httpx.Response(
+                200,
+                json={"result": [{"super_class": ""}]},
+                headers={"X-Total-Count": "1"},
+            ),
+        ]
+
+        # Mock: resolve task_sys_id -> "task"
+        respx.get(f"{BASE_URL}/api/now/table/sys_db_object/task_sys_id").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": {"name": "task"}},
+            )
+        )
+
+        # Mock: sys_dictionary returns fields from both incident and task
+        respx.get(f"{BASE_URL}/api/now/table/sys_dictionary").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": [
+                        # incident's own field
+                        {
+                            "element": "caller_id",
+                            "reference": "sys_user",
+                            "column_label": "Caller",
+                        },
+                        # inherited from task
+                        {
+                            "element": "assigned_to",
+                            "reference": "sys_user",
+                            "column_label": "Assigned to",
+                        },
+                        {
+                            "element": "opened_by",
+                            "reference": "sys_user",
+                            "column_label": "Opened by",
+                        },
+                    ]
+                },
+                headers={"X-Total-Count": "3"},
+            )
+        )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["rel_references_from"](table="incident", sys_id="inc001")
+        result = json.loads(raw)
+
+        assert result["status"] == "success"
+        outgoing = result["data"]["outgoing_references"]
+        fields = [o["field"] for o in outgoing]
+        # All three reference fields should be found (including inherited ones)
+        assert "caller_id" in fields
+        assert "assigned_to" in fields
+        assert "opened_by" in fields
+        assert len(outgoing) == 3
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_hierarchy_stops_at_root(self, settings, auth_provider):
+        """Hierarchy walk terminates when there is no super_class."""
+        # Mock: get the record
+        respx.get(f"{BASE_URL}/api/now/table/task/t1").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": {
+                        "sys_id": "t1",
+                        "assigned_to": "user1",
+                    }
+                },
+            )
+        )
+        # Mock: hierarchy -- task has no parent (empty super_class)
+        respx.get(f"{BASE_URL}/api/now/table/sys_db_object").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": [{"super_class": ""}]},
+                headers={"X-Total-Count": "1"},
+            )
+        )
+        # Mock: sys_dictionary returns one field
+        respx.get(f"{BASE_URL}/api/now/table/sys_dictionary").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": [
+                        {
+                            "element": "assigned_to",
+                            "reference": "sys_user",
+                            "column_label": "Assigned to",
+                        },
+                    ]
+                },
+                headers={"X-Total-Count": "1"},
+            )
+        )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["rel_references_from"](table="task", sys_id="t1")
+        result = json.loads(raw)
+
+        assert result["status"] == "success"
+        outgoing = result["data"]["outgoing_references"]
+        assert len(outgoing) == 1
+        assert outgoing[0]["field"] == "assigned_to"
+        # Only one sys_db_object query should have been made (for "task" itself)
+        # and it stopped immediately since super_class was empty
+
+    @pytest.mark.asyncio
+    @respx.mock
     async def test_handles_no_reference_fields(self, settings, auth_provider):
         """Returns empty outgoing_references when record has no reference fields."""
         respx.get(f"{BASE_URL}/api/now/table/cmdb_ci/ci1").mock(
             return_value=httpx.Response(
                 200,
                 json={"result": {"sys_id": "ci1", "name": "Server01"}},
+            )
+        )
+        # Mock: hierarchy -- cmdb_ci has no parent
+        respx.get(f"{BASE_URL}/api/now/table/sys_db_object").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": [{"super_class": ""}]},
+                headers={"X-Total-Count": "1"},
             )
         )
         respx.get(f"{BASE_URL}/api/now/table/sys_dictionary").mock(

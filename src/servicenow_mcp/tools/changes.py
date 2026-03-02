@@ -9,7 +9,7 @@ from mcp.server.fastmcp import FastMCP
 from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.config import Settings
-from servicenow_mcp.policy import check_table_access, mask_audit_entry, mask_sensitive_fields
+from servicenow_mcp.policy import INTERNAL_QUERY_LIMIT, check_table_access, mask_audit_entry, mask_sensitive_fields
 from servicenow_mcp.utils import (
     ServiceNowQuery,
     format_response,
@@ -64,7 +64,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                         "action",
                         "target_name",
                     ],
-                    limit=500,
+                    limit=INTERNAL_QUERY_LIMIT,
                 )
 
             members = [mask_sensitive_fields(m) for m in members_result["records"]]
@@ -286,7 +286,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     "sys_update_xml",
                     ServiceNowQuery().equals("update_set", update_set_id).build(),
                     fields=["sys_id", "type", "action", "target_name"],
-                    limit=500,
+                    limit=INTERNAL_QUERY_LIMIT,
                 )
 
             members = [mask_sensitive_fields(m) for m in members_result["records"]]
