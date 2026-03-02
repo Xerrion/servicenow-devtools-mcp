@@ -19,6 +19,49 @@ from servicenow_mcp.utils import (
 )
 
 
+async def _resolve_table_hierarchy(client: ServiceNowClient, table: str) -> list[str]:
+    """Resolve a table's inheritance chain by walking sys_db_object.super_class.
+
+    Returns a list starting with *table* followed by its ancestors (e.g.
+    ``["incident", "task"]``).  The walk is capped at 10 iterations to
+    guard against circular references.
+    """
+    tables = [table]
+    current_table = table
+
+    for _ in range(10):
+        result = await client.query_records(
+            "sys_db_object",
+            ServiceNowQuery().equals("name", current_table).build(),
+            fields=["super_class"],
+            limit=1,
+        )
+        records = result.get("records", [])
+        if not records:
+            break
+
+        super_class = records[0].get("super_class", "")
+        if not super_class:
+            break
+
+        # super_class is a reference field -- may come back as a dict or plain string
+        super_class_id = super_class.get("value", "") if isinstance(super_class, dict) else super_class
+
+        if not super_class_id:
+            break
+
+        # Resolve the sys_id to the parent table's name
+        parent = await client.get_record("sys_db_object", super_class_id, fields=["name"])
+        parent_name = parent.get("name", "")
+        if not parent_name or parent_name in tables:
+            break
+
+        tables.append(parent_name)
+        current_table = parent_name
+
+    return tables
+
+
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
     """Register relationship tools on the MCP server."""
 
@@ -110,12 +153,15 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 # Get the record
                 record = mask_sensitive_fields(await client.get_record(table, sys_id, display_values=True))
 
-                # Get reference fields for this table
+                # Resolve full table hierarchy (e.g. incident -> task) so we
+                # pick up inherited reference fields from parent tables.
+                table_hierarchy = await _resolve_table_hierarchy(client, table)
+
                 ref_fields = await client.query_records(
                     "sys_dictionary",
-                    ServiceNowQuery().equals("name", table).equals("internal_type", "reference").build(),
+                    ServiceNowQuery().in_list("name", table_hierarchy).equals("internal_type", "reference").build(),
                     fields=["element", "reference", "column_label"],
-                    limit=100,
+                    limit=200,
                 )
 
                 outgoing: list[dict[str, Any]] = []
