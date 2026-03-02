@@ -93,6 +93,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         limit: int = 100,
         offset: int = 0,
         order_by: str = "",
+        display_values: bool = False,
     ) -> str:
         """Query any table with filter conditions, returning matching records.
 
@@ -103,6 +104,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             limit: Maximum number of records to return (capped by policy).
             offset: Number of records to skip for pagination.
             order_by: Field to sort results by (empty for default).
+            display_values: If True, return display values instead of raw values.
         """
         correlation_id = generate_correlation_id()
         warnings: list[str] = []
@@ -126,6 +128,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     limit=effective_limit,
                     offset=offset,
                     order_by=order,
+                    display_values=display_values,
                 )
 
             # Mask sensitive fields in each record

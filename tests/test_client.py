@@ -75,6 +75,24 @@ class TestServiceNowClientGetRecord:
 
     @pytest.mark.asyncio
     @respx.mock
+    async def test_get_record_without_display_values(self, settings, auth_provider):
+        """Omits display_value param when display_values is False."""
+        from servicenow_mcp.client import ServiceNowClient
+
+        route = respx.get(f"{BASE_URL}/api/now/table/incident/abc123").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": {"sys_id": "abc123"}},
+            )
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            await client.get_record("incident", "abc123", display_values=False)
+
+        assert "sysparm_display_value" not in str(route.calls[0].request.url)
+
+    @pytest.mark.asyncio
+    @respx.mock
     async def test_get_record_not_found(self, settings, auth_provider):
         """Raises NotFoundError for 404."""
         from servicenow_mcp.client import ServiceNowClient
@@ -192,6 +210,44 @@ class TestServiceNowClientQueryRecords:
 
         assert result["records"] == []
         assert result["count"] == 0
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_query_records_with_display_values(self, settings, auth_provider):
+        """Passes display_value parameter when display_values=True."""
+        from servicenow_mcp.client import ServiceNowClient
+
+        route = respx.get(f"{BASE_URL}/api/now/table/incident").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": []},
+                headers={"X-Total-Count": "0"},
+            )
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            await client.query_records("incident", "active=true", display_values=True)
+
+        assert "sysparm_display_value=true" in str(route.calls[0].request.url)
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_query_records_without_display_values(self, settings, auth_provider):
+        """Omits display_value param when display_values is False."""
+        from servicenow_mcp.client import ServiceNowClient
+
+        route = respx.get(f"{BASE_URL}/api/now/table/incident").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": []},
+                headers={"X-Total-Count": "0"},
+            )
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            await client.query_records("incident", "active=true", display_values=False)
+
+        assert "sysparm_display_value" not in str(route.calls[0].request.url)
 
 
 class TestServiceNowClientGetMetadata:
