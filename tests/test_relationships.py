@@ -108,6 +108,131 @@ class TestRelReferencesTo:
         assert result["status"] == "error"
         assert "denied" in result["error"].lower()
 
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_paginates_all_dictionary_entries(self, settings, auth_provider):
+        """Paginated sys_dictionary fetches collect fields across all pages."""
+        page_size = 1000
+
+        # Build two pages: first page has exactly page_size entries, second has 2
+        page1_fields = [
+            {"name": f"table_p1_{i}", "element": "ref_field", "reference": "sys_user", "column_label": f"Ref {i}"}
+            for i in range(page_size)
+        ]
+        page2_fields = [
+            {"name": "task", "element": "assigned_to", "reference": "sys_user", "column_label": "Assigned to"},
+            {"name": "task", "element": "opened_by", "reference": "sys_user", "column_label": "Opened by"},
+        ]
+
+        dict_route = respx.get(f"{BASE_URL}/api/now/table/sys_dictionary")
+        dict_route.side_effect = [
+            # First page: full page_size records -> triggers next page fetch
+            httpx.Response(
+                200,
+                json={"result": page1_fields},
+                headers={"X-Total-Count": str(page_size + 2)},
+            ),
+            # Second page: fewer than page_size -> pagination stops
+            httpx.Response(
+                200,
+                json={"result": page2_fields},
+                headers={"X-Total-Count": str(page_size + 2)},
+            ),
+        ]
+
+        # Mock all referencing tables to return empty results (page 1 tables)
+        for i in range(page_size):
+            respx.get(f"{BASE_URL}/api/now/table/table_p1_{i}").mock(
+                return_value=httpx.Response(
+                    200,
+                    json={"result": []},
+                    headers={"X-Total-Count": "0"},
+                )
+            )
+
+        # Mock the page 2 table (task) - returns a matching record for assigned_to
+        respx.get(f"{BASE_URL}/api/now/table/task").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": [{"sys_id": "task1", "assigned_to": "user123"}]},
+                headers={"X-Total-Count": "1"},
+            )
+        )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["rel_references_to"](table="sys_user", sys_id="user123")
+        result = json.loads(raw)
+
+        assert result["status"] == "success"
+        refs = result["data"]["incoming_references"]
+        # The task table entries from page 2 should be present in results
+        task_refs = [r for r in refs if r["table"] == "task"]
+        assert len(task_refs) >= 1, "Fields from page 2 should be processed"
+        task_fields = {r["field"] for r in task_refs}
+        assert "assigned_to" in task_fields or "opened_by" in task_fields
+
+        # Verify that two sys_dictionary pages were fetched
+        assert dict_route.call_count == 2
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_filters_denied_and_internal_tables(self, settings, auth_provider):
+        """Denied tables and system-internal var__m_ entries are skipped."""
+        denied = next(iter(DENIED_TABLES))
+        respx.get(f"{BASE_URL}/api/now/table/sys_dictionary").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": [
+                        # Denied table entry - should be skipped
+                        {"name": denied, "element": "user", "reference": "sys_user", "column_label": "User"},
+                        # var__m_ internal entry - should be skipped
+                        {
+                            "name": "var__m_some_table",
+                            "element": "ref",
+                            "reference": "sys_user",
+                            "column_label": "Ref",
+                        },
+                        # sys_variable_value entry - should be skipped
+                        {
+                            "name": "sys_variable_value",
+                            "element": "ref",
+                            "reference": "sys_user",
+                            "column_label": "Ref",
+                        },
+                        # Valid entry - should be processed
+                        {
+                            "name": "incident",
+                            "element": "caller_id",
+                            "reference": "sys_user",
+                            "column_label": "Caller",
+                        },
+                    ]
+                },
+                headers={"X-Total-Count": "4"},
+            )
+        )
+
+        # Only incident should be queried (the rest are filtered out)
+        respx.get(f"{BASE_URL}/api/now/table/incident").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": [{"sys_id": "inc1", "caller_id": "user1"}]},
+                headers={"X-Total-Count": "1"},
+            )
+        )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["rel_references_to"](table="sys_user", sys_id="user1")
+        result = json.loads(raw)
+
+        assert result["status"] == "success"
+        refs = result["data"]["incoming_references"]
+        # Only the incident entry should survive filtering
+        assert len(refs) == 1
+        assert refs[0]["table"] == "incident"
+        assert refs[0]["field"] == "caller_id"
+
 
 class TestRelReferencesFrom:
     """Tests for the rel_references_from tool."""

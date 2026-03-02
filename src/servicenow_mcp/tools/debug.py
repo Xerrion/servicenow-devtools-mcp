@@ -9,7 +9,7 @@ from mcp.server.fastmcp import FastMCP
 from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.config import Settings
-from servicenow_mcp.policy import check_table_access, mask_audit_entry, mask_sensitive_fields
+from servicenow_mcp.policy import INTERNAL_QUERY_LIMIT, check_table_access, mask_audit_entry, mask_sensitive_fields
 from servicenow_mcp.utils import (
     ServiceNowQuery,
     format_response,
@@ -72,7 +72,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                             "newvalue",
                             "sys_created_on",
                         ],
-                        limit=200,
+                        limit=INTERNAL_QUERY_LIMIT,
                         order_by="sys_created_on",
                     ),
                     client.query_records(
@@ -85,7 +85,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                             "level",
                             "sys_created_on",
                         ],
-                        limit=100,
+                        limit=INTERNAL_QUERY_LIMIT,
                         order_by="sys_created_on",
                     ),
                     client.query_records(
@@ -98,7 +98,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                             "sys_created_on",
                             "sys_created_by",
                         ],
-                        limit=100,
+                        limit=INTERNAL_QUERY_LIMIT,
                         order_by="sys_created_on",
                     ),
                 )
@@ -184,7 +184,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                         "output_data",
                         "error_message",
                     ],
-                    limit=200,
+                    limit=INTERNAL_QUERY_LIMIT,
                     order_by="sys_created_on",
                 )
 
@@ -244,7 +244,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                         "direct",
                         "body_text",
                     ],
-                    limit=100,
+                    limit=INTERNAL_QUERY_LIMIT,
                     order_by="sys_created_on",
                 )
 
@@ -306,7 +306,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                             "error_string",
                             "sys_created_on",
                         ],
-                        limit=100,
+                        limit=INTERNAL_QUERY_LIMIT,
                         order_by="sys_created_on",
                     )
                     for entry in result["records"]:
@@ -338,7 +338,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                             "endpoint",
                             "sys_created_on",
                         ],
-                        limit=100,
+                        limit=INTERNAL_QUERY_LIMIT,
                         order_by="sys_created_on",
                     )
                     for entry in result["records"]:
@@ -402,7 +402,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                         "sys_target_sys_id",
                         "sys_import_state_comment",
                     ],
-                    limit=500,
+                    limit=INTERNAL_QUERY_LIMIT,
                     order_by="sys_created_on",
                 )
 

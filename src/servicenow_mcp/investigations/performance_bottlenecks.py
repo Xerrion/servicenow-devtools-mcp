@@ -4,7 +4,7 @@ from collections import Counter
 from typing import Any
 
 from servicenow_mcp.client import ServiceNowClient
-from servicenow_mcp.policy import check_table_access, mask_sensitive_fields
+from servicenow_mcp.policy import INTERNAL_QUERY_LIMIT, check_table_access, mask_sensitive_fields
 from servicenow_mcp.utils import ServiceNowQuery, validate_identifier
 
 HEAVY_AUTOMATION_THRESHOLD = 10
@@ -44,7 +44,7 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
         "sys_script",
         q.build(),
         fields=["sys_id", "name", "collection", "active"],
-        limit=500,
+        limit=INTERNAL_QUERY_LIMIT,
     )
     br_records = [mask_sensitive_fields(r) for r in br_result["records"]]
 
@@ -150,7 +150,7 @@ async def explain(client: ServiceNowClient, element_id: str) -> dict[str, Any]:
             "sys_script",
             br_query,
             fields=["sys_id", "name", "when"],
-            limit=50,
+            limit=INTERNAL_QUERY_LIMIT,
         )
         br_count = len(br_result["records"])
 

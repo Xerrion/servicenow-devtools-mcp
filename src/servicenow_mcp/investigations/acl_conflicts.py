@@ -4,7 +4,7 @@ from collections import defaultdict
 from typing import Any
 
 from servicenow_mcp.client import ServiceNowClient
-from servicenow_mcp.policy import check_table_access, mask_sensitive_fields
+from servicenow_mcp.policy import INTERNAL_QUERY_LIMIT, check_table_access, mask_sensitive_fields
 from servicenow_mcp.utils import ServiceNowQuery, validate_identifier
 
 
@@ -34,7 +34,7 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
         "sys_security_acl",
         query,
         fields=["sys_id", "name", "operation", "condition", "script", "active"],
-        limit=500,
+        limit=INTERNAL_QUERY_LIMIT,
     )
     acls = [mask_sensitive_fields(a) for a in acl_result["records"]]
 
