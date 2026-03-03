@@ -1,18 +1,251 @@
-"""Service Request domain tools for ServiceNow MCP server."""
+"""Request Management domain tools."""
+
+import json
+import uuid
 
 from mcp.server.fastmcp import FastMCP
 
 from servicenow_mcp.auth import BasicAuthProvider
+from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.config import Settings
+from servicenow_mcp.policy import check_table_access, mask_sensitive_fields, write_gate
+from servicenow_mcp.utils import format_response, safe_tool_call
 
 
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
-    """Register Service Request domain tools.
+    """Register Request Management tools with MCP server.
 
     Args:
         mcp: FastMCP instance for tool registration
         settings: Server configuration settings
         auth_provider: Authentication provider for ServiceNow API
     """
-    # Tools will be implemented in Task 6 (incident), Tasks 7-11 (others)
-    pass
+
+    @mcp.tool()
+    async def request_list(
+        state: str = "",
+        requested_for: str = "",
+        assignment_group: str = "",
+        limit: int = 20,
+    ) -> str:
+        """List requests with optional filters.
+
+        Args:
+            state: Request state filter
+            requested_for: sys_id of requested_for user
+            assignment_group: sys_id or name of assignment group
+            limit: Maximum results to return (default 20)
+        """
+        correlation_id = str(uuid.uuid4())
+
+        async def _run() -> str:
+            check_table_access("sc_request")
+
+            query_parts = []
+            if state:
+                query_parts.append(f"state={state}")
+            if requested_for:
+                query_parts.append(f"requested_for={requested_for}")
+            if assignment_group:
+                query_parts.append(f"assignment_group={assignment_group}")
+
+            query = "^".join(query_parts) if query_parts else ""
+
+            async with ServiceNowClient(settings, auth_provider) as client:
+                result = await client.query_records(
+                    table="sc_request",
+                    query=query,
+                    display_values=True,
+                    limit=limit,
+                )
+                masked = [mask_sensitive_fields(r) for r in result["records"]]
+                return json.dumps(format_response(data=masked, correlation_id=correlation_id))
+
+        return await safe_tool_call(_run, correlation_id)
+
+    @mcp.tool()
+    async def request_get(number: str) -> str:
+        """Fetch request by REQ number.
+
+        Args:
+            number: Request number (must start with REQ prefix)
+        """
+        correlation_id = str(uuid.uuid4())
+
+        async def _run() -> str:
+            check_table_access("sc_request")
+
+            if not number.upper().startswith("REQ"):
+                return json.dumps(
+                    format_response(
+                        data=None,
+                        correlation_id=correlation_id,
+                        status="error",
+                        error=f"Invalid request number: {number}. Must start with REQ prefix.",
+                    )
+                )
+
+            async with ServiceNowClient(settings, auth_provider) as client:
+                result = await client.query_records(
+                    table="sc_request",
+                    query=f"number={number.upper()}",
+                    display_values=True,
+                    limit=1,
+                )
+                if not result["records"]:
+                    return json.dumps(
+                        format_response(
+                            data=None,
+                            correlation_id=correlation_id,
+                            status="error",
+                            error=f"Request {number} not found.",
+                        )
+                    )
+                masked = mask_sensitive_fields(result["records"][0])
+                return json.dumps(format_response(data=masked, correlation_id=correlation_id))
+
+        return await safe_tool_call(_run, correlation_id)
+
+    @mcp.tool()
+    async def request_items(number: str, limit: int = 20) -> str:
+        """Fetch request items (RITMs) for a request.
+
+        Args:
+            number: Request number (must start with REQ prefix)
+            limit: Maximum results to return (default 20)
+        """
+        correlation_id = str(uuid.uuid4())
+
+        async def _run() -> str:
+            check_table_access("sc_req_item")
+
+            if not number.upper().startswith("REQ"):
+                return json.dumps(
+                    format_response(
+                        data=None,
+                        correlation_id=correlation_id,
+                        status="error",
+                        error=f"Invalid request number: {number}. Must start with REQ prefix.",
+                    )
+                )
+
+            async with ServiceNowClient(settings, auth_provider) as client:
+                result = await client.query_records(
+                    table="sc_req_item",
+                    query=f"request.number={number.upper()}",
+                    display_values=True,
+                    limit=limit,
+                )
+                masked = [mask_sensitive_fields(r) for r in result["records"]]
+                return json.dumps(format_response(data=masked, correlation_id=correlation_id))
+
+        return await safe_tool_call(_run, correlation_id)
+
+    @mcp.tool()
+    async def request_item_get(number: str) -> str:
+        """Fetch request item by RITM number.
+
+        Args:
+            number: Request item number (must start with RITM prefix)
+        """
+        correlation_id = str(uuid.uuid4())
+
+        async def _run() -> str:
+            check_table_access("sc_req_item")
+
+            if not number.upper().startswith("RITM"):
+                return json.dumps(
+                    format_response(
+                        data=None,
+                        correlation_id=correlation_id,
+                        status="error",
+                        error=f"Invalid request item number: {number}. Must start with RITM prefix.",
+                    )
+                )
+
+            async with ServiceNowClient(settings, auth_provider) as client:
+                result = await client.query_records(
+                    table="sc_req_item",
+                    query=f"number={number.upper()}",
+                    display_values=True,
+                    limit=1,
+                )
+                if not result["records"]:
+                    return json.dumps(
+                        format_response(
+                            data=None,
+                            correlation_id=correlation_id,
+                            status="error",
+                            error=f"Request item {number} not found.",
+                        )
+                    )
+                masked = mask_sensitive_fields(result["records"][0])
+                return json.dumps(format_response(data=masked, correlation_id=correlation_id))
+
+        return await safe_tool_call(_run, correlation_id)
+
+    @mcp.tool()
+    async def request_item_update(
+        number: str,
+        state: str = "",
+        assignment_group: str = "",
+        assigned_to: str = "",
+    ) -> str:
+        """Update a request item by RITM number.
+
+        Args:
+            number: Request item number (must start with RITM prefix)
+            state: Request item state
+            assignment_group: sys_id or name of assignment group
+            assigned_to: sys_id of assigned user
+        """
+        correlation_id = str(uuid.uuid4())
+
+        async def _run() -> str:
+            check_table_access("sc_req_item")
+
+            blocked = write_gate("sc_req_item", settings, correlation_id)
+            if blocked:
+                return blocked
+
+            if not number.upper().startswith("RITM"):
+                return json.dumps(
+                    format_response(
+                        data=None,
+                        correlation_id=correlation_id,
+                        status="error",
+                        error=f"Invalid request item number: {number}. Must start with RITM prefix.",
+                    )
+                )
+
+            async with ServiceNowClient(settings, auth_provider) as client:
+                result = await client.query_records(
+                    table="sc_req_item",
+                    query=f"number={number.upper()}",
+                    limit=1,
+                )
+                if not result["records"]:
+                    return json.dumps(
+                        format_response(
+                            data=None,
+                            correlation_id=correlation_id,
+                            status="error",
+                            error=f"Request item {number} not found.",
+                        )
+                    )
+
+                sys_id = result["records"][0]["sys_id"]
+
+                changes = {}
+                if state:
+                    changes["state"] = state
+                if assignment_group:
+                    changes["assignment_group"] = assignment_group
+                if assigned_to:
+                    changes["assigned_to"] = assigned_to
+
+                updated = await client.update_record("sc_req_item", sys_id, changes)
+                masked = mask_sensitive_fields(updated)
+                return json.dumps(format_response(data=masked, correlation_id=correlation_id))
+
+        return await safe_tool_call(_run, correlation_id)
