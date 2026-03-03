@@ -8,24 +8,9 @@ from mcp.server.fastmcp import FastMCP
 
 from servicenow_mcp.auth import create_auth
 from servicenow_mcp.config import Settings
-from servicenow_mcp.packages import get_package, list_packages
+from servicenow_mcp.packages import _TOOL_GROUP_MODULES, get_package, list_packages
 
 logger = logging.getLogger(__name__)
-
-# Map tool group names to their module paths
-_TOOL_GROUP_MODULES: dict[str, str] = {
-    "introspection": "servicenow_mcp.tools.introspection",
-    "relationships": "servicenow_mcp.tools.relationships",
-    "testing": "servicenow_mcp.tools.testing",
-    "metadata": "servicenow_mcp.tools.metadata",
-    "changes": "servicenow_mcp.tools.changes",
-    "debug": "servicenow_mcp.tools.debug",
-    "developer": "servicenow_mcp.tools.developer",
-    "dev_utils": "servicenow_mcp.tools.dev_utils",
-    "investigations": "servicenow_mcp.tools.investigations",
-    "documentation": "servicenow_mcp.tools.documentation",
-    "utility": "servicenow_mcp.tools.utility",
-}
 
 
 def create_mcp_server() -> FastMCP:

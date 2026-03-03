@@ -51,3 +51,109 @@ if blocked:
 
 ### Commit Message
 `refactor(policy): extract write_gate to shared module for domain tool reuse`
+
+## Task 3: Add 4 Preset Package Combinations
+
+**Pattern:** PACKAGE_REGISTRY dict entry structure is:
+```python
+"preset_name": [
+    "group1",
+    "group2",
+    ...
+]
+```
+
+**Key Finding:** `get_package()` and `list_packages()` functions already support new registry entries automatically. No code changes needed outside PACKAGE_REGISTRY itself.
+
+**Presets Added:**
+- `itil`: 7 groups - ITIL process support (incident, change, problem)
+- `developer`: 10 groups - Full developer toolkit (all introspection + debug + dev tools)
+- `readonly`: 8 groups - Safe read-only operations (no mutations, no developer tools)
+- `analyst`: 6 groups - Business analyst tools (reporting, docs, investigations)
+
+**TDD Pattern Used:**
+1. Write 9 failing tests (RED) covering all 4 presets + list_packages verification + backward compatibility
+2. Implement 4 entries in PACKAGE_REGISTRY (GREEN)
+3. All 24 tests pass (15 existing + 9 new)
+4. 100% coverage on packages.py
+5. Strict mypy pass
+
+**Inheritance from Task 1:** Registry-based validation means adding new keys here automatically makes them valid in config validation via `_VALID_PACKAGES = set(PACKAGE_REGISTRY.keys())`.
+
+## [2026-03-03T16:15:00Z] Task 4: Comma-Separated Group Selection
+
+### Architecture Decision: Moved _TOOL_GROUP_MODULES to packages.py
+**Problem:** Circular import - `config.py` → `packages.py`, but `packages.py` needed `_TOOL_GROUP_MODULES` from `server.py` which imports `packages.py`.
+
+**Solution:** Move `_TOOL_GROUP_MODULES` dict from `server.py` (lines 15-28) to `packages.py` (lines 1-12) as the source of truth. This makes logical sense: it maps group names to modules, which is fundamentally a package/grouping concept.
+
+**Result:** No circular dependency. Clean dependency chain: `server.py` imports from `packages.py` only.
+
+### Implementation Pattern: Comma Parsing with Validation
+
+**Core Logic in `get_package()`:**
+1. **Preset-first check**: If name in `PACKAGE_REGISTRY`, return preset (backward compatible)
+2. **Fallback to comma parsing**: Split by comma, strip whitespace
+3. **Empty group detection**: Check for empty strings BEFORE filtering (catches trailing/leading commas)
+4. **Deduplication with order preservation**: Track seen groups, skip duplicates
+5. **Validation against _TOOL_GROUP_MODULES**: Catch invalid group names and preset names used in comma syntax
+6. **Clear error messages**: List ALL invalid groups + provide valid group names
+
+**Key insight:** Separate validation of empty groups (before filtering) from invalid group names (after filtering). This catches `"debug,"` but allows `"debug"`.
+
+### TDD Cycle: 13 Tests in RED → GREEN
+
+**All tests passing:**
+- Valid comma-separated groups with/without spaces
+- Deduplication (single and mixed duplicates)
+- Empty group rejection (empty string, trailing/leading commas)
+- Invalid group names with clear error messages
+- Preset backward compatibility unchanged
+- Preset names rejected in comma syntax (e.g., "introspection,itil" is invalid)
+- Order preservation during deduplication
+
+### Config Validator Update
+
+**Pattern:** Use local import of `get_package()` inside validator function:
+```python
+@field_validator("mcp_tool_package")
+@classmethod
+def validate_mcp_tool_package(cls, v: str) -> str:
+    from servicenow_mcp.packages import get_package
+    try:
+        get_package(v)  # Validates both presets and comma syntax
+    except ValueError as e:
+        raise ValueError(f"Invalid mcp_tool_package: {e}") from e
+    return v
+```
+
+**Why local import:** Avoids module-level circular imports while keeping validation centralized.
+
+### Full Test Suite Impact
+- 532 tests pass (18 integration skipped)
+- 96% code coverage
+- Zero LSP errors on modified files
+- All existing functionality preserved
+
+### User-Facing Behavior Examples
+```
+MCP_TOOL_PACKAGE="introspection,debug,utility"     # Custom composition
+MCP_TOOL_PACKAGE="introspection, debug, utility"   # With spaces (auto-trimmed)
+MCP_TOOL_PACKAGE="debug,debug,introspection"       # Deduped to ["debug", "introspection"]
+MCP_TOOL_PACKAGE="itil"                            # Preset still works
+MCP_TOOL_PACKAGE="introspection,itil,debug"        # ERROR: preset name in comma syntax
+MCP_TOOL_PACKAGE="introspection,invalid_group"     # ERROR: unknown group
+```
+
+### Files Modified
+1. `src/servicenow_mcp/packages.py` - Moved _TOOL_GROUP_MODULES, extended get_package()
+2. `src/servicenow_mcp/server.py` - Import _TOOL_GROUP_MODULES from packages
+3. `src/servicenow_mcp/config.py` - Updated validator to accept comma syntax
+4. `tests/test_packages.py` - Added 13 new tests for comma syntax (all passing)
+5. `tests/test_config.py` - Updated error message expectation
+
+### Commit Message
+`feat(config): support comma-separated group selection in MCP_TOOL_PACKAGE`
+
+### Next Steps (Tasks 5+)
+This foundation enables domain-specific tool packages to reference individual groups rather than predefined presets. Example: `"incident,change,debug"` loads only incident + change domain tools + debug utilities.

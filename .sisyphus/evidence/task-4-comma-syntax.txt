@@ -1,0 +1,55 @@
+## Task 4: Comma-Separated Group Selection - Evidence
+
+### Test Execution Summary
+All 13 new comma-separated tests PASS:
+- test_comma_separated_valid_groups PASSED
+- test_comma_separated_with_spaces PASSED
+- test_comma_separated_deduplicates PASSED
+- test_comma_separated_mixed_duplicates PASSED
+- test_comma_separated_invalid_group_raises PASSED
+- test_comma_separated_multiple_invalid_groups_raises PASSED
+- test_comma_separated_empty_groups_raises PASSED
+- test_comma_separated_trailing_comma_raises PASSED
+- test_comma_separated_leading_comma_raises PASSED
+- test_preset_name_still_works PASSED
+- test_comma_separated_cannot_use_preset_names PASSED
+- test_comma_separated_single_group PASSED
+- test_comma_separated_preserves_order PASSED
+
+### Full Test Suite Results
+- Total tests: 532 passed, 18 deselected (integration skipped)
+- Coverage: 96%
+- All existing tests continue to pass
+
+### Implementation Details
+1. Moved _TOOL_GROUP_MODULES from server.py to packages.py to avoid circular imports
+2. Extended get_package() to:
+   - Check if name is in PACKAGE_REGISTRY first (preset behavior unchanged)
+   - Parse comma-separated values as fallback
+   - Strip whitespace from each group name
+   - Detect and reject empty group names
+   - Deduplicate while preserving order
+   - Validate each group against _TOOL_GROUP_MODULES
+   - Reject preset names used in comma syntax
+   - Provide clear error messages listing invalid groups
+
+3. Updated config validator to:
+   - Import get_package() locally to avoid import order issues
+   - Call get_package() for validation (handles both presets and comma syntax)
+   - Wrap errors with context about invalid mcp_tool_package
+
+### Verified Scenarios
+- "introspection,debug,utility" -> ["introspection", "debug", "utility"] ✓
+- "introspection, debug, utility" (with spaces) -> ["introspection", "debug", "utility"] ✓
+- "debug,debug,debug" (deduplication) -> ["debug"] ✓
+- ",,,", ",debug,", "introspection," (empty groups) -> ValueError ✓
+- "introspection,invalid_group" (invalid group) -> ValueError with clear message ✓
+- "introspection,itil,debug" (preset in comma syntax) -> ValueError ✓
+- "itil" (preset still works unchanged) -> [...] ✓
+- Config validator accepts comma-separated values ✓
+
+### LSP Diagnostics
+- No errors in packages.py
+- No errors in config.py
+- No errors in server.py
+- All type hints correct

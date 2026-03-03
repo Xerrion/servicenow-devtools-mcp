@@ -107,3 +107,200 @@ class TestPackageRegistry:
         packages["full"].append("should_not_persist")
         fresh = list_packages()
         assert "should_not_persist" not in fresh["full"]
+
+    def test_get_package_itil(self):
+        """get_package returns correct groups for itil preset."""
+        from servicenow_mcp.packages import get_package
+
+        groups = get_package("itil")
+        expected = ["introspection", "relationships", "metadata", "changes", "debug", "documentation", "utility"]
+        assert groups == expected
+        assert len(groups) == 7
+
+    def test_get_package_developer(self):
+        """get_package returns correct groups for developer preset."""
+        from servicenow_mcp.packages import get_package
+
+        groups = get_package("developer")
+        expected = [
+            "introspection",
+            "relationships",
+            "metadata",
+            "changes",
+            "debug",
+            "developer",
+            "dev_utils",
+            "investigations",
+            "documentation",
+            "utility",
+        ]
+        assert groups == expected
+        assert len(groups) == 10
+
+    def test_get_package_readonly(self):
+        """get_package returns correct groups for readonly preset."""
+        from servicenow_mcp.packages import get_package
+
+        groups = get_package("readonly")
+        expected = [
+            "introspection",
+            "relationships",
+            "metadata",
+            "changes",
+            "debug",
+            "investigations",
+            "documentation",
+            "utility",
+        ]
+        assert groups == expected
+        assert len(groups) == 8
+
+    def test_get_package_analyst(self):
+        """get_package returns correct groups for analyst preset."""
+        from servicenow_mcp.packages import get_package
+
+        groups = get_package("analyst")
+        expected = ["introspection", "relationships", "metadata", "investigations", "documentation", "utility"]
+        assert groups == expected
+        assert len(groups) == 6
+
+    def test_list_packages_includes_itil(self):
+        """list_packages includes itil preset."""
+        from servicenow_mcp.packages import list_packages
+
+        packages = list_packages()
+        assert "itil" in packages
+
+    def test_list_packages_includes_developer(self):
+        """list_packages includes developer preset."""
+        from servicenow_mcp.packages import list_packages
+
+        packages = list_packages()
+        assert "developer" in packages
+
+    def test_list_packages_includes_readonly(self):
+        """list_packages includes readonly preset."""
+        from servicenow_mcp.packages import list_packages
+
+        packages = list_packages()
+        assert "readonly" in packages
+
+    def test_list_packages_includes_analyst(self):
+        """list_packages includes analyst preset."""
+        from servicenow_mcp.packages import list_packages
+
+        packages = list_packages()
+        assert "analyst" in packages
+
+    def test_full_package_unchanged(self):
+        """full package still returns all groups unchanged."""
+        from servicenow_mcp.packages import get_package
+
+        groups = get_package("full")
+        assert "introspection" in groups
+        assert "relationships" in groups
+        assert "metadata" in groups
+        assert "changes" in groups
+        assert "debug" in groups
+        assert "developer" in groups
+        assert "dev_utils" in groups
+        assert "investigations" in groups
+        assert "documentation" in groups
+        assert "utility" in groups
+        assert len(groups) == 11
+
+
+class TestCommaSeparatedGroups:
+    """Test comma-separated group syntax for custom tool packages."""
+
+    def test_comma_separated_valid_groups(self):
+        """get_package accepts comma-separated group names and returns list."""
+        from servicenow_mcp.packages import get_package
+
+        groups = get_package("introspection,debug,utility")
+        assert groups == ["introspection", "debug", "utility"]
+
+    def test_comma_separated_with_spaces(self):
+        """get_package strips whitespace from comma-separated groups."""
+        from servicenow_mcp.packages import get_package
+
+        groups = get_package("introspection, debug, utility")
+        assert groups == ["introspection", "debug", "utility"]
+
+    def test_comma_separated_deduplicates(self):
+        """get_package deduplicates repeated group names."""
+        from servicenow_mcp.packages import get_package
+
+        groups = get_package("debug,debug,debug")
+        assert groups == ["debug"]
+
+    def test_comma_separated_mixed_duplicates(self):
+        """get_package deduplicates mixed repeated groups."""
+        from servicenow_mcp.packages import get_package
+
+        groups = get_package("introspection,debug,introspection,utility,debug")
+        assert groups == ["introspection", "debug", "utility"]
+
+    def test_comma_separated_invalid_group_raises(self):
+        """get_package raises ValueError for unknown group names."""
+        from servicenow_mcp.packages import get_package
+
+        with pytest.raises(ValueError, match="Unknown group"):
+            get_package("introspection,invalid_group")
+
+    def test_comma_separated_multiple_invalid_groups_raises(self):
+        """get_package mentions all invalid group names in error."""
+        from servicenow_mcp.packages import get_package
+
+        with pytest.raises(ValueError, match="invalid_group"):
+            get_package("introspection,invalid_group,debug,fake_group")
+
+    def test_comma_separated_empty_groups_raises(self):
+        """get_package raises ValueError for empty group names."""
+        from servicenow_mcp.packages import get_package
+
+        with pytest.raises(ValueError, match="empty"):
+            get_package(",,,")
+
+    def test_comma_separated_trailing_comma_raises(self):
+        """get_package raises ValueError for trailing commas."""
+        from servicenow_mcp.packages import get_package
+
+        with pytest.raises(ValueError, match="empty"):
+            get_package("debug,introspection,")
+
+    def test_comma_separated_leading_comma_raises(self):
+        """get_package raises ValueError for leading commas."""
+        from servicenow_mcp.packages import get_package
+
+        with pytest.raises(ValueError, match="empty"):
+            get_package(",debug,introspection")
+
+    def test_preset_name_still_works(self):
+        """get_package still returns preset when name is in PACKAGE_REGISTRY."""
+        from servicenow_mcp.packages import get_package
+
+        groups = get_package("itil")
+        assert isinstance(groups, list)
+        assert "introspection" in groups
+
+    def test_comma_separated_cannot_use_preset_names(self):
+        """get_package rejects preset names in comma syntax."""
+        from servicenow_mcp.packages import get_package
+
+        with pytest.raises(ValueError, match="Unknown group"):
+            get_package("introspection,itil,debug")
+
+    def test_comma_separated_single_group(self):
+        """get_package accepts single group name."""
+        from servicenow_mcp.packages import get_package
+
+        groups = get_package("debug")
+        assert groups == ["debug"]
+
+    def test_comma_separated_preserves_order(self):
+        """get_package preserves order while deduplicating."""
+        from servicenow_mcp.packages import get_package
+
+        groups = get_package("utility,debug,introspection,debug")
+        assert groups == ["utility", "debug", "introspection"]
