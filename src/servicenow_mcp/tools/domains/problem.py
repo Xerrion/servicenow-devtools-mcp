@@ -5,6 +5,7 @@ import uuid
 from mcp.server.fastmcp import FastMCP
 
 from servicenow_mcp.auth import BasicAuthProvider
+from servicenow_mcp.choices import ChoiceRegistry
 from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.config import Settings
 from servicenow_mcp.policy import check_table_access, mask_sensitive_fields, write_gate
@@ -21,13 +22,19 @@ PROBLEM_STATE_MAP: dict[str, str] = {
 }
 
 
-def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
+def register_tools(
+    mcp: FastMCP,
+    settings: Settings,
+    auth_provider: BasicAuthProvider,
+    choices: ChoiceRegistry | None = None,
+) -> None:
     """Register Problem Management domain tools.
 
     Args:
         mcp: FastMCP instance for tool registration
         settings: Server configuration settings
         auth_provider: Authentication provider for ServiceNow API
+        choices: Optional choice registry for resolving field values
     """
 
     @mcp.tool()

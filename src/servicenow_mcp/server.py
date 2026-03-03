@@ -6,6 +6,7 @@ import logging
 from mcp.server.fastmcp import FastMCP
 
 from servicenow_mcp.auth import create_auth
+from servicenow_mcp.choices import ChoiceRegistry
 from servicenow_mcp.config import Settings
 from servicenow_mcp.packages import _TOOL_GROUP_MODULES, get_package, list_packages
 from servicenow_mcp.state import QueryTokenStore
@@ -28,6 +29,9 @@ def create_mcp_server() -> FastMCP:
     query_store = QueryTokenStore()
     mcp._sn_query_store = query_store  # type: ignore[attr-defined]
 
+    choices = ChoiceRegistry(settings, auth_provider)
+    mcp._sn_choices = choices  # type: ignore[attr-defined]
+
     # Always register the list_tool_packages tool
     @mcp.tool()
     def list_tool_packages() -> str:
@@ -44,7 +48,10 @@ def create_mcp_server() -> FastMCP:
             try:
                 module = importlib.import_module(module_path)
                 if hasattr(module, "register_tools"):
-                    module.register_tools(mcp, settings, auth_provider)
+                    if group_name.startswith("domain_"):
+                        module.register_tools(mcp, settings, auth_provider, choices=choices)
+                    else:
+                        module.register_tools(mcp, settings, auth_provider)
                     logger.info(f"Loaded tool group: {group_name}")
             except ImportError as e:
                 logger.warning(f"Could not load tool group '{group_name}': {e}")
