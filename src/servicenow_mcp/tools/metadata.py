@@ -1,6 +1,5 @@
 """Metadata tools for listing, inspecting, and searching ServiceNow platform artifacts."""
 
-import json
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
@@ -76,17 +75,14 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     limit=effective_limit,
                 )
 
-            return json.dumps(
-                format_response(
-                    data={
-                        "artifact_type": artifact_type,
-                        "table": table,
-                        "artifacts": [mask_sensitive_fields(r) for r in result["records"]],
-                        "total": result["count"],
-                    },
-                    correlation_id=correlation_id,
-                ),
-                indent=2,
+            return format_response(
+                data={
+                    "artifact_type": artifact_type,
+                    "table": table,
+                    "artifacts": [mask_sensitive_fields(r) for r in result["records"]],
+                    "total": result["count"],
+                },
+                correlation_id=correlation_id,
             )
 
         return await safe_tool_call(_run, correlation_id)
@@ -115,10 +111,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             async with ServiceNowClient(settings, auth_provider) as client:
                 record = mask_sensitive_fields(await client.get_record(table, sys_id))
 
-            return json.dumps(
-                format_response(data=record, correlation_id=correlation_id),
-                indent=2,
-            )
+            return format_response(data=record, correlation_id=correlation_id)
 
         return await safe_tool_call(_run, correlation_id)
 
@@ -188,17 +181,14 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                             # Skip tables that fail (e.g., access issues)
                             continue
 
-            return json.dumps(
-                format_response(
-                    data={
-                        "target": target,
-                        "matches": matches,
-                        "total_matches": len(matches),
-                        "search_method": search_method,
-                    },
-                    correlation_id=correlation_id,
-                ),
-                indent=2,
+            return format_response(
+                data={
+                    "target": target,
+                    "matches": matches,
+                    "total_matches": len(matches),
+                    "search_method": search_method,
+                },
+                correlation_id=correlation_id,
             )
 
         return await safe_tool_call(_run, correlation_id)
@@ -239,17 +229,14 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                         continue
                     writers.append(mask_sensitive_fields(record))
 
-            return json.dumps(
-                format_response(
-                    data={
-                        "table": table,
-                        "field": field if field else None,
-                        "writers": writers,
-                        "total": len(writers),
-                    },
-                    correlation_id=correlation_id,
-                ),
-                indent=2,
+            return format_response(
+                data={
+                    "table": table,
+                    "field": field if field else None,
+                    "writers": writers,
+                    "total": len(writers),
+                },
+                correlation_id=correlation_id,
             )
 
         return await safe_tool_call(_run, correlation_id)

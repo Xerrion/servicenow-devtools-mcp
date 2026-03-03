@@ -1,10 +1,9 @@
 """Tests for investigation tools (investigate_run, investigate_explain) and 7 investigation modules."""
 
-import json
-
 import httpx
 import pytest
 import respx
+from toon_format import decode as toon_decode
 
 from servicenow_mcp.auth import BasicAuthProvider
 
@@ -82,7 +81,7 @@ class TestInvestigateRun:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["investigate_run"](investigation="stale_automations")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["finding_count"] >= 1
@@ -93,7 +92,7 @@ class TestInvestigateRun:
         """Returns error for unknown investigation name."""
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["investigate_run"](investigation="nonexistent")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "error"
 
@@ -121,7 +120,7 @@ class TestInvestigateRun:
             investigation="stale_automations",
             element_id="flow_context:fc001",
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert "explanation" in result["data"]
@@ -166,7 +165,7 @@ class TestStaleAutomations:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["investigate_run"](investigation="stale_automations")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["finding_count"] == 1
@@ -188,7 +187,7 @@ class TestStaleAutomations:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["investigate_run"](investigation="stale_automations")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["finding_count"] == 0
@@ -215,7 +214,7 @@ class TestStaleAutomations:
             investigation="stale_automations",
             params='{"stale_days": 30}',
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "success"
         assert result["data"]["params"]["stale_days"] == 30
 
@@ -254,7 +253,7 @@ class TestDeprecatedApis:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["investigate_run"](investigation="deprecated_apis")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["finding_count"] >= 1
@@ -275,7 +274,7 @@ class TestDeprecatedApis:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["investigate_run"](investigation="deprecated_apis")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["finding_count"] == 0
@@ -347,7 +346,7 @@ class TestTableHealth:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["investigate_run"](investigation="table_health", params='{"table": "incident"}')
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         data = result["data"]
@@ -375,7 +374,7 @@ class TestTableHealth:
             investigation="table_health",
             params='{"table": "incident", "hours": 24}',
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "success"
         assert result["data"]["hours"] == 24
 
@@ -388,7 +387,7 @@ class TestTableHealth:
             investigation="table_health",
             params='{"table": "incident^active=true"}',
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "error"
         assert "Invalid identifier" in result["error"]
@@ -436,7 +435,7 @@ class TestAclConflicts:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["investigate_run"](investigation="acl_conflicts", params='{"table": "incident"}')
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["finding_count"] >= 1
@@ -477,7 +476,7 @@ class TestAclConflicts:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["investigate_run"](investigation="acl_conflicts", params='{"table": "incident"}')
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["finding_count"] == 0
@@ -527,7 +526,7 @@ class TestErrorAnalysis:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["investigate_run"](investigation="error_analysis")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["finding_count"] == 2  # 2 clusters
@@ -545,7 +544,7 @@ class TestErrorAnalysis:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["investigate_run"](investigation="error_analysis")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["finding_count"] == 0
@@ -560,7 +559,7 @@ class TestErrorAnalysis:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["investigate_run"](investigation="error_analysis", params='{"hours": 6}')
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "success"
         assert result["data"]["params"]["hours"] == 6
 
@@ -607,7 +606,7 @@ class TestSlowTransactions:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["investigate_run"](investigation="slow_transactions")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["finding_count"] >= 1
@@ -633,7 +632,7 @@ class TestSlowTransactions:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["investigate_run"](investigation="slow_transactions", params='{"hours": 12}')
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "success"
         assert result["data"]["params"]["hours"] == 12
 
@@ -656,7 +655,7 @@ class TestSlowTransactions:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["investigate_run"](investigation="slow_transactions")
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "success"
         assert result["data"]["params"]["hours"] == 24
 
@@ -700,7 +699,7 @@ class TestPerformanceBottlenecks:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["investigate_run"](investigation="performance_bottlenecks")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["finding_count"] >= 1
@@ -722,7 +721,7 @@ class TestPerformanceBottlenecks:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["investigate_run"](investigation="performance_bottlenecks", params='{"hours": 12}')
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "success"
         assert result["data"]["params"]["hours"] == 12
 
@@ -742,7 +741,7 @@ class TestPerformanceBottlenecks:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["investigate_run"](investigation="performance_bottlenecks")
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "success"
         assert result["data"]["params"]["hours"] is None
 
@@ -776,7 +775,7 @@ class TestExplainStaleAutomations:
             investigation="stale_automations",
             element_id="flow_context:fc001",
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert "explanation" in result["data"]
@@ -807,7 +806,7 @@ class TestExplainStaleAutomations:
             investigation="stale_automations",
             element_id="sys_script:br001",
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert "disabled" in result["data"]["explanation"].lower()
@@ -836,7 +835,7 @@ class TestExplainStaleAutomations:
             investigation="stale_automations",
             element_id="sys_script_include:si001",
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert "disabled" in result["data"]["explanation"].lower()
@@ -865,7 +864,7 @@ class TestExplainStaleAutomations:
             investigation="stale_automations",
             element_id="sysauto_script:sj001",
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert "Nightly Cleanup" in result["data"]["explanation"]
@@ -898,7 +897,7 @@ class TestExplainDeprecatedApis:
             investigation="deprecated_apis",
             element_id="sys_script_include:script001",
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert "deprecated" in result["data"]["explanation"].lower()
@@ -933,7 +932,7 @@ class TestExplainErrorAnalysis:
             investigation="error_analysis",
             element_id="syslog:log001",
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert "sys_script.My BR" in result["data"]["explanation"]
@@ -967,7 +966,7 @@ class TestExplainSlowTransactions:
             investigation="slow_transactions",
             element_id="sys_query_pattern:qp001",
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert "sys_query_pattern" in result["data"]["explanation"]
@@ -1001,7 +1000,7 @@ class TestExplainPerformanceBottlenecks:
             investigation="performance_bottlenecks",
             element_id="sysauto_script:sj001",
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert "Heavy Job" in result["data"]["explanation"]
@@ -1016,7 +1015,7 @@ class TestExplainPerformanceBottlenecks:
             investigation="performance_bottlenecks",
             element_id="../evil_table:sj001",
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "error"
         assert "Invalid identifier" in result["error"]
@@ -1029,7 +1028,7 @@ class TestExplainPerformanceBottlenecks:
             investigation="performance_bottlenecks",
             element_id="sys_user_token:sj001",
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "error"
         assert "denied" in result["error"].lower()
@@ -1059,7 +1058,7 @@ class TestExplainPerformanceBottlenecks:
             investigation="performance_bottlenecks",
             element_id="incident",
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["record_count"] == 5000
@@ -1095,7 +1094,7 @@ class TestExplainAclConflicts:
             investigation="acl_conflicts",
             element_id="acl001",
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert "incident.*.read" in result["data"]["explanation"]
@@ -1126,7 +1125,7 @@ class TestExplainTableHealth:
             investigation="table_health",
             element_id="incident",
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["record_count"] == 10000
@@ -1149,7 +1148,7 @@ class TestExplainSecurityRestrictions:
             investigation="deprecated_apis",
             element_id="sys_user:abc123456789012345678901234567ab",
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"  # Dispatcher succeeds; module returns error in data
         assert "error" in result["data"]
@@ -1164,7 +1163,7 @@ class TestExplainSecurityRestrictions:
             investigation="error_analysis",
             element_id="incident:abc123456789012345678901234567ab",
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert "error" in result["data"]
@@ -1179,7 +1178,7 @@ class TestExplainSecurityRestrictions:
             investigation="slow_transactions",
             element_id="sys_user:abc123456789012345678901234567ab",
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert "error" in result["data"]
@@ -1194,7 +1193,7 @@ class TestExplainSecurityRestrictions:
             investigation="stale_automations",
             element_id="sys_user:abc123456789012345678901234567ab",
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert "error" in result["data"]
@@ -1209,7 +1208,7 @@ class TestExplainSecurityRestrictions:
             investigation="error_analysis",
             element_id="syslog:not-a-sys-id",
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "error"
         assert "Invalid identifier" in result["error"]
@@ -1229,7 +1228,7 @@ class TestExplainElementIdSplitGuard:
             investigation="deprecated_apis",
             element_id="invalid_no_colon",
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert "error" in result["data"]
@@ -1243,7 +1242,7 @@ class TestExplainElementIdSplitGuard:
             investigation="error_analysis",
             element_id="invalid_no_colon",
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert "error" in result["data"]
@@ -1257,7 +1256,7 @@ class TestExplainElementIdSplitGuard:
             investigation="slow_transactions",
             element_id="invalid_no_colon",
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert "error" in result["data"]
@@ -1271,7 +1270,7 @@ class TestExplainElementIdSplitGuard:
             investigation="stale_automations",
             element_id="invalid_no_colon",
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert "error" in result["data"]
@@ -1306,7 +1305,7 @@ class TestTypeCoercion:
             investigation="slow_transactions",
             params='{"limit": "50"}',
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "success"
         assert result["data"]["params"]["limit"] == 50
 
@@ -1324,7 +1323,7 @@ class TestTypeCoercion:
             investigation="stale_automations",
             params='{"stale_days": "30", "limit": "10"}',
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "success"
         assert result["data"]["params"]["stale_days"] == 30
         assert result["data"]["params"]["limit"] == 10
@@ -1348,7 +1347,7 @@ class TestTypeCoercion:
             investigation="performance_bottlenecks",
             params='{"hours": "12", "limit": "5"}',
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "success"
         assert result["data"]["params"]["hours"] == 12
         assert result["data"]["params"]["limit"] == 5
@@ -1370,7 +1369,7 @@ class TestTypeCoercion:
             investigation="table_health",
             params='{"table": "incident", "hours": "48"}',
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "success"
         assert result["data"]["hours"] == 48
 
@@ -1387,7 +1386,7 @@ class TestTypeCoercion:
             investigation="deprecated_apis",
             params='{"limit": "50"}',
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "success"
         assert result["data"]["params"]["limit"] == 50
 
@@ -1412,7 +1411,7 @@ class TestErrorAnalysisCheckTableAccess:
             side_effect=PolicyError("Access to table 'syslog' is denied by policy"),
         ):
             raw = await tools["investigate_run"](investigation="error_analysis")
-            result = json.loads(raw)
+            result = toon_decode(raw)
 
         assert result["status"] == "error"
         assert "denied" in result["error"].lower()
@@ -1432,7 +1431,7 @@ class TestPerformanceBottlenecksElseBranch:
             investigation="performance_bottlenecks",
             element_id="INVALID_TABLE",
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "error"
         assert "Invalid identifier" in result["error"]
@@ -1445,7 +1444,7 @@ class TestPerformanceBottlenecksElseBranch:
             investigation="performance_bottlenecks",
             element_id="my-table!",
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "error"
         assert "Invalid identifier" in result["error"]
@@ -1458,7 +1457,7 @@ class TestPerformanceBottlenecksElseBranch:
             investigation="performance_bottlenecks",
             element_id="sys_user_token",
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "error"
         assert "denied" in result["error"].lower()
@@ -1932,7 +1931,7 @@ class TestPerformanceBottlenecksCheckTableAccess:
             side_effect=deny_sys_script,
         ):
             raw = await tools["investigate_run"](investigation="performance_bottlenecks")
-            result = json.loads(raw)
+            result = toon_decode(raw)
 
         assert result["status"] == "error"
         assert "denied" in result["error"].lower()
@@ -1959,7 +1958,7 @@ class TestSlowTransactionsCheckTableAccess:
             side_effect=deny_first_table,
         ):
             raw = await tools["investigate_run"](investigation="slow_transactions")
-            result = json.loads(raw)
+            result = toon_decode(raw)
 
         assert result["status"] == "error"
         assert "denied" in result["error"].lower()
@@ -1986,7 +1985,7 @@ class TestStaleAutomationsCheckTableAccess:
             side_effect=deny_flow_context,
         ):
             raw = await tools["investigate_run"](investigation="stale_automations")
-            result = json.loads(raw)
+            result = toon_decode(raw)
 
         assert result["status"] == "error"
         assert "denied" in result["error"].lower()
@@ -2012,7 +2011,7 @@ class TestTableHealthExplainCheckTableAccess:
                 investigation="table_health",
                 element_id="incident",
             )
-            result = json.loads(raw)
+            result = toon_decode(raw)
 
         assert result["status"] == "error"
         assert "denied" in result["error"].lower()

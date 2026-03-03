@@ -1,10 +1,10 @@
 """Tests for utility functions."""
 
-import json
 import uuid
 import warnings
 
 import pytest
+from toon_format import decode as toon_decode
 
 from servicenow_mcp.errors import ForbiddenError
 from servicenow_mcp.utils import safe_tool_call
@@ -39,7 +39,8 @@ class TestFormatResponse:
     def test_success_envelope(self):
         from servicenow_mcp.utils import format_response
 
-        resp = format_response(data={"key": "value"}, correlation_id="test-123")
+        raw = format_response(data={"key": "value"}, correlation_id="test-123")
+        resp = toon_decode(raw)
 
         assert resp["status"] == "success"
         assert resp["correlation_id"] == "test-123"
@@ -48,12 +49,13 @@ class TestFormatResponse:
     def test_error_envelope(self):
         from servicenow_mcp.utils import format_response
 
-        resp = format_response(
+        raw = format_response(
             data=None,
             correlation_id="test-456",
             status="error",
             error="Something went wrong",
         )
+        resp = toon_decode(raw)
 
         assert resp["status"] == "error"
         assert resp["error"] == "Something went wrong"
@@ -61,22 +63,24 @@ class TestFormatResponse:
     def test_pagination_included(self):
         from servicenow_mcp.utils import format_response
 
-        resp = format_response(
+        raw = format_response(
             data=[],
             correlation_id="test-789",
             pagination={"offset": 0, "limit": 100, "total": 250},
         )
+        resp = toon_decode(raw)
 
         assert resp["pagination"]["total"] == 250
 
     def test_warnings_included(self):
         from servicenow_mcp.utils import format_response
 
-        resp = format_response(
+        raw = format_response(
             data={},
             correlation_id="test-999",
             warnings=["Limit capped at 100"],
         )
+        resp = toon_decode(raw)
 
         assert "Limit capped at 100" in resp["warnings"]
 
@@ -611,7 +615,7 @@ class TestSafeToolCall:
             raise ForbiddenError("no access to incident")
 
         result = await safe_tool_call(fn, "test-corr-id")
-        parsed = json.loads(result)
+        parsed = toon_decode(result)
         assert parsed["status"] == "error"
         assert "Access denied by ServiceNow ACL" in parsed["error"]
         assert "no access to incident" in parsed["error"]
@@ -624,7 +628,7 @@ class TestSafeToolCall:
             raise ValueError("something broke")
 
         result = await safe_tool_call(fn, "test-corr-id")
-        parsed = json.loads(result)
+        parsed = toon_decode(result)
         assert parsed["status"] == "error"
         assert "something broke" in parsed["error"]
         assert parsed["correlation_id"] == "test-corr-id"

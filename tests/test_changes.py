@@ -1,11 +1,11 @@
 """Tests for change intelligence tools (changes_updateset_inspect, changes_diff_artifact, changes_last_touched, changes_release_notes)."""
 
-import json
 from urllib.parse import parse_qs, urlparse
 
 import httpx
 import pytest
 import respx
+from toon_format import decode as toon_decode
 
 from servicenow_mcp.auth import BasicAuthProvider
 
@@ -88,7 +88,7 @@ class TestChangesUpdatesetInspect:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["changes_updateset_inspect"](update_set_id="us001")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         data = result["data"]
@@ -134,7 +134,7 @@ class TestChangesUpdatesetInspect:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["changes_updateset_inspect"](update_set_id="us002")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert len(result["data"]["risk_flags"]) > 0
@@ -165,7 +165,7 @@ class TestChangesUpdatesetInspect:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["changes_updateset_inspect"](update_set_id="us003")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["total_members"] == 0
@@ -176,7 +176,7 @@ class TestChangesUpdatesetInspect:
         """Returns error when update_set_id contains invalid characters."""
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["changes_updateset_inspect"](update_set_id="invalid;id")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "error"
         assert "invalid identifier" in result["error"].lower()
@@ -214,7 +214,7 @@ class TestChangesDiffArtifact:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["changes_diff_artifact"](table="sys_script_include", sys_id="abc")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert "diff" in result["data"]
@@ -243,7 +243,7 @@ class TestChangesDiffArtifact:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["changes_diff_artifact"](table="sys_script_include", sys_id="abc")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "error"
 
@@ -280,7 +280,7 @@ class TestChangesDiffArtifact:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["changes_diff_artifact"](table="sys_script_include", sys_id="xyz")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         diff_text = result["data"]["diff"]
@@ -320,7 +320,7 @@ class TestChangesDiffArtifact:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["changes_diff_artifact"](table="sys_script_include", sys_id="abc")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
 
@@ -366,7 +366,7 @@ class TestChangesDiffArtifact:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["changes_diff_artifact"](table="sys_script_include", sys_id="abc^def")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         # The update_name should be "sys_script_include_abc^def" (unsanitized),
@@ -419,7 +419,7 @@ class TestChangesLastTouched:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["changes_last_touched"](table="incident", sys_id="inc001")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert len(result["data"]["changes"]) == 2
@@ -439,7 +439,7 @@ class TestChangesLastTouched:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["changes_last_touched"](table="incident", sys_id="inc999")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["changes"] == []
@@ -494,7 +494,7 @@ class TestChangesReleaseNotes:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["changes_release_notes"](update_set_id="us001")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         notes = result["data"]["release_notes"]
@@ -527,7 +527,7 @@ class TestChangesReleaseNotes:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["changes_release_notes"](update_set_id="us004")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert "Empty Release" in result["data"]["release_notes"]
@@ -538,7 +538,7 @@ class TestChangesReleaseNotes:
         """Returns error when update_set_id contains invalid characters."""
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["changes_release_notes"](update_set_id="invalid;id")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "error"
         assert "invalid identifier" in result["error"].lower()

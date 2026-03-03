@@ -1,7 +1,6 @@
 """Change intelligence tools for inspecting update sets, diffs, and audit trails."""
 
 import difflib
-import json
 from collections import defaultdict
 
 from mcp.server.fastmcp import FastMCP
@@ -102,21 +101,18 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     f"Contains {groups[risky_type].__len__()} '{risky_type}' artifact(s) — review carefully"
                 )
 
-            return json.dumps(
-                format_response(
-                    data={
-                        "update_set": {
-                            "sys_id": update_set.get("sys_id", ""),
-                            "name": update_set.get("name", ""),
-                            "state": update_set.get("state", ""),
-                        },
-                        "total_members": len(members),
-                        "groups": group_summary,
-                        "risk_flags": risk_flags,
+            return format_response(
+                data={
+                    "update_set": {
+                        "sys_id": update_set.get("sys_id", ""),
+                        "name": update_set.get("name", ""),
+                        "state": update_set.get("state", ""),
                     },
-                    correlation_id=correlation_id,
-                ),
-                indent=2,
+                    "total_members": len(members),
+                    "groups": group_summary,
+                    "risk_flags": risk_flags,
+                },
+                correlation_id=correlation_id,
             )
 
         return await safe_tool_call(_run, correlation_id)
@@ -152,14 +148,11 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             versions = [mask_sensitive_fields(v) for v in versions_result["records"]]
 
             if len(versions) < 2:
-                return json.dumps(
-                    format_response(
-                        data=None,
-                        correlation_id=correlation_id,
-                        status="error",
-                        error=f"Need at least 2 versions to diff, found {len(versions)}",
-                    ),
-                    indent=2,
+                return format_response(
+                    data=None,
+                    correlation_id=correlation_id,
+                    status="error",
+                    error=f"Need at least 2 versions to diff, found {len(versions)}",
                 )
 
             # versions[0] is newest (DESC order), versions[1] is second-newest
@@ -179,17 +172,14 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 )
             )
 
-            return json.dumps(
-                format_response(
-                    data={
-                        "artifact": update_name,
-                        "old_version": old_date,
-                        "new_version": new_date,
-                        "diff": "".join(diff_lines),
-                    },
-                    correlation_id=correlation_id,
-                ),
-                indent=2,
+            return format_response(
+                data={
+                    "artifact": update_name,
+                    "old_version": old_date,
+                    "new_version": new_date,
+                    "diff": "".join(diff_lines),
+                },
+                correlation_id=correlation_id,
             )
 
         return await safe_tool_call(_run, correlation_id)
@@ -243,17 +233,14 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     }
                 )
 
-            return json.dumps(
-                format_response(
-                    data={
-                        "table": table,
-                        "sys_id": sys_id,
-                        "total": len(changes),
-                        "changes": changes,
-                    },
-                    correlation_id=correlation_id,
-                ),
-                indent=2,
+            return format_response(
+                data={
+                    "table": table,
+                    "sys_id": sys_id,
+                    "total": len(changes),
+                    "changes": changes,
+                },
+                correlation_id=correlation_id,
             )
 
         return await safe_tool_call(_run, correlation_id)
@@ -335,15 +322,12 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
 
             release_notes = "\n".join(lines)
 
-            return json.dumps(
-                format_response(
-                    data={
-                        "update_set_name": us_name,
-                        "release_notes": release_notes,
-                    },
-                    correlation_id=correlation_id,
-                ),
-                indent=2,
+            return format_response(
+                data={
+                    "update_set_name": us_name,
+                    "release_notes": release_notes,
+                },
+                correlation_id=correlation_id,
             )
 
         return await safe_tool_call(_run, correlation_id)

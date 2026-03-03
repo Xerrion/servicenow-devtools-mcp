@@ -1,7 +1,6 @@
 """ATF (Automated Test Framework) tools for introspection, execution, and intelligence."""
 
 import asyncio
-import json
 import logging
 import time
 
@@ -29,13 +28,11 @@ def _atf_execution_gate(settings: Settings, correlation_id: str) -> str | None:
     """Gate ATF execution tools - running tests creates result records."""
     reason = write_blocked_reason("sys_atf_test_result", settings)
     if reason:
-        return json.dumps(
-            format_response(
-                data=None,
-                correlation_id=correlation_id,
-                status="error",
-                error=reason,
-            )
+        return format_response(
+            data=None,
+            correlation_id=correlation_id,
+            status="error",
+            error=reason,
         )
     return None
 
@@ -77,15 +74,12 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
 
             records = [mask_sensitive_fields(rec) for rec in result["records"]]
 
-            return json.dumps(
-                format_response(
-                    data={
-                        "record_count": len(records),
-                        "records": records,
-                    },
-                    correlation_id=correlation_id,
-                ),
-                indent=2,
+            return format_response(
+                data={
+                    "record_count": len(records),
+                    "records": records,
+                },
+                correlation_id=correlation_id,
             )
 
         return await safe_tool_call(_run, correlation_id)
@@ -122,16 +116,13 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             test_record = mask_sensitive_fields(test)
             steps = [mask_sensitive_fields(step) for step in steps_result["records"]]
 
-            return json.dumps(
-                format_response(
-                    data={
-                        "test": test_record,
-                        "steps": steps,
-                        "step_count": len(steps),
-                    },
-                    correlation_id=correlation_id,
-                ),
-                indent=2,
+            return format_response(
+                data={
+                    "test": test_record,
+                    "steps": steps,
+                    "step_count": len(steps),
+                },
+                correlation_id=correlation_id,
             )
 
         return await safe_tool_call(_run, correlation_id)
@@ -174,15 +165,12 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     )
                     suite["member_count"] = count_result.get("stats", {}).get("count", 0)
 
-            return json.dumps(
-                format_response(
-                    data={
-                        "record_count": len(suites),
-                        "suites": suites,
-                    },
-                    correlation_id=correlation_id,
-                ),
-                indent=2,
+            return format_response(
+                data={
+                    "record_count": len(suites),
+                    "suites": suites,
+                },
+                correlation_id=correlation_id,
             )
 
         return await safe_tool_call(_run, correlation_id)
@@ -207,25 +195,19 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
 
         async def _run() -> str:
             if not test_id and not suite_id:
-                return json.dumps(
-                    format_response(
-                        data=None,
-                        correlation_id=correlation_id,
-                        status="error",
-                        error="Must provide exactly one of test_id or suite_id.",
-                    ),
-                    indent=2,
+                return format_response(
+                    data=None,
+                    correlation_id=correlation_id,
+                    status="error",
+                    error="Must provide exactly one of test_id or suite_id.",
                 )
 
             if test_id and suite_id:
-                return json.dumps(
-                    format_response(
-                        data=None,
-                        correlation_id=correlation_id,
-                        status="error",
-                        error="Must provide exactly one of test_id or suite_id, not both.",
-                    ),
-                    indent=2,
+                return format_response(
+                    data=None,
+                    correlation_id=correlation_id,
+                    status="error",
+                    error="Must provide exactly one of test_id or suite_id, not both.",
                 )
 
             if test_id:
@@ -270,16 +252,13 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
 
             records = [mask_sensitive_fields(rec) for rec in result["records"]]
 
-            return json.dumps(
-                format_response(
-                    data={
-                        "result_type": result_type,
-                        "result_count": len(records),
-                        "results": records,
-                    },
-                    correlation_id=correlation_id,
-                ),
-                indent=2,
+            return format_response(
+                data={
+                    "result_type": result_type,
+                    "result_count": len(records),
+                    "results": records,
+                },
+                correlation_id=correlation_id,
             )
 
         return await safe_tool_call(_run, correlation_id)
@@ -316,28 +295,22 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 snboq_id = result.get("snboqId") or result.get("snboq_id") or result.get("executionId", "")
 
                 if not snboq_id:
-                    return json.dumps(
-                        format_response(
-                            data=None,
-                            correlation_id=correlation_id,
-                            status="error",
-                            error="ATF execution started but no execution ID returned.",
-                        ),
-                        indent=2,
+                    return format_response(
+                        data=None,
+                        correlation_id=correlation_id,
+                        status="error",
+                        error="ATF execution started but no execution ID returned.",
                     )
 
                 if not poll:
-                    return json.dumps(
-                        format_response(
-                            data={
-                                "execution_id": snboq_id,
-                                "status": "started",
-                                "test_id": test_id,
-                                "polling": False,
-                            },
-                            correlation_id=correlation_id,
-                        ),
-                        indent=2,
+                    return format_response(
+                        data={
+                            "execution_id": snboq_id,
+                            "status": "started",
+                            "test_id": test_id,
+                            "polling": False,
+                        },
+                        correlation_id=correlation_id,
                     )
 
                 start_time = time.monotonic()
@@ -351,36 +324,30 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     progress = progress_result.get("progress", 0)
 
                     if state in terminal_states:
-                        return json.dumps(
-                            format_response(
-                                data={
-                                    "execution_id": snboq_id,
-                                    "status": state,
-                                    "progress": progress,
-                                    "test_id": test_id,
-                                },
-                                correlation_id=correlation_id,
-                            ),
-                            indent=2,
+                        return format_response(
+                            data={
+                                "execution_id": snboq_id,
+                                "status": state,
+                                "progress": progress,
+                                "test_id": test_id,
+                            },
+                            correlation_id=correlation_id,
                         )
 
                     await asyncio.sleep(clamped_interval)
 
-                return json.dumps(
-                    format_response(
-                        data={
-                            "execution_id": snboq_id,
-                            "status": "polling_timeout",
-                            "progress": progress,
-                            "test_id": test_id,
-                            "last_known_state": state,
-                        },
-                        correlation_id=correlation_id,
-                        warnings=[
-                            f"Polling timeout after {clamped_max_duration}s. Use atf_progress with execution_id to check status."
-                        ],
-                    ),
-                    indent=2,
+                return format_response(
+                    data={
+                        "execution_id": snboq_id,
+                        "status": "polling_timeout",
+                        "progress": progress,
+                        "test_id": test_id,
+                        "last_known_state": state,
+                    },
+                    correlation_id=correlation_id,
+                    warnings=[
+                        f"Polling timeout after {clamped_max_duration}s. Use atf_progress with execution_id to check status."
+                    ],
                 )
 
         return await safe_tool_call(_run, correlation_id)
@@ -417,28 +384,22 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 snboq_id = result.get("snboqId") or result.get("snboq_id") or result.get("executionId", "")
 
                 if not snboq_id:
-                    return json.dumps(
-                        format_response(
-                            data=None,
-                            correlation_id=correlation_id,
-                            status="error",
-                            error="ATF execution started but no execution ID returned.",
-                        ),
-                        indent=2,
+                    return format_response(
+                        data=None,
+                        correlation_id=correlation_id,
+                        status="error",
+                        error="ATF execution started but no execution ID returned.",
                     )
 
                 if not poll:
-                    return json.dumps(
-                        format_response(
-                            data={
-                                "execution_id": snboq_id,
-                                "status": "started",
-                                "suite_id": suite_id,
-                                "polling": False,
-                            },
-                            correlation_id=correlation_id,
-                        ),
-                        indent=2,
+                    return format_response(
+                        data={
+                            "execution_id": snboq_id,
+                            "status": "started",
+                            "suite_id": suite_id,
+                            "polling": False,
+                        },
+                        correlation_id=correlation_id,
                     )
 
                 start_time = time.monotonic()
@@ -452,36 +413,30 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     progress = progress_result.get("progress", 0)
 
                     if state in terminal_states:
-                        return json.dumps(
-                            format_response(
-                                data={
-                                    "execution_id": snboq_id,
-                                    "status": state,
-                                    "progress": progress,
-                                    "suite_id": suite_id,
-                                },
-                                correlation_id=correlation_id,
-                            ),
-                            indent=2,
+                        return format_response(
+                            data={
+                                "execution_id": snboq_id,
+                                "status": state,
+                                "progress": progress,
+                                "suite_id": suite_id,
+                            },
+                            correlation_id=correlation_id,
                         )
 
                     await asyncio.sleep(clamped_interval)
 
-                return json.dumps(
-                    format_response(
-                        data={
-                            "execution_id": snboq_id,
-                            "status": "polling_timeout",
-                            "progress": progress,
-                            "suite_id": suite_id,
-                            "last_known_state": state,
-                        },
-                        correlation_id=correlation_id,
-                        warnings=[
-                            f"Polling timeout after {clamped_max_duration}s. Use atf_progress with execution_id to check status."
-                        ],
-                    ),
-                    indent=2,
+                return format_response(
+                    data={
+                        "execution_id": snboq_id,
+                        "status": "polling_timeout",
+                        "progress": progress,
+                        "suite_id": suite_id,
+                        "last_known_state": state,
+                    },
+                    correlation_id=correlation_id,
+                    warnings=[
+                        f"Polling timeout after {clamped_max_duration}s. Use atf_progress with execution_id to check status."
+                    ],
                 )
 
         return await safe_tool_call(_run, correlation_id)
@@ -507,25 +462,19 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
 
         async def _run() -> str:
             if not test_id and not suite_id:
-                return json.dumps(
-                    format_response(
-                        data=None,
-                        correlation_id=correlation_id,
-                        status="error",
-                        error="Must provide exactly one of test_id or suite_id.",
-                    ),
-                    indent=2,
+                return format_response(
+                    data=None,
+                    correlation_id=correlation_id,
+                    status="error",
+                    error="Must provide exactly one of test_id or suite_id.",
                 )
 
             if test_id and suite_id:
-                return json.dumps(
-                    format_response(
-                        data=None,
-                        correlation_id=correlation_id,
-                        status="error",
-                        error="Must provide exactly one of test_id or suite_id, not both.",
-                    ),
-                    indent=2,
+                return format_response(
+                    data=None,
+                    correlation_id=correlation_id,
+                    status="error",
+                    error="Must provide exactly one of test_id or suite_id, not both.",
                 )
 
             if test_id:
@@ -551,21 +500,18 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             total_runs = len(records)
 
             if total_runs == 0:
-                return json.dumps(
-                    format_response(
-                        data={
-                            "total_runs": 0,
-                            "pass_count": 0,
-                            "fail_count": 0,
-                            "pass_rate": 0.0,
-                            "flaky": False,
-                            "recent_trend": "no_data",
-                            "last_run": None,
-                        },
-                        correlation_id=correlation_id,
-                        warnings=["No execution results found in the specified time window."],
-                    ),
-                    indent=2,
+                return format_response(
+                    data={
+                        "total_runs": 0,
+                        "pass_count": 0,
+                        "fail_count": 0,
+                        "pass_rate": 0.0,
+                        "flaky": False,
+                        "recent_trend": "no_data",
+                        "last_run": None,
+                    },
+                    correlation_id=correlation_id,
+                    warnings=["No execution results found in the specified time window."],
                 )
 
             pass_count = sum(1 for r in records if r.get("status", "").lower() in {"success", "passed"})
@@ -607,21 +553,18 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
 
             last_run = records[-1] if records else None
 
-            return json.dumps(
-                format_response(
-                    data={
-                        "total_runs": total_runs,
-                        "pass_count": pass_count,
-                        "fail_count": fail_count,
-                        "pass_rate": round(pass_rate, 3),
-                        "flaky": flaky,
-                        "transition_count": transitions,
-                        "recent_trend": trend,
-                        "last_run": mask_sensitive_fields(last_run) if last_run else None,
-                    },
-                    correlation_id=correlation_id,
-                ),
-                indent=2,
+            return format_response(
+                data={
+                    "total_runs": total_runs,
+                    "pass_count": pass_count,
+                    "fail_count": fail_count,
+                    "pass_rate": round(pass_rate, 3),
+                    "flaky": flaky,
+                    "transition_count": transitions,
+                    "recent_trend": trend,
+                    "last_run": mask_sensitive_fields(last_run) if last_run else None,
+                },
+                correlation_id=correlation_id,
             )
 
         return await safe_tool_call(_run, correlation_id)

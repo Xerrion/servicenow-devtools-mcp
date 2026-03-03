@@ -1,11 +1,11 @@
 """Tests for metadata tools (meta_list_artifacts, meta_get_artifact, meta_find_references, meta_what_writes)."""
 
-import json
 from urllib.parse import parse_qs, urlparse
 
 import httpx
 import pytest
 import respx
+from toon_format import decode as toon_decode
 
 from servicenow_mcp.auth import BasicAuthProvider
 
@@ -82,7 +82,7 @@ class TestMetaListArtifacts:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["meta_list_artifacts"](artifact_type="business_rule")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert len(result["data"]["artifacts"]) == 2
@@ -112,7 +112,7 @@ class TestMetaListArtifacts:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["meta_list_artifacts"](artifact_type="business_rule", query="collection=incident^active=true")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert len(result["data"]["artifacts"]) == 1
@@ -122,7 +122,7 @@ class TestMetaListArtifacts:
         """Unknown artifact type returns an error."""
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["meta_list_artifacts"](artifact_type="nonexistent_type")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "error"
         assert "unknown" in result["error"].lower() or "type" in result["error"].lower()
@@ -141,7 +141,7 @@ class TestMetaListArtifacts:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["meta_list_artifacts"](artifact_type="business_rule")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert "correlation_id" in result
         assert len(result["correlation_id"]) > 0
@@ -161,7 +161,7 @@ class TestMetaListArtifacts:
         tools = _register_and_get_tools(settings, auth_provider)
         # Pass limit=9999, which should be capped to settings.max_row_limit (default 100)
         raw = await tools["meta_list_artifacts"](artifact_type="business_rule", limit=9999)
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         # Verify the request used the capped limit, not the original 9999
@@ -199,7 +199,7 @@ class TestMetaGetArtifact:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["meta_get_artifact"](artifact_type="business_rule", sys_id="br1")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["sys_id"] == "br1"
@@ -215,7 +215,7 @@ class TestMetaGetArtifact:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["meta_get_artifact"](artifact_type="business_rule", sys_id="missing")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "error"
 
@@ -248,7 +248,7 @@ class TestMetaFindReferences:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["meta_find_references"](target="GlideRecord")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert len(result["data"]["matches"]) >= 1
@@ -292,7 +292,7 @@ class TestMetaFindReferences:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["meta_find_references"](target="GlideRecord")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert len(result["data"]["matches"]) >= 1
@@ -314,7 +314,7 @@ class TestMetaFindReferences:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["meta_find_references"](target="NonExistentAPI12345")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["matches"] == []
@@ -341,7 +341,7 @@ class TestMetaFindReferences:
         tools = _register_and_get_tools(settings, auth_provider)
         # Pass limit=9999, which should be capped to settings.max_row_limit (default 100)
         raw = await tools["meta_find_references"](target="SomeTarget", limit=9999)
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["search_method"] == "table_scan_fallback"
@@ -377,7 +377,7 @@ class TestMetaFindReferences:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["meta_find_references"](target="foo^bar")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["search_method"] == "table_scan_fallback"
@@ -422,7 +422,7 @@ class TestMetaWhatWrites:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["meta_what_writes"](table="incident")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert len(result["data"]["writers"]) >= 1
@@ -463,7 +463,7 @@ class TestMetaWhatWrites:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["meta_what_writes"](table="incident", field="priority")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         # Only the BR that references 'priority' should appear
@@ -485,7 +485,7 @@ class TestMetaWhatWrites:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["meta_what_writes"](table="cmdb_ci")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["writers"] == []

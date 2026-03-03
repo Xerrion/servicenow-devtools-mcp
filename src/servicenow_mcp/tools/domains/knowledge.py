@@ -1,6 +1,5 @@
 """Knowledge Management domain tools."""
 
-import json
 import re
 import uuid
 
@@ -61,10 +60,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     limit=limit,
                 )
                 masked = [mask_sensitive_fields(r) for r in result["records"]]
-                return json.dumps(
-                    format_response(data=masked, correlation_id=correlation_id),
-                    indent=2,
-                )
+                return format_response(data=masked, correlation_id=correlation_id)
 
         return await safe_tool_call(_run, correlation_id)
 
@@ -104,18 +100,15 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     )
 
                 if not result["records"]:
-                    return json.dumps(
-                        format_response(
-                            data=None,
-                            correlation_id=correlation_id,
-                            status="error",
-                            error=f"Knowledge article '{number_or_sys_id}' not found.",
-                        ),
-                        indent=2,
+                    return format_response(
+                        data=None,
+                        correlation_id=correlation_id,
+                        status="error",
+                        error=f"Knowledge article '{number_or_sys_id}' not found.",
                     )
 
                 masked = mask_sensitive_fields(result["records"][0])
-                return json.dumps(format_response(data=masked, correlation_id=correlation_id), indent=2)
+                return format_response(data=masked, correlation_id=correlation_id)
 
         return await safe_tool_call(_run, correlation_id)
 
@@ -141,25 +134,19 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         async def _run() -> str:
             # Validate required fields
             if not short_description.strip():
-                return json.dumps(
-                    format_response(
-                        data=None,
-                        correlation_id=correlation_id,
-                        status="error",
-                        error="short_description is required and cannot be empty.",
-                    ),
-                    indent=2,
+                return format_response(
+                    data=None,
+                    correlation_id=correlation_id,
+                    status="error",
+                    error="short_description is required and cannot be empty.",
                 )
 
             if not text.strip():
-                return json.dumps(
-                    format_response(
-                        data=None,
-                        correlation_id=correlation_id,
-                        status="error",
-                        error="text is required and cannot be empty.",
-                    ),
-                    indent=2,
+                return format_response(
+                    data=None,
+                    correlation_id=correlation_id,
+                    status="error",
+                    error="text is required and cannot be empty.",
                 )
 
             check_table_access("kb_knowledge")
@@ -183,7 +170,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             async with ServiceNowClient(settings, auth_provider) as client:
                 result = await client.create_record(table="kb_knowledge", data=data)
                 masked = mask_sensitive_fields(result)
-                return json.dumps(format_response(data=masked, correlation_id=correlation_id), indent=2)
+                return format_response(data=masked, correlation_id=correlation_id)
 
         return await safe_tool_call(_run, correlation_id)
 
@@ -236,14 +223,11 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     )
 
                 if not result["records"]:
-                    return json.dumps(
-                        format_response(
-                            data=None,
-                            correlation_id=correlation_id,
-                            status="error",
-                            error=f"Knowledge article '{number_or_sys_id}' not found.",
-                        ),
-                        indent=2,
+                    return format_response(
+                        data=None,
+                        correlation_id=correlation_id,
+                        status="error",
+                        error=f"Knowledge article '{number_or_sys_id}' not found.",
                     )
 
                 sys_id = result["records"][0]["sys_id"]
@@ -262,14 +246,11 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     changes["kb_category"] = kb_category
 
                 if not changes:
-                    return json.dumps(
-                        format_response(
-                            data=None,
-                            correlation_id=correlation_id,
-                            status="error",
-                            error="No fields to update provided.",
-                        ),
-                        indent=2,
+                    return format_response(
+                        data=None,
+                        correlation_id=correlation_id,
+                        status="error",
+                        error="No fields to update provided.",
                     )
 
                 update_result = await client.update_record(
@@ -278,7 +259,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     data=changes,
                 )
                 masked = mask_sensitive_fields(update_result)
-                return json.dumps(format_response(data=masked, correlation_id=correlation_id), indent=2)
+                return format_response(data=masked, correlation_id=correlation_id)
 
         return await safe_tool_call(_run, correlation_id)
 
@@ -302,26 +283,20 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         async def _run() -> str:
             # Validate at least one feedback type provided
             if rating is None and not comment.strip():
-                return json.dumps(
-                    format_response(
-                        data=None,
-                        correlation_id=correlation_id,
-                        status="error",
-                        error="Must provide rating or comment.",
-                    ),
-                    indent=2,
+                return format_response(
+                    data=None,
+                    correlation_id=correlation_id,
+                    status="error",
+                    error="Must provide rating or comment.",
                 )
 
             # Validate rating range if provided
             if rating is not None and (rating < 1 or rating > 5):
-                return json.dumps(
-                    format_response(
-                        data=None,
-                        correlation_id=correlation_id,
-                        status="error",
-                        error="Rating must be between 1 and 5.",
-                    ),
-                    indent=2,
+                return format_response(
+                    data=None,
+                    correlation_id=correlation_id,
+                    status="error",
+                    error="Rating must be between 1 and 5.",
                 )
 
             check_table_access("kb_knowledge")
@@ -351,14 +326,11 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     )
 
                 if not result["records"]:
-                    return json.dumps(
-                        format_response(
-                            data=None,
-                            correlation_id=correlation_id,
-                            status="error",
-                            error=f"Knowledge article '{number_or_sys_id}' not found.",
-                        ),
-                        indent=2,
+                    return format_response(
+                        data=None,
+                        correlation_id=correlation_id,
+                        status="error",
+                        error=f"Knowledge article '{number_or_sys_id}' not found.",
                     )
 
                 article_sys_id = result["records"][0]["sys_id"]
@@ -374,6 +346,6 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     data=feedback_data,
                 )
                 masked = mask_sensitive_fields(created)
-                return json.dumps(format_response(data=masked, correlation_id=correlation_id), indent=2)
+                return format_response(data=masked, correlation_id=correlation_id)
 
         return await safe_tool_call(_run, correlation_id)

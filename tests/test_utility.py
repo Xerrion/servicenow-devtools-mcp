@@ -3,6 +3,7 @@
 import json
 
 import pytest
+from toon_format import decode as toon_decode
 
 from servicenow_mcp.auth import BasicAuthProvider
 
@@ -31,7 +32,7 @@ class TestBuildQuery:
         """Build a simple equals query."""
         tools = _register_and_get_tools(settings, auth_provider)
         raw = tools["build_query"](conditions='[{"operator": "equals", "field": "active", "value": "true"}]')
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "success"
         assert result["data"]["query"] == "active=true"
 
@@ -39,7 +40,7 @@ class TestBuildQuery:
         """Build a query with hours_ago time filter."""
         tools = _register_and_get_tools(settings, auth_provider)
         raw = tools["build_query"](conditions='[{"operator": "hours_ago", "field": "sys_created_on", "value": 24}]')
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "success"
         assert result["data"]["query"] == "sys_created_on>=javascript:gs.hoursAgoStart(24)"
 
@@ -54,7 +55,7 @@ class TestBuildQuery:
             ]
         )
         raw = tools["build_query"](conditions=conditions)
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "success"
         assert result["data"]["query"] == (
             "active=true^sys_created_on>=javascript:gs.hoursAgoStart(24)^sourceLIKEincident"
@@ -64,7 +65,7 @@ class TestBuildQuery:
         """Unary operators like is_empty don't need a value."""
         tools = _register_and_get_tools(settings, auth_provider)
         raw = tools["build_query"](conditions='[{"operator": "is_empty", "field": "assigned_to"}]')
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "success"
         assert result["data"]["query"] == "assigned_toISEMPTY"
 
@@ -72,7 +73,7 @@ class TestBuildQuery:
         """Unknown operator returns an error response."""
         tools = _register_and_get_tools(settings, auth_provider)
         raw = tools["build_query"](conditions='[{"operator": "INVALID", "field": "active", "value": "true"}]')
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "error"
         assert "Unknown operator" in result["error"]
 
@@ -80,7 +81,7 @@ class TestBuildQuery:
         """Malformed JSON returns an error response."""
         tools = _register_and_get_tools(settings, auth_provider)
         raw = tools["build_query"](conditions="not valid json")
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "error"
         assert "Invalid JSON" in result["error"]
 
@@ -88,7 +89,7 @@ class TestBuildQuery:
         """Missing required 'field' key returns an error."""
         tools = _register_and_get_tools(settings, auth_provider)
         raw = tools["build_query"](conditions='[{"operator": "equals", "value": "true"}]')
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "error"
         assert "requires 'operator' and 'field'" in result["error"]
 
@@ -96,7 +97,7 @@ class TestBuildQuery:
         """Binary operators require a value."""
         tools = _register_and_get_tools(settings, auth_provider)
         raw = tools["build_query"](conditions='[{"operator": "equals", "field": "active"}]')
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "error"
         assert "requires a 'value'" in result["error"]
 
@@ -104,7 +105,7 @@ class TestBuildQuery:
         """Non-array JSON returns an error."""
         tools = _register_and_get_tools(settings, auth_provider)
         raw = tools["build_query"](conditions='{"operator": "equals"}')
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "error"
         assert "must be a JSON array" in result["error"]
 
@@ -112,7 +113,7 @@ class TestBuildQuery:
         """Empty array returns empty query string."""
         tools = _register_and_get_tools(settings, auth_provider)
         raw = tools["build_query"](conditions="[]")
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "success"
         assert result["data"]["query"] == ""
 
@@ -120,7 +121,7 @@ class TestBuildQuery:
         """Test days_ago time filter."""
         tools = _register_and_get_tools(settings, auth_provider)
         raw = tools["build_query"](conditions='[{"operator": "days_ago", "field": "sys_created_on", "value": 30}]')
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "success"
         assert result["data"]["query"] == "sys_created_on>=javascript:gs.daysAgoStart(30)"
 
@@ -128,7 +129,7 @@ class TestBuildQuery:
         """Test starts_with string operator."""
         tools = _register_and_get_tools(settings, auth_provider)
         raw = tools["build_query"](conditions='[{"operator": "starts_with", "field": "name", "value": "incident"}]')
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "success"
         assert result["data"]["query"] == "nameSTARTSWITHincident"
 
@@ -142,7 +143,7 @@ class TestBuildQuery:
             ]
         )
         raw = tools["build_query"](conditions=conditions)
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "success"
         assert result["data"]["query"] == "state=1^ORstate=2"
 
@@ -156,7 +157,7 @@ class TestBuildQuery:
             ]
         )
         raw = tools["build_query"](conditions=conditions)
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "success"
         assert result["data"]["query"] == "nameSTARTSWITHINC^ORnameSTARTSWITHREQ"
 
@@ -169,7 +170,7 @@ class TestBuildQuery:
             ]
         )
         raw = tools["build_query"](conditions=conditions)
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "success"
         assert result["data"]["query"] == "stateIN1,2,3"
 
@@ -182,7 +183,7 @@ class TestBuildQuery:
             ]
         )
         raw = tools["build_query"](conditions=conditions)
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "success"
         assert result["data"]["query"] == "priorityNOT IN4,5"
 
@@ -195,7 +196,7 @@ class TestBuildQuery:
             ]
         )
         raw = tools["build_query"](conditions=conditions)
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "error"
         assert "list of strings" in result["error"]
 
@@ -209,7 +210,7 @@ class TestBuildQuery:
             ]
         )
         raw = tools["build_query"](conditions=conditions)
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "success"
         assert result["data"]["query"] == "active=true^ORDERBYsys_created_on"
 
@@ -223,7 +224,7 @@ class TestBuildQuery:
             ]
         )
         raw = tools["build_query"](conditions=conditions)
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "success"
         assert result["data"]["query"] == "active=true^ORDERBYDESCsys_created_on"
 
@@ -236,7 +237,7 @@ class TestBuildQuery:
             ]
         )
         raw = tools["build_query"](conditions=conditions)
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "success"
         # The ^ in the value should be escaped to ^^
         assert result["data"]["query"] == "name=foo^^bar"
@@ -247,7 +248,7 @@ class TestBuildQuery:
         raw = tools["build_query"](
             conditions='[{"operator": "hours_ago", "field": "sys_created_on"}]',
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "error"
         assert "requires an integer 'value'" in result["error"]
 
@@ -258,6 +259,6 @@ class TestBuildQuery:
         tools = _register_and_get_tools(settings, auth_provider)
         with patch("servicenow_mcp.tools.utility.ServiceNowQuery", side_effect=RuntimeError("boom")):
             raw = tools["build_query"](conditions='[{"operator": "equals", "field": "active", "value": "true"}]')
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "error"
         assert "boom" in result["error"]

@@ -1,7 +1,6 @@
 """MCP server entry point with stdio and SSE transport."""
 
 import importlib
-import json
 import logging
 
 from mcp.server.fastmcp import FastMCP
@@ -9,6 +8,7 @@ from mcp.server.fastmcp import FastMCP
 from servicenow_mcp.auth import create_auth
 from servicenow_mcp.config import Settings
 from servicenow_mcp.packages import _TOOL_GROUP_MODULES, get_package, list_packages
+from servicenow_mcp.utils import serialize
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +28,7 @@ def create_mcp_server() -> FastMCP:
     @mcp.tool()
     def list_tool_packages() -> str:
         """List all available tool packages and their tool groups."""
-        return json.dumps(list_packages(), indent=2)
+        return serialize(list_packages())
 
     # Load tools based on active package
     package_name = settings.mcp_tool_package

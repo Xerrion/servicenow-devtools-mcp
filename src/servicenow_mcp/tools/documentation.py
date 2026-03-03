@@ -1,7 +1,6 @@
 """Documentation tools for generating logic maps, summaries, test scenarios, and review notes."""
 
 import asyncio
-import json
 import re
 from typing import Any
 
@@ -147,15 +146,13 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
 
             total = len(br_result["records"]) + len(cs_records) + len(uip_records) + len(uia_records)
 
-            return json.dumps(
-                format_response(
-                    data={
-                        "table": table,
-                        "phases": phases,
-                        "total_automations": total,
-                    },
-                    correlation_id=correlation_id,
-                )
+            return format_response(
+                data={
+                    "table": table,
+                    "phases": phases,
+                    "total_automations": total,
+                },
+                correlation_id=correlation_id,
             )
 
         return await safe_tool_call(_run, correlation_id)
@@ -177,13 +174,11 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             table = ARTIFACT_TABLES.get(artifact_type)
             if not table:
                 valid_types = ", ".join(sorted(ARTIFACT_TABLES.keys()))
-                return json.dumps(
-                    format_response(
-                        data=None,
-                        correlation_id=correlation_id,
-                        status="error",
-                        error=f"Unknown artifact type '{artifact_type}'. Valid: {valid_types}",
-                    )
+                return format_response(
+                    data=None,
+                    correlation_id=correlation_id,
+                    status="error",
+                    error=f"Unknown artifact type '{artifact_type}'. Valid: {valid_types}",
                 )
 
             check_table_access(table)
@@ -205,17 +200,15 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     except Exception:
                         pass
 
-            return json.dumps(
-                format_response(
-                    data={
-                        "artifact": record,
-                        "referenced_tables": referenced_tables,
-                        "referenced_by": referenced_by,
-                        "summary": f"Artifact '{artifact_name}' references {len(referenced_tables)} table(s) "
-                        f"and is referenced by {len(referenced_by)} other artifact(s).",
-                    },
-                    correlation_id=correlation_id,
-                )
+            return format_response(
+                data={
+                    "artifact": record,
+                    "referenced_tables": referenced_tables,
+                    "referenced_by": referenced_by,
+                    "summary": f"Artifact '{artifact_name}' references {len(referenced_tables)} table(s) "
+                    f"and is referenced by {len(referenced_by)} other artifact(s).",
+                },
+                correlation_id=correlation_id,
             )
 
         return await safe_tool_call(_run, correlation_id)
@@ -237,13 +230,11 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             table = ARTIFACT_TABLES.get(artifact_type)
             if not table:
                 valid_types = ", ".join(sorted(ARTIFACT_TABLES.keys()))
-                return json.dumps(
-                    format_response(
-                        data=None,
-                        correlation_id=correlation_id,
-                        status="error",
-                        error=f"Unknown artifact type '{artifact_type}'. Valid: {valid_types}",
-                    )
+                return format_response(
+                    data=None,
+                    correlation_id=correlation_id,
+                    status="error",
+                    error=f"Unknown artifact type '{artifact_type}'. Valid: {valid_types}",
                 )
 
             check_table_access(table)
@@ -255,19 +246,17 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             script = record.get("script", "")
             scenarios = _generate_test_scenarios(script, record)
 
-            return json.dumps(
-                format_response(
-                    data={
-                        "artifact": {
-                            "name": record.get("name", ""),
-                            "sys_id": sys_id,
-                            "type": artifact_type,
-                        },
-                        "scenarios": scenarios,
-                        "scenario_count": len(scenarios),
+            return format_response(
+                data={
+                    "artifact": {
+                        "name": record.get("name", ""),
+                        "sys_id": sys_id,
+                        "type": artifact_type,
                     },
-                    correlation_id=correlation_id,
-                )
+                    "scenarios": scenarios,
+                    "scenario_count": len(scenarios),
+                },
+                correlation_id=correlation_id,
             )
 
         return await safe_tool_call(_run, correlation_id)
@@ -289,13 +278,11 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             table = ARTIFACT_TABLES.get(artifact_type)
             if not table:
                 valid_types = ", ".join(sorted(ARTIFACT_TABLES.keys()))
-                return json.dumps(
-                    format_response(
-                        data=None,
-                        correlation_id=correlation_id,
-                        status="error",
-                        error=f"Unknown artifact type '{artifact_type}'. Valid: {valid_types}",
-                    )
+                return format_response(
+                    data=None,
+                    correlation_id=correlation_id,
+                    status="error",
+                    error=f"Unknown artifact type '{artifact_type}'. Valid: {valid_types}",
                 )
 
             check_table_access(table)
@@ -307,19 +294,17 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             script = record.get("script", "")
             findings = _scan_for_anti_patterns(script)
 
-            return json.dumps(
-                format_response(
-                    data={
-                        "artifact": {
-                            "name": record.get("name", ""),
-                            "sys_id": sys_id,
-                            "type": artifact_type,
-                        },
-                        "findings": findings,
-                        "finding_count": len(findings),
+            return format_response(
+                data={
+                    "artifact": {
+                        "name": record.get("name", ""),
+                        "sys_id": sys_id,
+                        "type": artifact_type,
                     },
-                    correlation_id=correlation_id,
-                )
+                    "findings": findings,
+                    "finding_count": len(findings),
+                },
+                correlation_id=correlation_id,
             )
 
         return await safe_tool_call(_run, correlation_id)

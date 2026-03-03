@@ -1,10 +1,9 @@
 """Tests for documentation tools (docs_logic_map, docs_artifact_summary, docs_test_scenarios, docs_review_notes)."""
 
-import json
-
 import httpx
 import pytest
 import respx
+from toon_format import decode as toon_decode
 
 from servicenow_mcp.auth import BasicAuthProvider
 
@@ -95,7 +94,7 @@ class TestDocsLogicMap:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["docs_logic_map"](table="incident")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         data = result["data"]
@@ -120,7 +119,7 @@ class TestDocsLogicMap:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["docs_logic_map"](table="custom_table")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["total_automations"] == 0
@@ -161,7 +160,7 @@ class TestDocsArtifactSummary:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["docs_artifact_summary"](artifact_type="business_rule", sys_id="br001")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         data = result["data"]
@@ -179,7 +178,7 @@ class TestDocsArtifactSummary:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["docs_artifact_summary"](artifact_type="business_rule", sys_id="bad_id")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "error"
 
@@ -212,7 +211,7 @@ class TestDocsArtifactSummary:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["docs_artifact_summary"](artifact_type="business_rule", sys_id="br_sensitive")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         artifact = result["data"]["artifact"]
@@ -251,7 +250,7 @@ class TestDocsTestScenarios:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["docs_test_scenarios"](artifact_type="business_rule", sys_id="br001")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert len(result["data"]["scenarios"]) >= 1
@@ -279,7 +278,7 @@ class TestDocsTestScenarios:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["docs_test_scenarios"](artifact_type="business_rule", sys_id="br002")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         scenario_names = [s["scenario"] for s in result["data"]["scenarios"]]
@@ -305,7 +304,7 @@ class TestDocsTestScenarios:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["docs_test_scenarios"](artifact_type="business_rule", sys_id="br003")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         # Should still return at least generic scenarios
@@ -332,7 +331,7 @@ class TestDocsTestScenarios:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["docs_test_scenarios"](artifact_type="business_rule", sys_id="br_sensitive")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         # The artifact name in response should reflect the masked record
@@ -375,7 +374,7 @@ class TestDocsReviewNotes:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["docs_review_notes"](artifact_type="business_rule", sys_id="br001")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         findings = result["data"]["findings"]
@@ -404,7 +403,7 @@ class TestDocsReviewNotes:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["docs_review_notes"](artifact_type="business_rule", sys_id="br002")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         categories = [f["category"] for f in result["data"]["findings"]]
@@ -431,7 +430,7 @@ class TestDocsReviewNotes:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["docs_review_notes"](artifact_type="business_rule", sys_id="br003")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert len(result["data"]["findings"]) == 0
@@ -458,7 +457,7 @@ class TestDocsReviewNotes:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["docs_review_notes"](artifact_type="business_rule", sys_id="br_sensitive")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         # The artifact name in response should be present

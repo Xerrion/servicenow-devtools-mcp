@@ -64,13 +64,11 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         try:
             parsed: list[dict[str, Any]] = json.loads(conditions)
             if not isinstance(parsed, list):
-                return json.dumps(
-                    format_response(
-                        data=None,
-                        correlation_id=correlation_id,
-                        status="error",
-                        error="conditions must be a JSON array",
-                    )
+                return format_response(
+                    data=None,
+                    correlation_id=correlation_id,
+                    status="error",
+                    error="conditions must be a JSON array",
                 )
 
             query = ServiceNowQuery()
@@ -80,48 +78,40 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 value = condition.get("value")
 
                 if not operator or not field:
-                    return json.dumps(
-                        format_response(
-                            data=None,
-                            correlation_id=correlation_id,
-                            status="error",
-                            error=f"Each condition requires 'operator' and 'field'. Got: {condition}",
-                        )
+                    return format_response(
+                        data=None,
+                        correlation_id=correlation_id,
+                        status="error",
+                        error=f"Each condition requires 'operator' and 'field'. Got: {condition}",
                     )
 
                 if operator in _UNARY_OPERATORS:
                     getattr(query, operator)(field)
                 elif operator in _TIME_OPERATORS:
                     if value is None:
-                        return json.dumps(
-                            format_response(
-                                data=None,
-                                correlation_id=correlation_id,
-                                status="error",
-                                error=f"Time operator '{operator}' requires an integer 'value'.",
-                            )
+                        return format_response(
+                            data=None,
+                            correlation_id=correlation_id,
+                            status="error",
+                            error=f"Time operator '{operator}' requires an integer 'value'.",
                         )
                     getattr(query, operator)(field, int(value))
                 elif operator in _BINARY_OPERATORS or operator in _OR_BINARY_OPERATORS:
                     if value is None:
-                        return json.dumps(
-                            format_response(
-                                data=None,
-                                correlation_id=correlation_id,
-                                status="error",
-                                error=f"Operator '{operator}' requires a 'value'.",
-                            )
+                        return format_response(
+                            data=None,
+                            correlation_id=correlation_id,
+                            status="error",
+                            error=f"Operator '{operator}' requires a 'value'.",
                         )
                     getattr(query, operator)(field, str(value))
                 elif operator in _LIST_OPERATORS:
                     if value is None or not isinstance(value, list):
-                        return json.dumps(
-                            format_response(
-                                data=None,
-                                correlation_id=correlation_id,
-                                status="error",
-                                error=f"Operator '{operator}' requires a 'value' that is a list of strings.",
-                            )
+                        return format_response(
+                            data=None,
+                            correlation_id=correlation_id,
+                            status="error",
+                            error=f"Operator '{operator}' requires a 'value' that is a list of strings.",
                         )
                     getattr(query, operator)(field, [str(v) for v in value])
                 elif operator == "order_by":
@@ -136,21 +126,17 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                         | _LIST_OPERATORS
                         | {"order_by"}
                     )
-                    return json.dumps(
-                        format_response(
-                            data=None,
-                            correlation_id=correlation_id,
-                            status="error",
-                            error=f"Unknown operator '{operator}'. Valid operators: {valid}",
-                        )
+                    return format_response(
+                        data=None,
+                        correlation_id=correlation_id,
+                        status="error",
+                        error=f"Unknown operator '{operator}'. Valid operators: {valid}",
                     )
 
             built = query.build()
-            return json.dumps(format_response(data={"query": built}, correlation_id=correlation_id))
+            return format_response(data={"query": built}, correlation_id=correlation_id)
 
         except json.JSONDecodeError as e:
-            return json.dumps(
-                format_response(data=None, correlation_id=correlation_id, status="error", error=f"Invalid JSON: {e}")
-            )
+            return format_response(data=None, correlation_id=correlation_id, status="error", error=f"Invalid JSON: {e}")
         except Exception as e:
-            return json.dumps(format_response(data=None, correlation_id=correlation_id, status="error", error=str(e)))
+            return format_response(data=None, correlation_id=correlation_id, status="error", error=str(e))

@@ -1,11 +1,11 @@
 """Tests for Change Management domain tools."""
 
-import json
 from unittest.mock import patch
 
 import pytest
 import respx
 from httpx import Response
+from toon_format import decode as toon_decode
 
 from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.config import Settings
@@ -45,7 +45,7 @@ class TestChangeList:
 
         tools = _register_and_get_tools(settings, auth_provider)
         result = await tools["change_list"]()
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "success"
         assert len(data["data"]) == 2
@@ -94,7 +94,7 @@ class TestChangeGet:
 
         tools = _register_and_get_tools(settings, auth_provider)
         result = await tools["change_get"](number="CHG0010001")
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "success"
         assert data["data"]["number"] == "CHG0010001"
@@ -105,7 +105,7 @@ class TestChangeGet:
         """Should reject non-CHG numbers."""
         tools = _register_and_get_tools(settings, auth_provider)
         result = await tools["change_get"](number="INC0010001")
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "error"
         assert "CHG" in data["error"]
@@ -118,7 +118,7 @@ class TestChangeGet:
 
         tools = _register_and_get_tools(settings, auth_provider)
         result = await tools["change_get"](number="CHG9999999")
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "error"
         assert "not found" in data["error"].lower()
@@ -150,7 +150,7 @@ class TestChangeCreate:
             short_description="New change",
             type="normal",
         )
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "success"
         assert data["data"]["number"] == "CHG0010123"
@@ -160,7 +160,7 @@ class TestChangeCreate:
         """Should reject empty short_description."""
         tools = _register_and_get_tools(settings, auth_provider)
         result = await tools["change_create"](short_description="")
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "error"
         assert "short_description" in data["error"].lower()
@@ -170,7 +170,7 @@ class TestChangeCreate:
         """Should reject invalid type value."""
         tools = _register_and_get_tools(settings, auth_provider)
         result = await tools["change_create"](short_description="Test", type="invalid_type")
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "error"
         assert "type" in data["error"].lower()
@@ -207,7 +207,7 @@ class TestChangeUpdate:
             number="CHG0010001",
             short_description="Updated",
         )
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "success"
         assert data["data"]["short_description"] == "Updated"
@@ -217,7 +217,7 @@ class TestChangeUpdate:
         """Should reject non-CHG numbers."""
         tools = _register_and_get_tools(settings, auth_provider)
         result = await tools["change_update"](number="INC0010001", short_description="Test")
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "error"
         assert "CHG" in data["error"]
@@ -241,7 +241,7 @@ class TestChangeUpdate:
                 number="CHG0010001",
                 short_description="Test",
             )
-            data = json.loads(result)
+            data = toon_decode(result)
 
             assert data["status"] == "error"
             assert "production" in data["error"].lower()
@@ -268,7 +268,7 @@ class TestChangeTasks:
 
         tools = _register_and_get_tools(settings, auth_provider)
         result = await tools["change_tasks"](number="CHG0010001")
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "success"
         assert len(data["data"]) == 2
@@ -279,7 +279,7 @@ class TestChangeTasks:
         """Should reject non-CHG numbers."""
         tools = _register_and_get_tools(settings, auth_provider)
         result = await tools["change_tasks"](number="INC0010001")
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "error"
         assert "CHG" in data["error"]
@@ -297,7 +297,7 @@ class TestChangeTasks:
 
         tools = _register_and_get_tools(settings, auth_provider)
         result = await tools["change_tasks"](number="CHG0010001")
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "success"
         assert len(data["data"]) == 0
@@ -334,7 +334,7 @@ class TestChangeAddComment:
             number="CHG0010001",
             comment="User comment added",
         )
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "success"
 
@@ -366,7 +366,7 @@ class TestChangeAddComment:
             number="CHG0010001",
             work_note="Internal work note",
         )
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "success"
 
@@ -379,7 +379,7 @@ class TestChangeAddComment:
             comment="",
             work_note="",
         )
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "error"
         assert "comment" in data["error"].lower() or "work_note" in data["error"].lower()

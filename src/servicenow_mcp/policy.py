@@ -1,6 +1,5 @@
 """Policy engine for query safety, deny lists, field masking and write gating."""
 
-import json
 import logging
 import re
 from typing import Any
@@ -158,13 +157,11 @@ def write_gate(table: str, settings: Settings, correlation_id: str) -> str | Non
 
     reason = write_blocked_reason(table, settings)
     if reason:
-        return json.dumps(
-            format_response(
-                data=None,
-                correlation_id=correlation_id,
-                status="error",
-                error=reason,
-            )
+        return format_response(
+            data=None,
+            correlation_id=correlation_id,
+            status="error",
+            error=reason,
         )
     return None
 

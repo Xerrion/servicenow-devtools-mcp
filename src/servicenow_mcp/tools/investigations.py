@@ -36,13 +36,11 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             module = INVESTIGATION_REGISTRY.get(investigation)
             if module is None:
                 available = ", ".join(sorted(INVESTIGATION_REGISTRY.keys()))
-                return json.dumps(
-                    format_response(
-                        data=None,
-                        correlation_id=correlation_id,
-                        status="error",
-                        error=f"Unknown investigation '{investigation}'. Available: {available}",
-                    )
+                return format_response(
+                    data=None,
+                    correlation_id=correlation_id,
+                    status="error",
+                    error=f"Unknown investigation '{investigation}'. Available: {available}",
                 )
 
             params_dict: dict[str, Any] = json.loads(params) if params else {}
@@ -55,7 +53,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             async with ServiceNowClient(settings, auth_provider) as client:
                 result = await module.run(client, params_dict)
 
-            return json.dumps(format_response(data=result, correlation_id=correlation_id))
+            return format_response(data=result, correlation_id=correlation_id)
 
         return await safe_tool_call(_run, correlation_id)
 
@@ -76,13 +74,11 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             module = INVESTIGATION_REGISTRY.get(investigation)
             if module is None:
                 available = ", ".join(sorted(INVESTIGATION_REGISTRY.keys()))
-                return json.dumps(
-                    format_response(
-                        data=None,
-                        correlation_id=correlation_id,
-                        status="error",
-                        error=f"Unknown investigation '{investigation}'. Available: {available}",
-                    )
+                return format_response(
+                    data=None,
+                    correlation_id=correlation_id,
+                    status="error",
+                    error=f"Unknown investigation '{investigation}'. Available: {available}",
                 )
 
             # Validate element_id components to prevent injection
@@ -96,6 +92,6 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             async with ServiceNowClient(settings, auth_provider) as client:
                 result = await module.explain(client, element_id)
 
-            return json.dumps(format_response(data=result, correlation_id=correlation_id))
+            return format_response(data=result, correlation_id=correlation_id)
 
         return await safe_tool_call(_run, correlation_id)

@@ -1,11 +1,11 @@
 """Tests for Knowledge Management domain tools."""
 
-import json
 from unittest.mock import patch
 
 import pytest
 import respx
 from httpx import Response
+from toon_format import decode as toon_decode
 
 from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.config import Settings
@@ -45,7 +45,7 @@ class TestKnowledgeSearch:
 
         tools = _register_and_get_tools(settings, auth_provider)
         result = await tools["knowledge_search"](query="password")
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "success"
         assert len(data["data"]) == 2
@@ -95,7 +95,7 @@ class TestKnowledgeGet:
 
         tools = _register_and_get_tools(settings, auth_provider)
         result = await tools["knowledge_get"](number_or_sys_id="KB0010001")
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "success"
         assert data["data"]["number"] == "KB0010001"
@@ -118,7 +118,7 @@ class TestKnowledgeGet:
 
         tools = _register_and_get_tools(settings, auth_provider)
         result = await tools["knowledge_get"](number_or_sys_id="abc123def456abc123def456abc12345")
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "success"
         assert data["data"]["number"] == "KB0010001"
@@ -136,7 +136,7 @@ class TestKnowledgeGet:
 
         tools = _register_and_get_tools(settings, auth_provider)
         result = await tools["knowledge_get"](number_or_sys_id="abc123def456abc123def456abc12345")
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "error"
         assert "not found" in data["error"].lower()
@@ -166,7 +166,7 @@ class TestKnowledgeCreate:
 
         tools = _register_and_get_tools(settings, auth_provider)
         result = await tools["knowledge_create"](short_description="New article", text="Article content")
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "success"
         assert data["data"]["number"] == "KB0010003"
@@ -178,7 +178,7 @@ class TestKnowledgeCreate:
         """Should return error if short_description is empty."""
         tools = _register_and_get_tools(settings, auth_provider)
         result = await tools["knowledge_create"](short_description="", text="Article content")
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "error"
         assert "short_description" in data["error"].lower()
@@ -189,7 +189,7 @@ class TestKnowledgeCreate:
         """Should return error if text is empty."""
         tools = _register_and_get_tools(settings, auth_provider)
         result = await tools["knowledge_create"](short_description="New article", text="")
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "error"
         assert "text" in data["error"].lower()
@@ -210,7 +210,7 @@ class TestKnowledgeCreate:
 
             tools = _register_and_get_tools(prod_settings, prod_auth)
             result = await tools["knowledge_create"](short_description="Test", text="Content")
-            data = json.loads(result)
+            data = toon_decode(result)
 
             assert data["status"] == "error"
             assert "production" in data["error"].lower()
@@ -235,7 +235,7 @@ class TestKnowledgeUpdate:
 
         tools = _register_and_get_tools(settings, auth_provider)
         result = await tools["knowledge_update"](number_or_sys_id="KB0010001", short_description="Updated title")
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "success"
         assert data["data"]["short_description"] == "Updated title"
@@ -267,7 +267,7 @@ class TestKnowledgeUpdate:
         result = await tools["knowledge_update"](
             number_or_sys_id="abc123def456abc123def456abc12345", text="Updated content"
         )
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "success"
         assert data["data"]["text"] == "Updated content"
@@ -285,7 +285,7 @@ class TestKnowledgeUpdate:
 
         tools = _register_and_get_tools(settings, auth_provider)
         result = await tools["knowledge_update"](number_or_sys_id="KB9999999", short_description="Test")
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "error"
         assert "not found" in data["error"].lower()
@@ -300,7 +300,7 @@ class TestKnowledgeUpdate:
 
         tools = _register_and_get_tools(settings, auth_provider)
         result = await tools["knowledge_update"](number_or_sys_id="KB0010001")
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "error"
         assert "no fields" in data["error"].lower()
@@ -325,7 +325,7 @@ class TestKnowledgeFeedback:
 
         tools = _register_and_get_tools(settings, auth_provider)
         result = await tools["knowledge_feedback"](number_or_sys_id="KB0010001", rating=5)
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "success"
         assert data["data"]["article"] == "kb123"
@@ -347,7 +347,7 @@ class TestKnowledgeFeedback:
 
         tools = _register_and_get_tools(settings, auth_provider)
         result = await tools["knowledge_feedback"](number_or_sys_id="KB0010001", comment="Very helpful")
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "success"
         assert data["data"]["article"] == "kb123"
@@ -376,7 +376,7 @@ class TestKnowledgeFeedback:
 
         tools = _register_and_get_tools(settings, auth_provider)
         result = await tools["knowledge_feedback"](number_or_sys_id="KB0010001", rating=4, comment="Good article")
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "success"
         assert data["data"]["rating"] == "4"
@@ -388,7 +388,7 @@ class TestKnowledgeFeedback:
         """Should return error if neither rating nor comment provided."""
         tools = _register_and_get_tools(settings, auth_provider)
         result = await tools["knowledge_feedback"](number_or_sys_id="KB0010001")
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "error"
         assert "rating or comment" in data["error"].lower()
@@ -399,7 +399,7 @@ class TestKnowledgeFeedback:
         """Should return error if rating below 1."""
         tools = _register_and_get_tools(settings, auth_provider)
         result = await tools["knowledge_feedback"](number_or_sys_id="KB0010001", rating=0)
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "error"
         assert "between 1 and 5" in data["error"].lower()
@@ -410,7 +410,7 @@ class TestKnowledgeFeedback:
         """Should return error if rating above 5."""
         tools = _register_and_get_tools(settings, auth_provider)
         result = await tools["knowledge_feedback"](number_or_sys_id="KB0010001", rating=6)
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "error"
         assert "between 1 and 5" in data["error"].lower()

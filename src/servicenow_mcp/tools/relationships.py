@@ -1,7 +1,6 @@
 """Relationship tools for traversing ServiceNow reference fields."""
 
 import asyncio
-import json
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
@@ -145,15 +144,12 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 results = await asyncio.gather(*tasks)
                 references = [r for r in results if r is not None]
 
-            return json.dumps(
-                format_response(
-                    data={
-                        "target": {"table": table, "sys_id": sys_id},
-                        "incoming_references": references,
-                    },
-                    correlation_id=correlation_id,
-                ),
-                indent=2,
+            return format_response(
+                data={
+                    "target": {"table": table, "sys_id": sys_id},
+                    "incoming_references": references,
+                },
+                correlation_id=correlation_id,
             )
 
         return await safe_tool_call(_run, correlation_id)
@@ -200,15 +196,12 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                             }
                         )
 
-            return json.dumps(
-                format_response(
-                    data={
-                        "source": {"table": table, "sys_id": sys_id},
-                        "outgoing_references": outgoing,
-                    },
-                    correlation_id=correlation_id,
-                ),
-                indent=2,
+            return format_response(
+                data={
+                    "source": {"table": table, "sys_id": sys_id},
+                    "outgoing_references": outgoing,
+                },
+                correlation_id=correlation_id,
             )
 
         return await safe_tool_call(_run, correlation_id)

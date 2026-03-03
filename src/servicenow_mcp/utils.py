@@ -8,6 +8,8 @@ import warnings
 from collections.abc import Awaitable, Callable
 from typing import Any
 
+from toon_format import encode as toon_encode
+
 from servicenow_mcp.errors import ForbiddenError
 
 logger = logging.getLogger(__name__)
@@ -63,6 +65,18 @@ def generate_correlation_id() -> str:
     return str(uuid.uuid4())
 
 
+def serialize(data: Any) -> str:
+    """Serialize *data* to TOON format for LLM-friendly output.
+
+    Falls back to JSON if TOON encoding fails.
+    """
+    try:
+        return toon_encode(data)
+    except Exception:
+        logger.warning("TOON encoding failed, falling back to JSON", exc_info=True)
+        return json.dumps(data, indent=2)
+
+
 def format_response(
     data: Any,
     correlation_id: str,
@@ -70,8 +84,8 @@ def format_response(
     error: str | None = None,
     pagination: dict[str, int] | None = None,
     warnings: list[str] | None = None,
-) -> dict[str, Any]:
-    """Build a standardized response envelope."""
+) -> str:
+    """Build and serialize a standardized response envelope."""
     response: dict[str, Any] = {
         "correlation_id": correlation_id,
         "status": status,
@@ -83,7 +97,7 @@ def format_response(
         response["pagination"] = pagination
     if warnings is not None:
         response["warnings"] = warnings
-    return response
+    return serialize(response)
 
 
 def build_encoded_query(conditions: dict[str, str] | str) -> str:
@@ -366,20 +380,16 @@ async def safe_tool_call(
     try:
         return await fn()
     except ForbiddenError as e:
-        return json.dumps(
-            format_response(
-                data=None,
-                correlation_id=correlation_id,
-                status="error",
-                error=f"Access denied by ServiceNow ACL: {e}",
-            )
+        return format_response(
+            data=None,
+            correlation_id=correlation_id,
+            status="error",
+            error=f"Access denied by ServiceNow ACL: {e}",
         )
     except Exception as e:
-        return json.dumps(
-            format_response(
-                data=None,
-                correlation_id=correlation_id,
-                status="error",
-                error=str(e),
-            )
+        return format_response(
+            data=None,
+            correlation_id=correlation_id,
+            status="error",
+            error=str(e),
         )

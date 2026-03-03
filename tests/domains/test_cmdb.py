@@ -1,10 +1,9 @@
 """Tests for CMDB domain tools."""
 
-import json
-
 import pytest
 import respx
 from httpx import Response
+from toon_format import decode as toon_decode
 
 from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.config import Settings
@@ -43,7 +42,7 @@ class TestCmdbList:
         )
 
         result = await cmdb_list()
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "success"
         assert len(data["data"]) == 2
@@ -68,7 +67,7 @@ class TestCmdbList:
         )
 
         result = await cmdb_list(ci_class="cmdb_ci_server")
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "success"
         assert len(data["data"]) == 1
@@ -94,7 +93,7 @@ class TestCmdbList:
         )
 
         result = await cmdb_list(operational_status="operational")
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "success"
         request = respx.calls.last.request
@@ -124,7 +123,7 @@ class TestCmdbGet:
         )
 
         result = await cmdb_get(name_or_sys_id=sys_id)
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "success"
         assert data["data"]["name"] == "server-01"
@@ -150,7 +149,7 @@ class TestCmdbGet:
         )
 
         result = await cmdb_get(name_or_sys_id="server-01")
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "success"
         assert data["data"]["name"] == "server-01"
@@ -173,7 +172,7 @@ class TestCmdbGet:
         )
 
         result = await cmdb_get(name_or_sys_id="nonexistent")
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "error"
         assert "not found" in data["error"].lower()
@@ -203,7 +202,7 @@ class TestCmdbRelationships:
         )
 
         result = await cmdb_relationships(name_or_sys_id=sys_id, direction="both")
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "success"
         assert len(data["data"]) == 2
@@ -228,7 +227,7 @@ class TestCmdbRelationships:
         )
 
         result = await cmdb_relationships(name_or_sys_id=sys_id, direction="parent")
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "success"
         # Verify query used child.sys_id
@@ -267,7 +266,7 @@ class TestCmdbRelationships:
         )
 
         result = await cmdb_relationships(name_or_sys_id="server-01", direction="parent")
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "success"
 
@@ -295,7 +294,7 @@ class TestCmdbClasses:
         )
 
         result = await cmdb_classes(limit=50)
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "success"
         assert isinstance(data["data"], list)
@@ -320,7 +319,7 @@ class TestCmdbClasses:
         )
 
         result = await cmdb_classes(limit=10)
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "success"
 
@@ -349,7 +348,7 @@ class TestCmdbHealth:
         )
 
         result = await cmdb_health()
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "success"
         assert isinstance(data["data"], list)
@@ -374,7 +373,7 @@ class TestCmdbHealth:
         )
 
         result = await cmdb_health(ci_class="cmdb_ci_server")
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "success"
         # Verify the correct table was queried
@@ -394,7 +393,7 @@ class TestErrorHandling:
 
         # Try to access a denied table
         result = await cmdb_list(ci_class="sys_user_has_password")
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "error"
         assert "denied" in data["error"].lower() or "forbidden" in data["error"].lower()
@@ -412,7 +411,7 @@ class TestErrorHandling:
         )
 
         result = await cmdb_get(name_or_sys_id="test")
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "error"
         assert "correlation_id" in data

@@ -1,7 +1,5 @@
 """Introspection tools for ServiceNow table discovery and querying."""
 
-import json
-
 from mcp.server.fastmcp import FastMCP
 
 from servicenow_mcp.auth import BasicAuthProvider
@@ -44,12 +42,9 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     "default_value": entry.get("default_value", ""),
                 }
                 fields.append(field_info)
-            return json.dumps(
-                format_response(
-                    data={"table": table, "fields": fields, "field_count": len(fields)},
-                    correlation_id=correlation_id,
-                ),
-                indent=2,
+            return format_response(
+                data={"table": table, "fields": fields, "field_count": len(fields)},
+                correlation_id=correlation_id,
             )
 
         return await safe_tool_call(_run, correlation_id)
@@ -78,10 +73,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             async with ServiceNowClient(settings, auth_provider) as client:
                 record = await client.get_record(table, sys_id, fields=field_list, display_values=display_values)
             record = mask_sensitive_fields(record)
-            return json.dumps(
-                format_response(data=record, correlation_id=correlation_id),
-                indent=2,
-            )
+            return format_response(data=record, correlation_id=correlation_id)
 
         return await safe_tool_call(_run, correlation_id)
 
@@ -134,18 +126,15 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             # Mask sensitive fields in each record
             masked_records = [mask_sensitive_fields(r) for r in result["records"]]
 
-            return json.dumps(
-                format_response(
-                    data=masked_records,
-                    correlation_id=correlation_id,
-                    pagination={
-                        "offset": offset,
-                        "limit": effective_limit,
-                        "total": result["count"],
-                    },
-                    warnings=warnings if warnings else None,
-                ),
-                indent=2,
+            return format_response(
+                data=masked_records,
+                correlation_id=correlation_id,
+                pagination={
+                    "offset": offset,
+                    "limit": effective_limit,
+                    "total": result["count"],
+                },
+                warnings=warnings if warnings else None,
             )
 
         return await safe_tool_call(_run, correlation_id)
@@ -197,9 +186,6 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     sum_fields=_split(sum_fields),
                 )
 
-            return json.dumps(
-                format_response(data=result, correlation_id=correlation_id),
-                indent=2,
-            )
+            return format_response(data=result, correlation_id=correlation_id)
 
         return await safe_tool_call(_run, correlation_id)

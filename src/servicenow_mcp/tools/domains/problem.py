@@ -1,6 +1,5 @@
 """Problem Management domain tools for ServiceNow MCP server."""
 
-import json
 import uuid
 
 from mcp.server.fastmcp import FastMCP
@@ -76,10 +75,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     limit=limit,
                 )
                 masked = [mask_sensitive_fields(r) for r in result["records"]]
-                return json.dumps(
-                    format_response(data=masked, correlation_id=correlation_id),
-                    indent=2,
-                )
+                return format_response(data=masked, correlation_id=correlation_id)
 
         return await safe_tool_call(_run, correlation_id)
 
@@ -96,14 +92,11 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             check_table_access("problem")
 
             if not number.upper().startswith("PRB"):
-                return json.dumps(
-                    format_response(
-                        data=None,
-                        correlation_id=correlation_id,
-                        status="error",
-                        error=f"Invalid problem number: {number}. Must start with PRB prefix.",
-                    ),
-                    indent=2,
+                return format_response(
+                    data=None,
+                    correlation_id=correlation_id,
+                    status="error",
+                    error=f"Invalid problem number: {number}. Must start with PRB prefix.",
                 )
 
             async with ServiceNowClient(settings, auth_provider) as client:
@@ -114,17 +107,14 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     limit=1,
                 )
                 if not result["records"]:
-                    return json.dumps(
-                        format_response(
-                            data=None,
-                            correlation_id=correlation_id,
-                            status="error",
-                            error=f"Problem {number} not found.",
-                        ),
-                        indent=2,
+                    return format_response(
+                        data=None,
+                        correlation_id=correlation_id,
+                        status="error",
+                        error=f"Problem {number} not found.",
                     )
                 masked = mask_sensitive_fields(result["records"][0])
-                return json.dumps(format_response(data=masked, correlation_id=correlation_id), indent=2)
+                return format_response(data=masked, correlation_id=correlation_id)
 
         return await safe_tool_call(_run, correlation_id)
 
@@ -163,36 +153,27 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 return blocked
 
             if not short_description or not short_description.strip():
-                return json.dumps(
-                    format_response(
-                        data=None,
-                        correlation_id=correlation_id,
-                        status="error",
-                        error="short_description is required and cannot be empty.",
-                    ),
-                    indent=2,
+                return format_response(
+                    data=None,
+                    correlation_id=correlation_id,
+                    status="error",
+                    error="short_description is required and cannot be empty.",
                 )
 
             if urgency < 1 or urgency > 4:
-                return json.dumps(
-                    format_response(
-                        data=None,
-                        correlation_id=correlation_id,
-                        status="error",
-                        error=f"urgency must be between 1 and 4, got {urgency}.",
-                    ),
-                    indent=2,
+                return format_response(
+                    data=None,
+                    correlation_id=correlation_id,
+                    status="error",
+                    error=f"urgency must be between 1 and 4, got {urgency}.",
                 )
 
             if impact < 1 or impact > 4:
-                return json.dumps(
-                    format_response(
-                        data=None,
-                        correlation_id=correlation_id,
-                        status="error",
-                        error=f"impact must be between 1 and 4, got {impact}.",
-                    ),
-                    indent=2,
+                return format_response(
+                    data=None,
+                    correlation_id=correlation_id,
+                    status="error",
+                    error=f"impact must be between 1 and 4, got {impact}.",
                 )
 
             record_data = {
@@ -216,7 +197,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             async with ServiceNowClient(settings, auth_provider) as client:
                 created = await client.create_record("problem", record_data)
                 masked = mask_sensitive_fields(created)
-                return json.dumps(format_response(data=masked, correlation_id=correlation_id), indent=2)
+                return format_response(data=masked, correlation_id=correlation_id)
 
         return await safe_tool_call(_run, correlation_id)
 
@@ -259,14 +240,11 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 return blocked
 
             if not number.upper().startswith("PRB"):
-                return json.dumps(
-                    format_response(
-                        data=None,
-                        correlation_id=correlation_id,
-                        status="error",
-                        error=f"Invalid problem number: {number}. Must start with PRB prefix.",
-                    ),
-                    indent=2,
+                return format_response(
+                    data=None,
+                    correlation_id=correlation_id,
+                    status="error",
+                    error=f"Invalid problem number: {number}. Must start with PRB prefix.",
                 )
 
             async with ServiceNowClient(settings, auth_provider) as client:
@@ -276,14 +254,11 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     limit=1,
                 )
                 if not result["records"]:
-                    return json.dumps(
-                        format_response(
-                            data=None,
-                            correlation_id=correlation_id,
-                            status="error",
-                            error=f"Problem {number} not found.",
-                        ),
-                        indent=2,
+                    return format_response(
+                        data=None,
+                        correlation_id=correlation_id,
+                        status="error",
+                        error=f"Problem {number} not found.",
                     )
 
                 sys_id = result["records"][0]["sys_id"]
@@ -321,19 +296,16 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     changes["subcategory"] = subcategory
 
                 if not changes:
-                    return json.dumps(
-                        format_response(
-                            data=None,
-                            correlation_id=correlation_id,
-                            status="error",
-                            error="No fields to update provided.",
-                        ),
-                        indent=2,
+                    return format_response(
+                        data=None,
+                        correlation_id=correlation_id,
+                        status="error",
+                        error="No fields to update provided.",
                     )
 
                 updated = await client.update_record("problem", sys_id, changes)
                 masked = mask_sensitive_fields(updated)
-                return json.dumps(format_response(data=masked, correlation_id=correlation_id), indent=2)
+                return format_response(data=masked, correlation_id=correlation_id)
 
         return await safe_tool_call(_run, correlation_id)
 
@@ -360,25 +332,19 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 return blocked
 
             if not number.upper().startswith("PRB"):
-                return json.dumps(
-                    format_response(
-                        data=None,
-                        correlation_id=correlation_id,
-                        status="error",
-                        error=f"Invalid problem number: {number}. Must start with PRB prefix.",
-                    ),
-                    indent=2,
+                return format_response(
+                    data=None,
+                    correlation_id=correlation_id,
+                    status="error",
+                    error=f"Invalid problem number: {number}. Must start with PRB prefix.",
                 )
 
             if not cause_notes or not cause_notes.strip():
-                return json.dumps(
-                    format_response(
-                        data=None,
-                        correlation_id=correlation_id,
-                        status="error",
-                        error="cause_notes is required and cannot be empty.",
-                    ),
-                    indent=2,
+                return format_response(
+                    data=None,
+                    correlation_id=correlation_id,
+                    status="error",
+                    error="cause_notes is required and cannot be empty.",
                 )
 
             async with ServiceNowClient(settings, auth_provider) as client:
@@ -388,14 +354,11 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     limit=1,
                 )
                 if not result["records"]:
-                    return json.dumps(
-                        format_response(
-                            data=None,
-                            correlation_id=correlation_id,
-                            status="error",
-                            error=f"Problem {number} not found.",
-                        ),
-                        indent=2,
+                    return format_response(
+                        data=None,
+                        correlation_id=correlation_id,
+                        status="error",
+                        error=f"Problem {number} not found.",
                     )
 
                 sys_id = result["records"][0]["sys_id"]
@@ -406,6 +369,6 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
 
                 updated = await client.update_record("problem", sys_id, changes)
                 masked = mask_sensitive_fields(updated)
-                return json.dumps(format_response(data=masked, correlation_id=correlation_id), indent=2)
+                return format_response(data=masked, correlation_id=correlation_id)
 
         return await safe_tool_call(_run, correlation_id)

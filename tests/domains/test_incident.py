@@ -1,11 +1,11 @@
 """Tests for Incident Management domain tools."""
 
-import json
 from unittest.mock import patch
 
 import pytest
 import respx
 from httpx import Response
+from toon_format import decode as toon_decode
 
 from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.config import Settings
@@ -45,7 +45,7 @@ class TestIncidentList:
 
         tools = _register_and_get_tools(settings, auth_provider)
         result = await tools["incident_list"]()
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "success"
         assert len(data["data"]) == 2
@@ -94,7 +94,7 @@ class TestIncidentGet:
 
         tools = _register_and_get_tools(settings, auth_provider)
         result = await tools["incident_get"](number="INC0010001")
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "success"
         assert data["data"]["number"] == "INC0010001"
@@ -105,7 +105,7 @@ class TestIncidentGet:
         """Should reject non-INC numbers."""
         tools = _register_and_get_tools(settings, auth_provider)
         result = await tools["incident_get"](number="CHG0010001")
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "error"
         assert "INC" in data["error"]
@@ -118,7 +118,7 @@ class TestIncidentGet:
 
         tools = _register_and_get_tools(settings, auth_provider)
         result = await tools["incident_get"](number="INC9999999")
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "error"
         assert "not found" in data["error"].lower()
@@ -151,7 +151,7 @@ class TestIncidentCreate:
             urgency=2,
             impact=3,
         )
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "success"
         assert data["data"]["number"] == "INC0010123"
@@ -161,7 +161,7 @@ class TestIncidentCreate:
         """Should reject empty short_description."""
         tools = _register_and_get_tools(settings, auth_provider)
         result = await tools["incident_create"](short_description="")
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "error"
         assert "short_description" in data["error"].lower()
@@ -173,13 +173,13 @@ class TestIncidentCreate:
 
         # Test urgency=0
         result = await tools["incident_create"](short_description="Test", urgency=0)
-        data = json.loads(result)
+        data = toon_decode(result)
         assert data["status"] == "error"
         assert "urgency" in data["error"].lower()
 
         # Test urgency=5
         result = await tools["incident_create"](short_description="Test", urgency=5)
-        data = json.loads(result)
+        data = toon_decode(result)
         assert data["status"] == "error"
         assert "urgency" in data["error"].lower()
 
@@ -215,7 +215,7 @@ class TestIncidentUpdate:
             number="INC0010001",
             short_description="Updated",
         )
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "success"
         assert data["data"]["short_description"] == "Updated"
@@ -225,7 +225,7 @@ class TestIncidentUpdate:
         """Should reject non-INC numbers."""
         tools = _register_and_get_tools(settings, auth_provider)
         result = await tools["incident_update"](number="CHG0010001", short_description="Test")
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "error"
         assert "INC" in data["error"]
@@ -249,7 +249,7 @@ class TestIncidentUpdate:
                 number="INC0010001",
                 short_description="Test",
             )
-            data = json.loads(result)
+            data = toon_decode(result)
 
             assert data["status"] == "error"
             assert "production" in data["error"].lower()
@@ -289,7 +289,7 @@ class TestIncidentResolve:
             close_code="Solved (Permanently)",
             close_notes="Fixed the issue",
         )
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "success"
         assert data["data"]["state"] == "6"
@@ -303,7 +303,7 @@ class TestIncidentResolve:
             close_code="",
             close_notes="Fixed",
         )
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "error"
         assert "close_code" in data["error"].lower()
@@ -317,7 +317,7 @@ class TestIncidentResolve:
             close_code="Solved (Permanently)",
             close_notes="",
         )
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "error"
         assert "close_notes" in data["error"].lower()
@@ -354,7 +354,7 @@ class TestIncidentAddComment:
             number="INC0010001",
             comment="User comment added",
         )
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "success"
 
@@ -386,7 +386,7 @@ class TestIncidentAddComment:
             number="INC0010001",
             work_note="Internal work note",
         )
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "success"
 
@@ -399,7 +399,7 @@ class TestIncidentAddComment:
             comment="",
             work_note="",
         )
-        data = json.loads(result)
+        data = toon_decode(result)
 
         assert data["status"] == "error"
         assert "comment" in data["error"].lower() or "work_note" in data["error"].lower()

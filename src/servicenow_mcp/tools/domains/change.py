@@ -1,6 +1,5 @@
 """Change Management domain tools for ServiceNow MCP server."""
 
-import json
 import uuid
 
 from mcp.server.fastmcp import FastMCP
@@ -78,10 +77,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     limit=limit,
                 )
                 masked = [mask_sensitive_fields(r) for r in result["records"]]
-                return json.dumps(
-                    format_response(data=masked, correlation_id=correlation_id),
-                    indent=2,
-                )
+                return format_response(data=masked, correlation_id=correlation_id)
 
         return await safe_tool_call(_run, correlation_id)
 
@@ -98,14 +94,11 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             check_table_access("change_request")
 
             if not number.upper().startswith("CHG"):
-                return json.dumps(
-                    format_response(
-                        data=None,
-                        correlation_id=correlation_id,
-                        status="error",
-                        error=f"Invalid change request number: {number}. Must start with CHG prefix.",
-                    ),
-                    indent=2,
+                return format_response(
+                    data=None,
+                    correlation_id=correlation_id,
+                    status="error",
+                    error=f"Invalid change request number: {number}. Must start with CHG prefix.",
                 )
 
             async with ServiceNowClient(settings, auth_provider) as client:
@@ -116,17 +109,14 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     limit=1,
                 )
                 if not result["records"]:
-                    return json.dumps(
-                        format_response(
-                            data=None,
-                            correlation_id=correlation_id,
-                            status="error",
-                            error=f"Change request {number} not found.",
-                        ),
-                        indent=2,
+                    return format_response(
+                        data=None,
+                        correlation_id=correlation_id,
+                        status="error",
+                        error=f"Change request {number} not found.",
                     )
                 masked = mask_sensitive_fields(result["records"][0])
-                return json.dumps(format_response(data=masked, correlation_id=correlation_id), indent=2)
+                return format_response(data=masked, correlation_id=correlation_id)
 
         return await safe_tool_call(_run, correlation_id)
 
@@ -161,26 +151,20 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 return blocked
 
             if not short_description or not short_description.strip():
-                return json.dumps(
-                    format_response(
-                        data=None,
-                        correlation_id=correlation_id,
-                        status="error",
-                        error="short_description is required and cannot be empty.",
-                    ),
-                    indent=2,
+                return format_response(
+                    data=None,
+                    correlation_id=correlation_id,
+                    status="error",
+                    error="short_description is required and cannot be empty.",
                 )
 
             valid_types = ["standard", "normal", "emergency"]
             if type and type not in valid_types:
-                return json.dumps(
-                    format_response(
-                        data=None,
-                        correlation_id=correlation_id,
-                        status="error",
-                        error=f"type must be one of {valid_types}, got '{type}'.",
-                    ),
-                    indent=2,
+                return format_response(
+                    data=None,
+                    correlation_id=correlation_id,
+                    status="error",
+                    error=f"type must be one of {valid_types}, got '{type}'.",
                 )
 
             record_data = {
@@ -202,7 +186,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             async with ServiceNowClient(settings, auth_provider) as client:
                 created = await client.create_record("change_request", record_data)
                 masked = mask_sensitive_fields(created)
-                return json.dumps(format_response(data=masked, correlation_id=correlation_id), indent=2)
+                return format_response(data=masked, correlation_id=correlation_id)
 
         return await safe_tool_call(_run, correlation_id)
 
@@ -237,14 +221,11 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 return blocked
 
             if not number.upper().startswith("CHG"):
-                return json.dumps(
-                    format_response(
-                        data=None,
-                        correlation_id=correlation_id,
-                        status="error",
-                        error=f"Invalid change request number: {number}. Must start with CHG prefix.",
-                    ),
-                    indent=2,
+                return format_response(
+                    data=None,
+                    correlation_id=correlation_id,
+                    status="error",
+                    error=f"Invalid change request number: {number}. Must start with CHG prefix.",
                 )
 
             async with ServiceNowClient(settings, auth_provider) as client:
@@ -254,14 +235,11 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     limit=1,
                 )
                 if not result["records"]:
-                    return json.dumps(
-                        format_response(
-                            data=None,
-                            correlation_id=correlation_id,
-                            status="error",
-                            error=f"Change request {number} not found.",
-                        ),
-                        indent=2,
+                    return format_response(
+                        data=None,
+                        correlation_id=correlation_id,
+                        status="error",
+                        error=f"Change request {number} not found.",
                     )
 
                 sys_id = result["records"][0]["sys_id"]
@@ -292,19 +270,16 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                         changes["state"] = state_map[state.lower()]
 
                 if not changes:
-                    return json.dumps(
-                        format_response(
-                            data=None,
-                            correlation_id=correlation_id,
-                            status="error",
-                            error="No fields to update provided.",
-                        ),
-                        indent=2,
+                    return format_response(
+                        data=None,
+                        correlation_id=correlation_id,
+                        status="error",
+                        error="No fields to update provided.",
                     )
 
                 updated = await client.update_record("change_request", sys_id, changes)
                 masked = mask_sensitive_fields(updated)
-                return json.dumps(format_response(data=masked, correlation_id=correlation_id), indent=2)
+                return format_response(data=masked, correlation_id=correlation_id)
 
         return await safe_tool_call(_run, correlation_id)
 
@@ -327,14 +302,11 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             check_table_access("change_task")
 
             if not number.upper().startswith("CHG"):
-                return json.dumps(
-                    format_response(
-                        data=None,
-                        correlation_id=correlation_id,
-                        status="error",
-                        error=f"Invalid change request number: {number}. Must start with CHG prefix.",
-                    ),
-                    indent=2,
+                return format_response(
+                    data=None,
+                    correlation_id=correlation_id,
+                    status="error",
+                    error=f"Invalid change request number: {number}. Must start with CHG prefix.",
                 )
 
             field_list = [f.strip() for f in fields.split(",") if f.strip()] if fields else None
@@ -348,10 +320,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     limit=limit,
                 )
                 masked = [mask_sensitive_fields(r) for r in result["records"]]
-                return json.dumps(
-                    format_response(data=masked, correlation_id=correlation_id),
-                    indent=2,
-                )
+                return format_response(data=masked, correlation_id=correlation_id)
 
         return await safe_tool_call(_run, correlation_id)
 
@@ -378,25 +347,19 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 return blocked
 
             if not number.upper().startswith("CHG"):
-                return json.dumps(
-                    format_response(
-                        data=None,
-                        correlation_id=correlation_id,
-                        status="error",
-                        error=f"Invalid change request number: {number}. Must start with CHG prefix.",
-                    ),
-                    indent=2,
+                return format_response(
+                    data=None,
+                    correlation_id=correlation_id,
+                    status="error",
+                    error=f"Invalid change request number: {number}. Must start with CHG prefix.",
                 )
 
             if not comment and not work_note:
-                return json.dumps(
-                    format_response(
-                        data=None,
-                        correlation_id=correlation_id,
-                        status="error",
-                        error="At least one of comment or work_note must be provided.",
-                    ),
-                    indent=2,
+                return format_response(
+                    data=None,
+                    correlation_id=correlation_id,
+                    status="error",
+                    error="At least one of comment or work_note must be provided.",
                 )
 
             async with ServiceNowClient(settings, auth_provider) as client:
@@ -406,14 +369,11 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     limit=1,
                 )
                 if not result["records"]:
-                    return json.dumps(
-                        format_response(
-                            data=None,
-                            correlation_id=correlation_id,
-                            status="error",
-                            error=f"Change request {number} not found.",
-                        ),
-                        indent=2,
+                    return format_response(
+                        data=None,
+                        correlation_id=correlation_id,
+                        status="error",
+                        error=f"Change request {number} not found.",
                     )
 
                 sys_id = result["records"][0]["sys_id"]
@@ -426,6 +386,6 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
 
                 updated = await client.update_record("change_request", sys_id, changes)
                 masked = mask_sensitive_fields(updated)
-                return json.dumps(format_response(data=masked, correlation_id=correlation_id), indent=2)
+                return format_response(data=masked, correlation_id=correlation_id)
 
         return await safe_tool_call(_run, correlation_id)
