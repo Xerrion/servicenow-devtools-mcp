@@ -26,6 +26,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         state: str = "",
         requested_for: str = "",
         assignment_group: str = "",
+        fields: str = "number,short_description,state,requested_for,assignment_group,sys_created_on",
         limit: int = 20,
     ) -> str:
         """List requests with optional filters.
@@ -34,6 +35,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             state: Request state filter
             requested_for: sys_id of requested_for user
             assignment_group: sys_id or name of assignment group
+            fields: Comma-separated list of fields to return (empty for all)
             limit: Maximum results to return (default 20)
         """
         correlation_id = str(uuid.uuid4())
@@ -49,16 +51,21 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             if assignment_group:
                 q = q.equals("assignment_group", assignment_group)
             query = q.build()
+            field_list = [f.strip() for f in fields.split(",") if f.strip()] if fields else None
 
             async with ServiceNowClient(settings, auth_provider) as client:
                 result = await client.query_records(
                     table="sc_request",
                     query=query,
+                    fields=field_list,
                     display_values=True,
                     limit=limit,
                 )
                 masked = [mask_sensitive_fields(r) for r in result["records"]]
-                return json.dumps(format_response(data=masked, correlation_id=correlation_id))
+                return json.dumps(
+                    format_response(data=masked, correlation_id=correlation_id),
+                    indent=2,
+                )
 
         return await safe_tool_call(_run, correlation_id)
 
@@ -81,7 +88,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                         correlation_id=correlation_id,
                         status="error",
                         error=f"Invalid request number: {number}. Must start with REQ prefix.",
-                    )
+                    ),
+                    indent=2,
                 )
 
             async with ServiceNowClient(settings, auth_provider) as client:
@@ -98,19 +106,25 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                             correlation_id=correlation_id,
                             status="error",
                             error=f"Request {number} not found.",
-                        )
+                        ),
+                        indent=2,
                     )
                 masked = mask_sensitive_fields(result["records"][0])
-                return json.dumps(format_response(data=masked, correlation_id=correlation_id))
+                return json.dumps(format_response(data=masked, correlation_id=correlation_id), indent=2)
 
         return await safe_tool_call(_run, correlation_id)
 
     @mcp.tool()
-    async def request_items(number: str, limit: int = 20) -> str:
+    async def request_items(
+        number: str,
+        fields: str = "number,short_description,state,assignment_group,assigned_to,sys_created_on",
+        limit: int = 20,
+    ) -> str:
         """Fetch request items (RITMs) for a request.
 
         Args:
             number: Request number (must start with REQ prefix)
+            fields: Comma-separated list of fields to return (empty for all)
             limit: Maximum results to return (default 20)
         """
         correlation_id = str(uuid.uuid4())
@@ -125,18 +139,25 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                         correlation_id=correlation_id,
                         status="error",
                         error=f"Invalid request number: {number}. Must start with REQ prefix.",
-                    )
+                    ),
+                    indent=2,
                 )
+
+            field_list = [f.strip() for f in fields.split(",") if f.strip()] if fields else None
 
             async with ServiceNowClient(settings, auth_provider) as client:
                 result = await client.query_records(
                     table="sc_req_item",
                     query=ServiceNowQuery().equals("request.number", number.upper()).build(),
+                    fields=field_list,
                     display_values=True,
                     limit=limit,
                 )
                 masked = [mask_sensitive_fields(r) for r in result["records"]]
-                return json.dumps(format_response(data=masked, correlation_id=correlation_id))
+                return json.dumps(
+                    format_response(data=masked, correlation_id=correlation_id),
+                    indent=2,
+                )
 
         return await safe_tool_call(_run, correlation_id)
 
@@ -159,7 +180,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                         correlation_id=correlation_id,
                         status="error",
                         error=f"Invalid request item number: {number}. Must start with RITM prefix.",
-                    )
+                    ),
+                    indent=2,
                 )
 
             async with ServiceNowClient(settings, auth_provider) as client:
@@ -176,10 +198,11 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                             correlation_id=correlation_id,
                             status="error",
                             error=f"Request item {number} not found.",
-                        )
+                        ),
+                        indent=2,
                     )
                 masked = mask_sensitive_fields(result["records"][0])
-                return json.dumps(format_response(data=masked, correlation_id=correlation_id))
+                return json.dumps(format_response(data=masked, correlation_id=correlation_id), indent=2)
 
         return await safe_tool_call(_run, correlation_id)
 
@@ -214,7 +237,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                         correlation_id=correlation_id,
                         status="error",
                         error=f"Invalid request item number: {number}. Must start with RITM prefix.",
-                    )
+                    ),
+                    indent=2,
                 )
 
             async with ServiceNowClient(settings, auth_provider) as client:
@@ -230,7 +254,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                             correlation_id=correlation_id,
                             status="error",
                             error=f"Request item {number} not found.",
-                        )
+                        ),
+                        indent=2,
                     )
 
                 sys_id = result["records"][0]["sys_id"]
@@ -250,11 +275,12 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                             correlation_id=correlation_id,
                             status="error",
                             error="No fields to update provided.",
-                        )
+                        ),
+                        indent=2,
                     )
 
                 updated = await client.update_record("sc_req_item", sys_id, changes)
                 masked = mask_sensitive_fields(updated)
-                return json.dumps(format_response(data=masked, correlation_id=correlation_id))
+                return json.dumps(format_response(data=masked, correlation_id=correlation_id), indent=2)
 
         return await safe_tool_call(_run, correlation_id)

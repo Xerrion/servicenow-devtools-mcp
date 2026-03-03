@@ -26,6 +26,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
     async def cmdb_list(
         ci_class: str = "cmdb_ci",
         operational_status: str = "",
+        fields: str = "name,sys_class_name,operational_status,sys_id,sys_updated_on",
         limit: int = 20,
     ) -> str:
         """List Configuration Items from CMDB.
@@ -33,6 +34,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         Args:
             ci_class: CMDB table/class to query (default "cmdb_ci")
             operational_status: Filter by operational status (operational=1, non_operational=2, etc.)
+            fields: Comma-separated list of fields to return (empty for all)
             limit: Maximum results to return (default 20)
         """
         correlation_id = str(uuid.uuid4())
@@ -54,16 +56,21 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 status_value = status_map.get(operational_status.lower(), operational_status)
                 q.equals("operational_status", status_value)
             query = q.build()
+            field_list = [f.strip() for f in fields.split(",") if f.strip()] if fields else None
 
             async with ServiceNowClient(settings, auth_provider) as client:
                 result = await client.query_records(
                     table=ci_class,
                     query=query,
+                    fields=field_list,
                     display_values=True,
                     limit=limit,
                 )
                 masked = [mask_sensitive_fields(r) for r in result["records"]]
-                return json.dumps(format_response(data=masked, correlation_id=correlation_id))
+                return json.dumps(
+                    format_response(data=masked, correlation_id=correlation_id),
+                    indent=2,
+                )
 
         return await safe_tool_call(_run, correlation_id)
 
@@ -105,10 +112,11 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                             correlation_id=correlation_id,
                             status="error",
                             error=f"CI '{name_or_sys_id}' not found in {ci_class}.",
-                        )
+                        ),
+                        indent=2,
                     )
                 masked = mask_sensitive_fields(result["records"][0])
-                return json.dumps(format_response(data=masked, correlation_id=correlation_id))
+                return json.dumps(format_response(data=masked, correlation_id=correlation_id), indent=2)
 
         return await safe_tool_call(_run, correlation_id)
 
@@ -149,7 +157,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                                 correlation_id=correlation_id,
                                 status="error",
                                 error=f"CI '{name_or_sys_id}' not found in {ci_class}.",
-                            )
+                            ),
+                            indent=2,
                         )
                     ci_sys_id = lookup_result["records"][0]["sys_id"]
                 else:
@@ -174,7 +183,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                             correlation_id=correlation_id,
                             status="error",
                             error=f"Invalid direction: {direction}. Must be 'parent', 'child', or 'both'.",
-                        )
+                        ),
+                        indent=2,
                     )
 
                 result = await client.query_records(
@@ -184,7 +194,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     limit=100,
                 )
                 masked = [mask_sensitive_fields(r) for r in result["records"]]
-                return json.dumps(format_response(data=masked, correlation_id=correlation_id))
+                return json.dumps(format_response(data=masked, correlation_id=correlation_id), indent=2)
 
         return await safe_tool_call(_run, correlation_id)
 
@@ -208,7 +218,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     query="",
                     group_by="sys_class_name",
                 )
-                return json.dumps(format_response(data=result, correlation_id=correlation_id))
+                return json.dumps(format_response(data=result, correlation_id=correlation_id), indent=2)
 
         return await safe_tool_call(_run, correlation_id)
 
@@ -232,6 +242,6 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     query="",
                     group_by="operational_status",
                 )
-                return json.dumps(format_response(data=result, correlation_id=correlation_id))
+                return json.dumps(format_response(data=result, correlation_id=correlation_id), indent=2)
 
         return await safe_tool_call(_run, correlation_id)
