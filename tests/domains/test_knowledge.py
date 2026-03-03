@@ -290,6 +290,21 @@ class TestKnowledgeUpdate:
         assert data["status"] == "error"
         assert "not found" in data["error"].lower()
 
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_update_no_changes_provided(self, settings, auth_provider):
+        """Should return error when no update fields are provided."""
+        respx.get(f"{BASE_URL}/api/now/table/kb_knowledge").mock(
+            return_value=Response(200, json={"result": [{"sys_id": "kb123", "number": "KB0010001"}]})
+        )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        result = await tools["knowledge_update"](number_or_sys_id="KB0010001")
+        data = json.loads(result)
+
+        assert data["status"] == "error"
+        assert "no fields" in data["error"].lower()
+
 
 class TestKnowledgeFeedback:
     """Tests for knowledge_feedback tool."""
@@ -297,12 +312,15 @@ class TestKnowledgeFeedback:
     @pytest.mark.asyncio
     @respx.mock
     async def test_feedback_with_rating(self, settings, auth_provider):
-        """Should submit rating feedback."""
+        """Should submit rating feedback to kb_feedback table."""
         respx.get(f"{BASE_URL}/api/now/table/kb_knowledge").mock(
             return_value=Response(200, json={"result": [{"sys_id": "kb123", "number": "KB0010001"}]})
         )
-        respx.patch(f"{BASE_URL}/api/now/table/kb_knowledge/kb123").mock(
-            return_value=Response(200, json={"result": {"sys_id": "kb123", "number": "KB0010001", "rating": "5"}})
+        respx.post(f"{BASE_URL}/api/now/table/kb_feedback").mock(
+            return_value=Response(
+                201,
+                json={"result": {"sys_id": "fb001", "article": "kb123", "rating": "5"}},
+            )
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
@@ -310,17 +328,20 @@ class TestKnowledgeFeedback:
         data = json.loads(result)
 
         assert data["status"] == "success"
+        assert data["data"]["article"] == "kb123"
+        assert data["data"]["rating"] == "5"
 
     @pytest.mark.asyncio
     @respx.mock
     async def test_feedback_with_comment(self, settings, auth_provider):
-        """Should submit comment feedback."""
+        """Should submit comment feedback to kb_feedback table."""
         respx.get(f"{BASE_URL}/api/now/table/kb_knowledge").mock(
             return_value=Response(200, json={"result": [{"sys_id": "kb123", "number": "KB0010001"}]})
         )
-        respx.patch(f"{BASE_URL}/api/now/table/kb_knowledge/kb123").mock(
+        respx.post(f"{BASE_URL}/api/now/table/kb_feedback").mock(
             return_value=Response(
-                200, json={"result": {"sys_id": "kb123", "number": "KB0010001", "feedback_comments": "Very helpful"}}
+                201,
+                json={"result": {"sys_id": "fb002", "article": "kb123", "comments": "Very helpful"}},
             )
         )
 
@@ -329,23 +350,25 @@ class TestKnowledgeFeedback:
         data = json.loads(result)
 
         assert data["status"] == "success"
+        assert data["data"]["article"] == "kb123"
+        assert data["data"]["comments"] == "Very helpful"
 
     @pytest.mark.asyncio
     @respx.mock
     async def test_feedback_both_rating_and_comment(self, settings, auth_provider):
-        """Should submit both rating and comment."""
+        """Should submit both rating and comment to kb_feedback."""
         respx.get(f"{BASE_URL}/api/now/table/kb_knowledge").mock(
             return_value=Response(200, json={"result": [{"sys_id": "kb123", "number": "KB0010001"}]})
         )
-        respx.patch(f"{BASE_URL}/api/now/table/kb_knowledge/kb123").mock(
+        respx.post(f"{BASE_URL}/api/now/table/kb_feedback").mock(
             return_value=Response(
-                200,
+                201,
                 json={
                     "result": {
-                        "sys_id": "kb123",
-                        "number": "KB0010001",
+                        "sys_id": "fb003",
+                        "article": "kb123",
                         "rating": "4",
-                        "feedback_comments": "Good article",
+                        "comments": "Good article",
                     }
                 },
             )
@@ -356,6 +379,8 @@ class TestKnowledgeFeedback:
         data = json.loads(result)
 
         assert data["status"] == "success"
+        assert data["data"]["rating"] == "4"
+        assert data["data"]["comments"] == "Good article"
 
     @pytest.mark.asyncio
     @respx.mock

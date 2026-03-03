@@ -156,23 +156,34 @@ def get_package(name: str) -> list[str]:
         raise ValueError("No empty groups allowed")
 
     seen: set[str] = set()
-    invalid: set[str] = set()
+    collisions: set[str] = set()
+    unknown: set[str] = set()
     result: list[str] = []
 
     for group in groups:
-        if group in invalid:
+        if group in collisions or group in unknown:
             continue
-        if group in PACKAGE_REGISTRY or group not in _TOOL_GROUP_MODULES:
-            invalid.add(group)
+        if group in PACKAGE_REGISTRY:
+            collisions.add(group)
+        elif group not in _TOOL_GROUP_MODULES:
+            unknown.add(group)
         elif group not in seen:
             seen.add(group)
             result.append(group)
 
-    if invalid:
-        raise ValueError(
-            f"Unknown group names: {', '.join(sorted(invalid))}. "
+    errors: list[str] = []
+    if collisions:
+        errors.append(
+            f"Cannot use preset package names as group names: {', '.join(sorted(collisions))}. "
+            f"Use them as a package name directly instead."
+        )
+    if unknown:
+        errors.append(
+            f"Unknown group names: {', '.join(sorted(unknown))}. "
             f"Valid groups: {', '.join(sorted(_TOOL_GROUP_MODULES.keys()))}"
         )
+    if errors:
+        raise ValueError(" ".join(errors))
 
     return result
 

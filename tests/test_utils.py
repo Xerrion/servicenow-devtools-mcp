@@ -288,7 +288,37 @@ class TestServiceNowQueryValidation:
         from servicenow_mcp.utils import ServiceNowQuery
 
         with pytest.raises(ValueError, match="Invalid identifier"):
-            ServiceNowQuery().is_not_empty("bad.field")
+            ServiceNowQuery().is_not_empty("bad-field")
+
+    def test_dot_walk_field_accepted(self):
+        from servicenow_mcp.utils import ServiceNowQuery
+
+        result = ServiceNowQuery().equals("change_request.number", "CHG001").build()
+        assert result == "change_request.number=CHG001"
+
+    def test_dot_walk_multi_level_accepted(self):
+        from servicenow_mcp.utils import ServiceNowQuery
+
+        result = ServiceNowQuery().equals("parent.child.sys_id", "abc123").build()
+        assert result == "parent.child.sys_id=abc123"
+
+    def test_dot_walk_leading_dot_rejected(self):
+        from servicenow_mcp.utils import ServiceNowQuery
+
+        with pytest.raises(ValueError, match="Invalid identifier"):
+            ServiceNowQuery().equals(".bad", "val")
+
+    def test_dot_walk_trailing_dot_rejected(self):
+        from servicenow_mcp.utils import ServiceNowQuery
+
+        with pytest.raises(ValueError, match="Invalid identifier"):
+            ServiceNowQuery().equals("bad.", "val")
+
+    def test_dot_walk_double_dot_rejected(self):
+        from servicenow_mcp.utils import ServiceNowQuery
+
+        with pytest.raises(ValueError, match="Invalid identifier"):
+            ServiceNowQuery().equals("a..b", "val")
 
     def test_caret_in_value_gets_escaped(self):
         """A caret in a value should be doubled."""

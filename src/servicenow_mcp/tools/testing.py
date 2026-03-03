@@ -64,7 +64,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             default_fields = "sys_id,name,description,active,sys_updated_on,test_origin"
             field_list = fields if fields else default_fields
 
-            query_str = ServiceNowQuery().raw(query).build() if query else ""
+            query_str = query
 
             async with ServiceNowClient(settings, auth_provider) as client:
                 result = await client.query_records(
@@ -156,10 +156,9 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             check_table_access("sys_atf_test_suite_test")
 
             async with ServiceNowClient(settings, auth_provider) as client:
-                query_str = ServiceNowQuery().raw(query).build() if query else ""
                 result = await client.query_records(
                     "sys_atf_test_suite",
-                    query_str,
+                    query,
                     fields=["sys_id", "name", "description", "active", "sys_updated_on"],
                     limit=limit,
                     order_by="sys_updated_on",
@@ -232,7 +231,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             if test_id:
                 check_table_access("sys_atf_test_result")
                 table = "sys_atf_test_result"
-                query = ServiceNowQuery().equals("test", test_id).build()
+                query = ServiceNowQuery().equals("test", test_id).order_by("sys_created_on", descending=True).build()
                 fields = [
                     "sys_id",
                     "status",
@@ -246,7 +245,9 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             else:
                 check_table_access("sys_atf_test_suite_result")
                 table = "sys_atf_test_suite_result"
-                query = ServiceNowQuery().equals("test_suite", suite_id).build()
+                query = (
+                    ServiceNowQuery().equals("test_suite", suite_id).order_by("sys_created_on", descending=True).build()
+                )
                 fields = [
                     "sys_id",
                     "status",
@@ -260,10 +261,9 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 result_type = "suite_results"
 
             async with ServiceNowClient(settings, auth_provider) as client:
-                query_obj = ServiceNowQuery().raw(query).order_by("sys_created_on", descending=True)
                 result = await client.query_records(
                     table,
-                    query_obj.build(),
+                    query,
                     fields=fields,
                     limit=limit,
                 )
@@ -528,24 +528,21 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     indent=2,
                 )
 
-            date_query = f"sys_created_on>=javascript:gs.daysAgoStart({days})"
-
             if test_id:
                 check_table_access("sys_atf_test_result")
                 table = "sys_atf_test_result"
-                id_filter = f"test={test_id}"
+                q = ServiceNowQuery().equals("test", test_id)
             else:
                 check_table_access("sys_atf_test_suite_result")
                 table = "sys_atf_test_suite_result"
-                id_filter = f"test_suite={suite_id}"
+                q = ServiceNowQuery().equals("test_suite", suite_id)
 
-            full_query = f"{id_filter}^{date_query}"
+            full_query = q.days_ago("sys_created_on", days).order_by("sys_created_on", descending=False).build()
 
             async with ServiceNowClient(settings, auth_provider) as client:
-                query_obj = ServiceNowQuery().raw(full_query).order_by("sys_created_on", descending=False)
                 result = await client.query_records(
                     table,
-                    query_obj.build(),
+                    full_query,
                     fields=["sys_id", "status", "sys_created_on"],
                     limit=limit,
                 )

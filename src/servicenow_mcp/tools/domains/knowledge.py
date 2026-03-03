@@ -10,7 +10,7 @@ from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.config import Settings
 from servicenow_mcp.policy import check_table_access, mask_sensitive_fields, write_gate
-from servicenow_mcp.utils import format_response, safe_tool_call
+from servicenow_mcp.utils import ServiceNowQuery, format_response, safe_tool_call
 
 
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
@@ -41,7 +41,13 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             check_table_access("kb_knowledge")
 
             # Build LIKE query for fuzzy search in short_description and text fields
-            search_query = f"short_descriptionLIKE{query}^ORtextLIKE{query}^workflow_state={workflow_state}"
+            search_query = (
+                ServiceNowQuery()
+                .like("short_description", query)
+                .or_condition("text", "LIKE", query)
+                .equals("workflow_state", workflow_state)
+                .build()
+            )
 
             async with ServiceNowClient(settings, auth_provider) as client:
                 result = await client.query_records(
@@ -70,13 +76,13 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             check_table_access("kb_knowledge")
 
             # Detect if input is sys_id (32-char lowercase hex string)
-            is_sys_id = bool(re.match(r"^[a-z0-9]{32}$", number_or_sys_id.lower()))
+            is_sys_id = bool(re.match(r"^[a-f0-9]{32}$", number_or_sys_id.lower()))
 
             async with ServiceNowClient(settings, auth_provider) as client:
                 # Try lookup by number first
                 result = await client.query_records(
                     table="kb_knowledge",
-                    query=f"number={number_or_sys_id.upper()}",
+                    query=ServiceNowQuery().equals("number", number_or_sys_id.upper()).build(),
                     display_values=True,
                     limit=1,
                 )
@@ -85,7 +91,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 if not result["records"] and is_sys_id:
                     result = await client.query_records(
                         table="kb_knowledge",
-                        query=f"sys_id={number_or_sys_id}",
+                        query=ServiceNowQuery().equals("sys_id", number_or_sys_id).build(),
                         display_values=True,
                         limit=1,
                     )
@@ -201,13 +207,13 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 return gate_error
 
             # Detect if input is sys_id (32-char lowercase hex string)
-            is_sys_id = bool(re.match(r"^[a-z0-9]{32}$", number_or_sys_id.lower()))
+            is_sys_id = bool(re.match(r"^[a-f0-9]{32}$", number_or_sys_id.lower()))
 
             async with ServiceNowClient(settings, auth_provider) as client:
                 # Try lookup by number first
                 result = await client.query_records(
                     table="kb_knowledge",
-                    query=f"number={number_or_sys_id.upper()}",
+                    query=ServiceNowQuery().equals("number", number_or_sys_id.upper()).build(),
                     limit=1,
                 )
 
@@ -215,7 +221,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 if not result["records"] and is_sys_id:
                     result = await client.query_records(
                         table="kb_knowledge",
-                        query=f"sys_id={number_or_sys_id}",
+                        query=ServiceNowQuery().equals("sys_id", number_or_sys_id).build(),
                         limit=1,
                     )
 
@@ -244,6 +250,16 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 if kb_category:
                     changes["kb_category"] = kb_category
 
+                if not changes:
+                    return json.dumps(
+                        format_response(
+                            data=None,
+                            correlation_id=correlation_id,
+                            status="error",
+                            error="No fields to update provided.",
+                        )
+                    )
+
                 update_result = await client.update_record(
                     table="kb_knowledge",
                     sys_id=sys_id,
@@ -261,6 +277,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         comment: str = "",
     ) -> str:
         """Submit feedback (rating or comment) for a knowledge article.
+
+        Creates a feedback record in the kb_feedback table linked to the article.
 
         Args:
             number_or_sys_id: KB number (e.g. KB0010001) or sys_id (32-char hex)
@@ -293,20 +311,20 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 )
 
             check_table_access("kb_knowledge")
+            check_table_access("kb_feedback")
 
-            # Check write gate
-            gate_error = write_gate("kb_knowledge", settings, correlation_id)
+            gate_error = write_gate("kb_feedback", settings, correlation_id)
             if gate_error:
                 return gate_error
 
             # Detect if input is sys_id (32-char lowercase hex string)
-            is_sys_id = bool(re.match(r"^[a-z0-9]{32}$", number_or_sys_id.lower()))
+            is_sys_id = bool(re.match(r"^[a-f0-9]{32}$", number_or_sys_id.lower()))
 
             async with ServiceNowClient(settings, auth_provider) as client:
                 # Try lookup by number first
                 result = await client.query_records(
                     table="kb_knowledge",
-                    query=f"number={number_or_sys_id.upper()}",
+                    query=ServiceNowQuery().equals("number", number_or_sys_id.upper()).build(),
                     limit=1,
                 )
 
@@ -314,7 +332,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 if not result["records"] and is_sys_id:
                     result = await client.query_records(
                         table="kb_knowledge",
-                        query=f"sys_id={number_or_sys_id}",
+                        query=ServiceNowQuery().equals("sys_id", number_or_sys_id).build(),
                         limit=1,
                     )
 
@@ -328,21 +346,19 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                         )
                     )
 
-                sys_id = result["records"][0]["sys_id"]
+                article_sys_id = result["records"][0]["sys_id"]
 
-                # Build changes dict based on what was provided
-                changes: dict[str, str] = {}
+                feedback_data: dict[str, str] = {"article": article_sys_id}
                 if rating is not None:
-                    changes["rating"] = str(rating)
+                    feedback_data["rating"] = str(rating)
                 if comment.strip():
-                    changes["feedback_comments"] = comment
+                    feedback_data["comments"] = comment
 
-                update_result = await client.update_record(
-                    table="kb_knowledge",
-                    sys_id=sys_id,
-                    data=changes,
+                created = await client.create_record(
+                    table="kb_feedback",
+                    data=feedback_data,
                 )
-                masked = mask_sensitive_fields(update_result)
+                masked = mask_sensitive_fields(created)
                 return json.dumps(format_response(data=masked, correlation_id=correlation_id))
 
         return await safe_tool_call(_run, correlation_id)

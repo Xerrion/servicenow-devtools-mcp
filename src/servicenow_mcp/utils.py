@@ -12,7 +12,7 @@ from servicenow_mcp.errors import ForbiddenError
 
 logger = logging.getLogger(__name__)
 
-_IDENTIFIER_RE = re.compile(r"^[a-z0-9_]+$")
+_IDENTIFIER_RE = re.compile(r"^[a-z0-9_]+(\.[a-z0-9_]+)*$")
 
 # Operators recognised by ``or_condition()``.
 _ALLOWED_OPERATORS: frozenset[str] = frozenset(
@@ -37,12 +37,15 @@ _ALLOWED_OPERATORS: frozenset[str] = frozenset(
 def validate_identifier(name: str) -> None:
     """Raise ValueError if *name* is not a valid ServiceNow identifier.
 
-    ServiceNow table and field names consist only of lowercase
-    alphanumerics and underscores (``[a-z0-9_]+``).
+    ServiceNow field names consist of lowercase alphanumerics and
+    underscores (``[a-z0-9_]+``).  Dot-walked references such as
+    ``change_request.number`` or ``child.sys_id`` are also accepted
+    (one or more segments separated by a single dot).
     """
     if not _IDENTIFIER_RE.match(name):
         raise ValueError(
-            f"Invalid identifier: {name!r}. Only lowercase alphanumeric characters and underscores are allowed."
+            f"Invalid identifier: {name!r}. "
+            "Only lowercase alphanumeric characters, underscores, and dot-walked segments are allowed."
         )
 
 

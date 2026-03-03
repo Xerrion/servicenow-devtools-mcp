@@ -9,7 +9,7 @@ from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.config import Settings
 from servicenow_mcp.policy import check_table_access, mask_sensitive_fields, write_gate
-from servicenow_mcp.utils import format_response, safe_tool_call
+from servicenow_mcp.utils import ServiceNowQuery, format_response, safe_tool_call
 
 
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
@@ -41,15 +41,14 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         async def _run() -> str:
             check_table_access("sc_request")
 
-            query_parts = []
+            q = ServiceNowQuery()
             if state:
-                query_parts.append(f"state={state}")
+                q = q.equals("state", state)
             if requested_for:
-                query_parts.append(f"requested_for={requested_for}")
+                q = q.equals("requested_for", requested_for)
             if assignment_group:
-                query_parts.append(f"assignment_group={assignment_group}")
-
-            query = "^".join(query_parts) if query_parts else ""
+                q = q.equals("assignment_group", assignment_group)
+            query = q.build()
 
             async with ServiceNowClient(settings, auth_provider) as client:
                 result = await client.query_records(
@@ -88,7 +87,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             async with ServiceNowClient(settings, auth_provider) as client:
                 result = await client.query_records(
                     table="sc_request",
-                    query=f"number={number.upper()}",
+                    query=ServiceNowQuery().equals("number", number.upper()).build(),
                     display_values=True,
                     limit=1,
                 )
@@ -132,7 +131,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             async with ServiceNowClient(settings, auth_provider) as client:
                 result = await client.query_records(
                     table="sc_req_item",
-                    query=f"request.number={number.upper()}",
+                    query=ServiceNowQuery().equals("request.number", number.upper()).build(),
                     display_values=True,
                     limit=limit,
                 )
@@ -166,7 +165,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             async with ServiceNowClient(settings, auth_provider) as client:
                 result = await client.query_records(
                     table="sc_req_item",
-                    query=f"number={number.upper()}",
+                    query=ServiceNowQuery().equals("number", number.upper()).build(),
                     display_values=True,
                     limit=1,
                 )
@@ -221,7 +220,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             async with ServiceNowClient(settings, auth_provider) as client:
                 result = await client.query_records(
                     table="sc_req_item",
-                    query=f"number={number.upper()}",
+                    query=ServiceNowQuery().equals("number", number.upper()).build(),
                     limit=1,
                 )
                 if not result["records"]:
@@ -243,6 +242,16 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     changes["assignment_group"] = assignment_group
                 if assigned_to:
                     changes["assigned_to"] = assigned_to
+
+                if not changes:
+                    return json.dumps(
+                        format_response(
+                            data=None,
+                            correlation_id=correlation_id,
+                            status="error",
+                            error="No fields to update provided.",
+                        )
+                    )
 
                 updated = await client.update_record("sc_req_item", sys_id, changes)
                 masked = mask_sensitive_fields(updated)

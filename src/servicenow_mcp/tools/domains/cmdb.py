@@ -10,7 +10,7 @@ from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.config import Settings
 from servicenow_mcp.policy import check_table_access, mask_sensitive_fields
-from servicenow_mcp.utils import format_response, safe_tool_call
+from servicenow_mcp.utils import ServiceNowQuery, format_response, safe_tool_call
 
 
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
@@ -40,7 +40,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         async def _run() -> str:
             check_table_access(ci_class)
 
-            query_parts = []
+            q = ServiceNowQuery()
             if operational_status:
                 # Map human-readable status to numeric codes
                 status_map = {
@@ -52,9 +52,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     "retired": "6",
                 }
                 status_value = status_map.get(operational_status.lower(), operational_status)
-                query_parts.append(f"operational_status={status_value}")
-
-            query = "^".join(query_parts) if query_parts else ""
+                q.equals("operational_status", status_value)
+            query = q.build()
 
             async with ServiceNowClient(settings, auth_provider) as client:
                 result = await client.query_records(
@@ -87,7 +86,10 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             # Detect if input is sys_id (32-char hex string)
             is_sys_id = bool(re.match(r"^[a-f0-9]{32}$", name_or_sys_id.lower()))
 
-            query = f"sys_id={name_or_sys_id}" if is_sys_id else f"name={name_or_sys_id}"
+            if is_sys_id:
+                query = ServiceNowQuery().equals("sys_id", name_or_sys_id).build()
+            else:
+                query = ServiceNowQuery().equals("name", name_or_sys_id).build()
 
             async with ServiceNowClient(settings, auth_provider) as client:
                 result = await client.query_records(
@@ -137,7 +139,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 if not is_sys_id:
                     lookup_result = await client.query_records(
                         table=ci_class,
-                        query=f"name={name_or_sys_id}",
+                        query=ServiceNowQuery().equals("name", name_or_sys_id).build(),
                         limit=1,
                     )
                     if not lookup_result["records"]:
@@ -155,11 +157,16 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
 
                 # Build relationship query based on direction
                 if direction == "parent":
-                    query = f"child.sys_id={ci_sys_id}"
+                    query = ServiceNowQuery().equals("child.sys_id", ci_sys_id).build()
                 elif direction == "child":
-                    query = f"parent.sys_id={ci_sys_id}"
+                    query = ServiceNowQuery().equals("parent.sys_id", ci_sys_id).build()
                 elif direction == "both":
-                    query = f"child.sys_id={ci_sys_id}^ORparent.sys_id={ci_sys_id}"
+                    query = (
+                        ServiceNowQuery()
+                        .equals("child.sys_id", ci_sys_id)
+                        .or_equals("parent.sys_id", ci_sys_id)
+                        .build()
+                    )
                 else:
                     return json.dumps(
                         format_response(

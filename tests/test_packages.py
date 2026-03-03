@@ -300,7 +300,7 @@ class TestCommaSeparatedGroups:
         """get_package rejects preset names in comma syntax."""
         from servicenow_mcp.packages import get_package
 
-        with pytest.raises(ValueError, match="Unknown group"):
+        with pytest.raises(ValueError, match="Cannot use preset package names"):
             get_package("introspection,itil,debug")
 
     def test_comma_separated_single_group(self):

@@ -9,7 +9,7 @@ from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.config import Settings
 from servicenow_mcp.policy import check_table_access, mask_sensitive_fields, write_gate
-from servicenow_mcp.utils import format_response, safe_tool_call
+from servicenow_mcp.utils import ServiceNowQuery, format_response, safe_tool_call
 
 
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
@@ -43,7 +43,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         async def _run() -> str:
             check_table_access("incident")
 
-            query_parts = []
+            q = ServiceNowQuery()
             if state and state != "all":
                 state_map = {
                     "open": "1",
@@ -54,15 +54,15 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     "canceled": "8",
                 }
                 if state.lower() in state_map:
-                    query_parts.append(f"state={state_map[state.lower()]}")
+                    q = q.equals("state", state_map[state.lower()])
             if priority:
-                query_parts.append(f"priority={priority}")
+                q = q.equals("priority", priority)
             if assigned_to:
-                query_parts.append(f"assigned_to={assigned_to}")
+                q = q.equals("assigned_to", assigned_to)
             if assignment_group:
-                query_parts.append(f"assignment_group={assignment_group}")
+                q = q.equals("assignment_group", assignment_group)
 
-            query = "^".join(query_parts) if query_parts else ""
+            query = q.build()
 
             async with ServiceNowClient(settings, auth_provider) as client:
                 result = await client.query_records(
@@ -101,7 +101,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             async with ServiceNowClient(settings, auth_provider) as client:
                 result = await client.query_records(
                     table="incident",
-                    query=f"number={number.upper()}",
+                    query=ServiceNowQuery().equals("number", number.upper()).build(),
                     display_values=True,
                     limit=1,
                 )
@@ -263,7 +263,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             async with ServiceNowClient(settings, auth_provider) as client:
                 result = await client.query_records(
                     table="incident",
-                    query=f"number={number.upper()}",
+                    query=ServiceNowQuery().equals("number", number.upper()).build(),
                     limit=1,
                 )
                 if not result["records"]:
@@ -380,7 +380,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             async with ServiceNowClient(settings, auth_provider) as client:
                 result = await client.query_records(
                     table="incident",
-                    query=f"number={number.upper()}",
+                    query=ServiceNowQuery().equals("number", number.upper()).build(),
                     limit=1,
                 )
                 if not result["records"]:
@@ -452,7 +452,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             async with ServiceNowClient(settings, auth_provider) as client:
                 result = await client.query_records(
                     table="incident",
-                    query=f"number={number.upper()}",
+                    query=ServiceNowQuery().equals("number", number.upper()).build(),
                     limit=1,
                 )
                 if not result["records"]:
