@@ -662,6 +662,61 @@ class TestServiceNowQueryStringOperators:
         assert result == "active=true^emailENDSWITH@example.com^short_descriptionNOT LIKEtest^categoryANYTHING"
 
 
+class TestServiceNowQueryFieldComparison:
+    """Test field-to-field comparison operators."""
+
+    def test_gt_field(self) -> None:
+        result = ServiceNowQuery().gt_field("sys_updated_on", "sys_created_on").build()
+        assert result == "sys_updated_onGT_FIELDsys_created_on"
+
+    def test_lt_field(self) -> None:
+        result = ServiceNowQuery().lt_field("priority", "impact").build()
+        assert result == "priorityLT_FIELDimpact"
+
+    def test_gt_or_equals_field(self) -> None:
+        result = ServiceNowQuery().gt_or_equals_field("end_date", "start_date").build()
+        assert result == "end_dateGT_OR_EQUALS_FIELDstart_date"
+
+    def test_lt_or_equals_field(self) -> None:
+        result = ServiceNowQuery().lt_or_equals_field("start_date", "end_date").build()
+        assert result == "start_dateLT_OR_EQUALS_FIELDend_date"
+
+    def test_same_as(self) -> None:
+        result = ServiceNowQuery().same_as("assigned_to", "opened_by").build()
+        assert result == "assigned_toSAMEASopened_by"
+
+    def test_not_same_as(self) -> None:
+        result = ServiceNowQuery().not_same_as("assigned_to", "opened_by").build()
+        assert result == "assigned_toNSAMEASopened_by"
+
+    def test_gt_field_validates_both_fields(self) -> None:
+        with pytest.raises(ValueError, match="Invalid identifier"):
+            ServiceNowQuery().gt_field("bad field!", "good_field")
+        with pytest.raises(ValueError, match="Invalid identifier"):
+            ServiceNowQuery().gt_field("good_field", "bad field!")
+
+    def test_same_as_validates_both_fields(self) -> None:
+        with pytest.raises(ValueError, match="Invalid identifier"):
+            ServiceNowQuery().same_as("bad field!", "good_field")
+        with pytest.raises(ValueError, match="Invalid identifier"):
+            ServiceNowQuery().same_as("good_field", "bad field!")
+
+    def test_chaining_field_comparison(self) -> None:
+        result = (
+            ServiceNowQuery()
+            .equals("active", "true")
+            .gt_field("sys_updated_on", "sys_created_on")
+            .not_same_as("assigned_to", "opened_by")
+            .build()
+        )
+        assert result == "active=true^sys_updated_onGT_FIELDsys_created_on^assigned_toNSAMEASopened_by"
+
+    def test_or_gt_field(self) -> None:
+        """Verify field comparison operators work in or_condition."""
+        result = ServiceNowQuery().gt_field("priority", "impact").or_condition("priority", "SAMEAS", "urgency").build()
+        assert result == "priorityGT_FIELDimpact^ORprioritySAMEASurgency"
+
+
 class TestSafeToolCall:
     """Tests for the safe_tool_call error-handling wrapper."""
 

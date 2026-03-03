@@ -39,6 +39,12 @@ _ALLOWED_OPERATORS: frozenset[str] = frozenset(
         "BETWEEN",
         "ANYTHING",
         "EMPTYSTRING",
+        "GT_FIELD",
+        "LT_FIELD",
+        "GT_OR_EQUALS_FIELD",
+        "LT_OR_EQUALS_FIELD",
+        "SAMEAS",
+        "NSAMEAS",
     }
 )
 
@@ -346,7 +352,51 @@ class ServiceNowQuery:
         self._parts.append(f"{field}NOT IN{sanitized}")
         return self
 
-    # --- OR conditions ---
+    # -- Field comparison --------------------------------------------------------
+
+    def gt_field(self, field: str, other_field: str) -> "ServiceNowQuery":
+        """Add ``fieldGT_FIELDother_field`` condition (field > other field)."""
+        validate_identifier(field)
+        validate_identifier(other_field)
+        self._parts.append(f"{field}GT_FIELD{other_field}")
+        return self
+
+    def lt_field(self, field: str, other_field: str) -> "ServiceNowQuery":
+        """Add ``fieldLT_FIELDother_field`` condition (field < other field)."""
+        validate_identifier(field)
+        validate_identifier(other_field)
+        self._parts.append(f"{field}LT_FIELD{other_field}")
+        return self
+
+    def gt_or_equals_field(self, field: str, other_field: str) -> "ServiceNowQuery":
+        """Add ``fieldGT_OR_EQUALS_FIELDother_field`` condition (field >= other field)."""
+        validate_identifier(field)
+        validate_identifier(other_field)
+        self._parts.append(f"{field}GT_OR_EQUALS_FIELD{other_field}")
+        return self
+
+    def lt_or_equals_field(self, field: str, other_field: str) -> "ServiceNowQuery":
+        """Add ``fieldLT_OR_EQUALS_FIELDother_field`` condition (field <= other field)."""
+        validate_identifier(field)
+        validate_identifier(other_field)
+        self._parts.append(f"{field}LT_OR_EQUALS_FIELD{other_field}")
+        return self
+
+    def same_as(self, field: str, other_field: str) -> "ServiceNowQuery":
+        """Add ``fieldSAMEASother_field`` condition (field equals other field)."""
+        validate_identifier(field)
+        validate_identifier(other_field)
+        self._parts.append(f"{field}SAMEAS{other_field}")
+        return self
+
+    def not_same_as(self, field: str, other_field: str) -> "ServiceNowQuery":
+        """Add ``fieldNSAMEASother_field`` condition (field != other field)."""
+        validate_identifier(field)
+        validate_identifier(other_field)
+        self._parts.append(f"{field}NSAMEAS{other_field}")
+        return self
+
+    # -- OR conditions ---------------------------------------------------------
 
     def or_condition(self, field: str, operator: str, value: str) -> "ServiceNowQuery":
         """Append an OR condition: ``^ORfield<OPERATOR>value``.
