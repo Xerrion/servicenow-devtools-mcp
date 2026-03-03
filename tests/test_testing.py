@@ -396,6 +396,16 @@ class TestAtfGetResults:
         assert result["data"]["results"][0]["status"] == "failure"
 
     @pytest.mark.asyncio
+    async def test_get_results_both_ids_provided(self, settings, auth_provider):
+        """Returns error when both test_id and suite_id are provided."""
+        tools, _query_store = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["atf_get_results"](test_id="test123", suite_id="suite456")
+        result = toon_decode(raw)
+
+        assert result["status"] == "error"
+        assert "not both" in result["error"].lower()
+
+    @pytest.mark.asyncio
     async def test_get_results_missing_both_ids(self, settings, auth_provider):
         """Returns error when neither test_id nor suite_id provided."""
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
@@ -497,6 +507,24 @@ class TestAtfRunTest:
 
         assert result["status"] == "error"
         assert "production" in result["error"].lower() or "blocked" in result["error"].lower()
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_run_test_no_execution_id(self, settings, auth_provider):
+        """Returns error when ATF run does not return an execution ID."""
+        respx.post(f"{BASE_URL}/api/now/sn_atf_tg/test_runner").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": {}},
+            )
+        )
+
+        tools, _query_store = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["atf_run_test"](test_id="test_no_id", poll=True)
+        result = toon_decode(raw)
+
+        assert result["status"] == "error"
+        assert "no execution id" in result["error"].lower()
 
     @pytest.mark.asyncio
     @respx.mock
@@ -619,6 +647,52 @@ class TestAtfRunSuite:
 
         assert result["status"] == "error"
         assert "production" in result["error"].lower() or "blocked" in result["error"].lower()
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_run_suite_no_execution_id(self, settings, auth_provider):
+        """Returns error when ATF suite run does not return an execution ID."""
+        respx.post(f"{BASE_URL}/api/now/sn_atf_tg/test_runner").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": {}},
+            )
+        )
+
+        tools, _query_store = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["atf_run_suite"](suite_id="suite_no_id", poll=True)
+        result = toon_decode(raw)
+
+        assert result["status"] == "error"
+        assert "no execution id" in result["error"].lower()
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_run_suite_timeout(self, settings, auth_provider):
+        """Mock progress always returning In Progress. Assert timeout with warnings."""
+        respx.post(f"{BASE_URL}/api/now/sn_atf_tg/test_runner").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": {"snboqId": "suite_exec_timeout"}},
+            )
+        )
+        respx.get(f"{BASE_URL}/api/now/sn_atf_tg/test_runner_progress").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": {"state": "In Progress", "progress": 50}},
+            )
+        )
+
+        tools, _query_store = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["atf_run_suite"](suite_id="suite_long", poll=True, poll_interval=2, max_poll_duration=10)
+        result = toon_decode(raw)
+
+        assert result["status"] == "success"
+        assert result["data"]["status"] == "polling_timeout"
+        assert result["data"]["execution_id"] == "suite_exec_timeout"
+        assert result["data"]["suite_id"] == "suite_long"
+        assert result["data"]["last_known_state"] == "in progress"
+        assert "warnings" in result
 
     @pytest.mark.asyncio
     @respx.mock
@@ -778,6 +852,62 @@ class TestAtfTestHealth:
 
         assert result["status"] == "error"
         assert "exactly one" in result["error"].lower() and "not both" in result["error"].lower()
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_health_trending_upward(self, settings, auth_provider):
+        """Mock early failures then later passes. Assert trend improving."""
+        respx.get(f"{BASE_URL}/api/now/table/sys_atf_test_result").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": [
+                        {"sys_id": "r1", "status": "failure", "sys_created_on": "2026-02-01 10:00:00"},
+                        {"sys_id": "r2", "status": "failure", "sys_created_on": "2026-02-02 10:00:00"},
+                        {"sys_id": "r3", "status": "failure", "sys_created_on": "2026-02-03 10:00:00"},
+                        {"sys_id": "r4", "status": "failure", "sys_created_on": "2026-02-04 10:00:00"},
+                        {"sys_id": "r5", "status": "success", "sys_created_on": "2026-02-05 10:00:00"},
+                        {"sys_id": "r6", "status": "success", "sys_created_on": "2026-02-06 10:00:00"},
+                        {"sys_id": "r7", "status": "success", "sys_created_on": "2026-02-07 10:00:00"},
+                        {"sys_id": "r8", "status": "success", "sys_created_on": "2026-02-08 10:00:00"},
+                    ]
+                },
+                headers={"X-Total-Count": "8"},
+            )
+        )
+
+        tools, _query_store = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["atf_test_health"](test_id="test_improving", days=30, limit=50)
+        result = toon_decode(raw)
+
+        assert result["status"] == "success"
+        assert result["data"]["recent_trend"] == "improving"
+        assert result["data"]["pass_rate"] == 0.5
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_health_insufficient_data_trend(self, settings, auth_provider):
+        """Mock fewer than 4 runs. Assert trend is insufficient_data."""
+        respx.get(f"{BASE_URL}/api/now/table/sys_atf_test_result").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": [
+                        {"sys_id": "r1", "status": "success", "sys_created_on": "2026-02-01 10:00:00"},
+                        {"sys_id": "r2", "status": "failure", "sys_created_on": "2026-02-02 10:00:00"},
+                    ]
+                },
+                headers={"X-Total-Count": "2"},
+            )
+        )
+
+        tools, _query_store = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["atf_test_health"](test_id="test_few_runs", days=30, limit=50)
+        result = toon_decode(raw)
+
+        assert result["status"] == "success"
+        assert result["data"]["total_runs"] == 2
+        assert result["data"]["recent_trend"] == "insufficient_data"
 
     @pytest.mark.asyncio
     @respx.mock

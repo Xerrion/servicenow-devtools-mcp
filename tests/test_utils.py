@@ -1,12 +1,14 @@
 """Tests for utility functions."""
 
+import json
 import uuid
+from unittest.mock import patch
 
 import pytest
 from toon_format import decode as toon_decode
 
 from servicenow_mcp.errors import ForbiddenError
-from servicenow_mcp.utils import ServiceNowQuery, safe_tool_call
+from servicenow_mcp.utils import ServiceNowQuery, safe_tool_call, serialize
 
 
 class TestCorrelationId:
@@ -82,6 +84,32 @@ class TestFormatResponse:
         resp = toon_decode(raw)
 
         assert "Limit capped at 100" in resp["warnings"]
+
+
+class TestSerialize:
+    """Test serialize function with TOON fallback to JSON."""
+
+    def test_serialize_returns_toon_by_default(self):
+        """When toon_encode succeeds, serialize returns TOON output."""
+        result = serialize({"key": "value"})
+        # Should be parseable by toon_decode
+        parsed = toon_decode(result)
+        assert parsed["key"] == "value"
+
+    def test_serialize_falls_back_to_json_on_toon_failure(self):
+        """When toon_encode raises, serialize falls back to json.dumps."""
+        with patch("servicenow_mcp.utils.toon_encode", side_effect=TypeError("unsupported type")):
+            result = serialize({"key": "value"})
+        parsed = json.loads(result)
+        assert parsed["key"] == "value"
+
+    def test_serialize_fallback_json_is_indented(self):
+        """The JSON fallback uses indent=2."""
+        with patch("servicenow_mcp.utils.toon_encode", side_effect=RuntimeError("boom")):
+            result = serialize({"a": 1})
+        # indent=2 means the output should have newlines and spaces
+        assert "\n" in result
+        assert "  " in result
 
 
 class TestServiceNowQuery:

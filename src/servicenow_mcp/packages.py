@@ -152,7 +152,7 @@ def get_package(name: str) -> list[str]:
 
     groups = [g for g in stripped_groups if g]
 
-    if not groups:
+    if not groups:  # pragma: no cover — defensive guard; line 150 catches all empty strings first
         raise ValueError("No empty groups allowed")
 
     seen: set[str] = set()

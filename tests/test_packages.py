@@ -317,6 +317,20 @@ class TestCommaSeparatedGroups:
         groups = get_package("utility,debug,introspection,debug")
         assert groups == ["utility", "debug", "introspection"]
 
+    def test_comma_separated_duplicate_preset_skipped(self):
+        """get_package skips repeated preset names already flagged as collisions."""
+        from servicenow_mcp.packages import get_package
+
+        with pytest.raises(ValueError, match="Cannot use preset package names"):
+            get_package("introspection,itil,itil,debug")
+
+    def test_comma_separated_duplicate_unknown_skipped(self):
+        """get_package skips repeated unknown names already flagged."""
+        from servicenow_mcp.packages import get_package
+
+        with pytest.raises(ValueError, match="Unknown group"):
+            get_package("introspection,bogus,bogus,debug")
+
 
 class TestDomainPackages:
     """Test domain-specific packages."""
