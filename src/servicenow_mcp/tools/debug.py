@@ -1,7 +1,6 @@
 """Debug and trace tools for investigating ServiceNow runtime behavior."""
 
 import asyncio
-import json
 from collections import Counter
 
 from mcp.server.fastmcp import FastMCP
@@ -143,17 +142,14 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             # Sort by timestamp
             timeline.sort(key=lambda e: e["timestamp"])
 
-            return json.dumps(
-                format_response(
-                    data={
-                        "record_sys_id": record_sys_id,
-                        "table": table,
-                        "event_count": len(timeline),
-                        "timeline": timeline,
-                    },
-                    correlation_id=correlation_id,
-                ),
-                indent=2,
+            return format_response(
+                data={
+                    "record_sys_id": record_sys_id,
+                    "table": table,
+                    "event_count": len(timeline),
+                    "timeline": timeline,
+                },
+                correlation_id=correlation_id,
             )
 
         return await safe_tool_call(_run, correlation_id)
@@ -201,22 +197,19 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     }
                 )
 
-            return json.dumps(
-                format_response(
-                    data={
-                        "context": {
-                            "sys_id": context.get("sys_id", ""),
-                            "name": context.get("name", ""),
-                            "state": context.get("state", ""),
-                            "started": context.get("started", ""),
-                            "ended": context.get("ended", ""),
-                        },
-                        "step_count": len(steps),
-                        "steps": steps,
+            return format_response(
+                data={
+                    "context": {
+                        "sys_id": context.get("sys_id", ""),
+                        "name": context.get("name", ""),
+                        "state": context.get("state", ""),
+                        "started": context.get("started", ""),
+                        "ended": context.get("ended", ""),
                     },
-                    correlation_id=correlation_id,
-                ),
-                indent=2,
+                    "step_count": len(steps),
+                    "steps": steps,
+                },
+                correlation_id=correlation_id,
             )
 
         return await safe_tool_call(_run, correlation_id)
@@ -262,16 +255,13 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     }
                 )
 
-            return json.dumps(
-                format_response(
-                    data={
-                        "record_sys_id": record_sys_id,
-                        "email_count": len(emails),
-                        "emails": emails,
-                    },
-                    correlation_id=correlation_id,
-                ),
-                indent=2,
+            return format_response(
+                data={
+                    "record_sys_id": record_sys_id,
+                    "email_count": len(emails),
+                    "emails": emails,
+                },
+                correlation_id=correlation_id,
             )
 
         return await safe_tool_call(_run, correlation_id)
@@ -354,26 +344,20 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                             }
                         )
                 else:
-                    return json.dumps(
-                        format_response(
-                            data=None,
-                            correlation_id=correlation_id,
-                            status="error",
-                            error=f"Unknown kind '{kind}'. Use 'ecc_queue' or 'rest_message'.",
-                        ),
-                        indent=2,
+                    return format_response(
+                        data=None,
+                        correlation_id=correlation_id,
+                        status="error",
+                        error=f"Unknown kind '{kind}'. Use 'ecc_queue' or 'rest_message'.",
                     )
 
-            return json.dumps(
-                format_response(
-                    data={
-                        "kind": kind,
-                        "error_count": len(errors),
-                        "errors": errors,
-                    },
-                    correlation_id=correlation_id,
-                ),
-                indent=2,
+            return format_response(
+                data={
+                    "kind": kind,
+                    "error_count": len(errors),
+                    "errors": errors,
+                },
+                correlation_id=correlation_id,
             )
 
         return await safe_tool_call(_run, correlation_id)
@@ -427,20 +411,17 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 **dict(state_counts),
             }
 
-            return json.dumps(
-                format_response(
-                    data={
-                        "import_set": {
-                            "sys_id": import_set.get("sys_id", ""),
-                            "table_name": import_set.get("table_name", ""),
-                            "state": import_set.get("state", ""),
-                        },
-                        "summary": summary,
-                        "errors": error_details,
+            return format_response(
+                data={
+                    "import_set": {
+                        "sys_id": import_set.get("sys_id", ""),
+                        "table_name": import_set.get("table_name", ""),
+                        "state": import_set.get("state", ""),
                     },
-                    correlation_id=correlation_id,
-                ),
-                indent=2,
+                    "summary": summary,
+                    "errors": error_details,
+                },
+                correlation_id=correlation_id,
             )
 
         return await safe_tool_call(_run, correlation_id)
@@ -502,18 +483,15 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     }
                 )
 
-            return json.dumps(
-                format_response(
-                    data={
-                        "table": table,
-                        "sys_id": sys_id,
-                        "field": field,
-                        "mutation_count": len(mutations),
-                        "mutations": mutations,
-                    },
-                    correlation_id=correlation_id,
-                ),
-                indent=2,
+            return format_response(
+                data={
+                    "table": table,
+                    "sys_id": sys_id,
+                    "field": field,
+                    "mutation_count": len(mutations),
+                    "mutations": mutations,
+                },
+                correlation_id=correlation_id,
             )
 
         return await safe_tool_call(_run, correlation_id)

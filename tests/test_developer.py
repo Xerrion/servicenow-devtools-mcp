@@ -5,6 +5,7 @@ import json
 import httpx
 import pytest
 import respx
+from toon_format import decode as toon_decode
 
 from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.policy import DENIED_TABLES
@@ -58,7 +59,7 @@ class TestRecordCreate:
             table="incident",
             data=json.dumps({"short_description": "Test incident", "state": "1"}),
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["table"] == "incident"
@@ -82,7 +83,7 @@ class TestRecordCreate:
             table="incident",
             data=json.dumps({"short_description": "Test"}),
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "error"
         assert "production" in result["error"].lower()
@@ -97,7 +98,7 @@ class TestRecordCreate:
             table=denied,
             data=json.dumps({"value": "test"}),
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "error"
         assert "denied" in result["error"].lower()
@@ -107,7 +108,7 @@ class TestRecordCreate:
         """Returns error when data is not valid JSON."""
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["record_create"](table="incident", data="not valid json")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "error"
 
@@ -124,7 +125,7 @@ class TestRecordCreate:
             table="incident",
             data=json.dumps({"short_description": "Test"}),
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "error"
         assert "acl" in result["error"].lower()
@@ -145,7 +146,7 @@ class TestRecordCreate:
                 table="incident",
                 data=json.dumps({"short_description": "Test"}),
             )
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "error"
         assert "connection failed" in result["error"]
 
@@ -164,7 +165,7 @@ class TestRecordPreviewCreate:
             table="incident",
             data=json.dumps({"short_description": "Test", "password": "s3cret"}),
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert "token" in result["data"]
@@ -188,7 +189,7 @@ class TestRecordPreviewCreate:
             table="incident",
             data=json.dumps({"short_description": "Test"}),
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "error"
 
     @pytest.mark.asyncio
@@ -196,7 +197,7 @@ class TestRecordPreviewCreate:
         """Returns error when data is not valid JSON."""
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["record_preview_create"](table="incident", data="{bad json")
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "error"
 
 
@@ -229,7 +230,7 @@ class TestRecordUpdate:
             sys_id="inc001",
             changes=json.dumps({"state": "2"}),
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["sys_id"] == "inc001"
@@ -253,7 +254,7 @@ class TestRecordUpdate:
             sys_id="inc001",
             changes=json.dumps({"state": "2"}),
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "error"
 
     @pytest.mark.asyncio
@@ -267,7 +268,7 @@ class TestRecordUpdate:
             sys_id="abc",
             changes=json.dumps({"value": "x"}),
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "error"
 
     @pytest.mark.asyncio
@@ -284,7 +285,7 @@ class TestRecordUpdate:
             sys_id="missing",
             changes=json.dumps({"state": "2"}),
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "error"
 
     @pytest.mark.asyncio
@@ -301,7 +302,7 @@ class TestRecordUpdate:
             sys_id="inc001",
             changes=json.dumps({"state": "2"}),
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "error"
         assert "acl" in result["error"].lower()
 
@@ -335,7 +336,7 @@ class TestRecordPreviewUpdate:
             sys_id="inc001",
             changes=json.dumps({"state": "2", "short_description": "Updated"}),
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert "token" in result["data"]
@@ -366,7 +367,7 @@ class TestRecordPreviewUpdate:
             sys_id="inc001",
             changes=json.dumps({"password": "new_password"}),
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["diff"]["password"]["old"] == "***MASKED***"
@@ -389,7 +390,7 @@ class TestRecordPreviewUpdate:
             sys_id="inc001",
             changes=json.dumps({"state": "2"}),
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "error"
 
 
@@ -407,7 +408,7 @@ class TestRecordDelete:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["record_delete"](table="incident", sys_id="inc001")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["table"] == "incident"
@@ -427,7 +428,7 @@ class TestRecordDelete:
         tools = {t.name: t.fn for t in mcp._tool_manager._tools.values()}
 
         raw = await tools["record_delete"](table="incident", sys_id="inc001")
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "error"
 
     @pytest.mark.asyncio
@@ -437,7 +438,7 @@ class TestRecordDelete:
         tools = _register_and_get_tools(settings, auth_provider)
 
         raw = await tools["record_delete"](table=denied, sys_id="abc")
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "error"
 
     @pytest.mark.asyncio
@@ -450,7 +451,7 @@ class TestRecordDelete:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["record_delete"](table="incident", sys_id="missing")
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "error"
 
     @pytest.mark.asyncio
@@ -463,7 +464,7 @@ class TestRecordDelete:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["record_delete"](table="incident", sys_id="inc001")
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "error"
         assert "acl" in result["error"].lower()
 
@@ -494,7 +495,7 @@ class TestRecordPreviewDelete:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["record_preview_delete"](table="incident", sys_id="inc001")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert "token" in result["data"]
@@ -516,7 +517,7 @@ class TestRecordPreviewDelete:
         tools = {t.name: t.fn for t in mcp._tool_manager._tools.values()}
 
         raw = await tools["record_preview_delete"](table="incident", sys_id="inc001")
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "error"
 
     @pytest.mark.asyncio
@@ -529,7 +530,7 @@ class TestRecordPreviewDelete:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["record_preview_delete"](table="incident", sys_id="missing")
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "error"
 
 
@@ -549,7 +550,7 @@ class TestRecordApply:
             table="incident",
             data=json.dumps({"short_description": "Test", "state": "1"}),
         )
-        token = json.loads(preview_raw)["data"]["token"]
+        token = toon_decode(preview_raw)["data"]["token"]
 
         # Phase 2: Apply
         respx.post(f"{BASE_URL}/api/now/table/incident").mock(
@@ -566,7 +567,7 @@ class TestRecordApply:
         )
 
         raw = await tools["record_apply"](preview_token=token)
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["action"] == "create"
@@ -591,7 +592,7 @@ class TestRecordApply:
             sys_id="inc001",
             changes=json.dumps({"state": "2"}),
         )
-        token = json.loads(preview_raw)["data"]["token"]
+        token = toon_decode(preview_raw)["data"]["token"]
 
         # Phase 2: Apply
         respx.patch(f"{BASE_URL}/api/now/table/incident/inc001").mock(
@@ -602,7 +603,7 @@ class TestRecordApply:
         )
 
         raw = await tools["record_apply"](preview_token=token)
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["action"] == "update"
@@ -627,13 +628,13 @@ class TestRecordApply:
 
         tools = _register_and_get_tools(settings, auth_provider)
         preview_raw = await tools["record_preview_delete"](table="incident", sys_id="inc001")
-        token = json.loads(preview_raw)["data"]["token"]
+        token = toon_decode(preview_raw)["data"]["token"]
 
         # Phase 2: Apply
         respx.delete(f"{BASE_URL}/api/now/table/incident/inc001").mock(return_value=httpx.Response(204))
 
         raw = await tools["record_apply"](preview_token=token)
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["action"] == "delete"
@@ -644,7 +645,7 @@ class TestRecordApply:
         """Returns error for an invalid/unknown token."""
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["record_apply"](preview_token="nonexistent-token")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "error"
         assert "invalid" in result["error"].lower() or "expired" in result["error"].lower()
@@ -659,7 +660,7 @@ class TestRecordApply:
             table="incident",
             data=json.dumps({"short_description": "Test"}),
         )
-        token = json.loads(preview_raw)["data"]["token"]
+        token = toon_decode(preview_raw)["data"]["token"]
 
         # First apply succeeds
         respx.post(f"{BASE_URL}/api/now/table/incident").mock(
@@ -669,12 +670,12 @@ class TestRecordApply:
             )
         )
         raw1 = await tools["record_apply"](preview_token=token)
-        result1 = json.loads(raw1)
+        result1 = toon_decode(raw1)
         assert result1["status"] == "success"
 
         # Second apply with same token fails
         raw2 = await tools["record_apply"](preview_token=token)
-        result2 = json.loads(raw2)
+        result2 = toon_decode(raw2)
         assert result2["status"] == "error"
         assert "invalid" in result2["error"].lower() or "expired" in result2["error"].lower()
 
@@ -687,7 +688,7 @@ class TestRecordApply:
             table="incident",
             data=json.dumps({"short_description": "Test"}),
         )
-        token = json.loads(preview_raw)["data"]["token"]
+        token = toon_decode(preview_raw)["data"]["token"]
 
         respx.post(f"{BASE_URL}/api/now/table/incident").mock(
             return_value=httpx.Response(
@@ -703,7 +704,7 @@ class TestRecordApply:
         )
 
         raw = await tools["record_apply"](preview_token=token)
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["record"]["password"] == "***MASKED***"
@@ -717,14 +718,14 @@ class TestRecordApply:
             table="incident",
             data=json.dumps({"short_description": "Test"}),
         )
-        token = json.loads(preview_raw)["data"]["token"]
+        token = toon_decode(preview_raw)["data"]["token"]
 
         respx.post(f"{BASE_URL}/api/now/table/incident").mock(
             return_value=httpx.Response(403, json={"error": {"message": "ACL denied"}})
         )
 
         raw = await tools["record_apply"](preview_token=token)
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "error"
         assert "acl" in result["error"].lower()
@@ -764,7 +765,7 @@ class TestMandatoryFieldValidation:
             table="incident",
             data=json.dumps({"short_description": "Test incident"}),
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "error"
         assert "missing_fields" in result["data"]
@@ -794,7 +795,7 @@ class TestMandatoryFieldValidation:
             table="incident",
             data=json.dumps({"short_description": "Test", "category": "software"}),
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["sys_id"] == "new001"
@@ -810,7 +811,7 @@ class TestMandatoryFieldValidation:
             table="incident",
             data=json.dumps({"short_description": "Test"}),
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "error"
         assert "category" in result["data"]["missing_fields"]
@@ -827,7 +828,7 @@ class TestMandatoryFieldValidation:
             table="incident",
             data=json.dumps({"short_description": "Test", "category": "software"}),
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert "token" in result["data"]
@@ -854,13 +855,13 @@ class TestMandatoryFieldValidation:
             table="incident",
             data=json.dumps({"short_description": "Test"}),
         )
-        token = json.loads(preview_raw)["data"]["token"]
+        token = toon_decode(preview_raw)["data"]["token"]
 
         # Phase 2: Apply - metadata now returns a NEW mandatory field
         respx.get(METADATA_URL).mock(return_value=httpx.Response(200, json=METADATA_WITH_TWO_MANDATORY))
 
         raw = await tools["record_apply"](preview_token=token)
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "error"
         assert "category" in result["data"]["missing_fields"]
@@ -888,7 +889,7 @@ class TestMandatoryFieldValidation:
             table="incident",
             data=json.dumps({"short_description": "Test"}),
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["sys_id"] == "new002"
@@ -915,7 +916,7 @@ class TestMandatoryFieldValidation:
             table="incident",
             data=json.dumps({"short_description": "Test"}),
         )
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["sys_id"] == "new003"

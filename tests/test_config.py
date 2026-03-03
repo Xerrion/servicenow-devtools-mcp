@@ -209,7 +209,7 @@ class TestSettings:
         env = self._make_env(MCP_TOOL_PACKAGE="foo")
         with (
             patch.dict("os.environ", env, clear=True),
-            pytest.raises(ValueError, match="mcp_tool_package must be one of"),
+            pytest.raises(ValueError, match="Unknown group names"),
         ):
             Settings(_env_file=None)
 

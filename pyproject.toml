@@ -28,6 +28,7 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "uvicorn>=0.30.0",
     "starlette>=0.38.0",
+    "toon-format",
 ]
 
 [project.urls]
@@ -84,3 +85,6 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = "servicenow_mcp.server"
 disable_error_code = ["call-arg"]
+
+[tool.uv.sources]
+toon-format = { git = "https://github.com/toon-format/toon-python.git" }

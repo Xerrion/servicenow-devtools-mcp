@@ -1,11 +1,11 @@
 """Tests for debug/trace tools."""
 
-import json
 from urllib.parse import parse_qs, urlparse
 
 import httpx
 import pytest
 import respx
+from toon_format import decode as toon_decode
 
 from servicenow_mcp.auth import BasicAuthProvider
 
@@ -96,7 +96,7 @@ class TestDebugTrace:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["debug_trace"](record_sys_id="inc001", table="incident", minutes=60)
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert len(result["data"]["timeline"]) == 3
@@ -120,7 +120,7 @@ class TestDebugTrace:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["debug_trace"](record_sys_id="inc999", table="incident")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["timeline"] == []
@@ -141,7 +141,7 @@ class TestDebugTrace:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["debug_trace"](record_sys_id="inc001", table="incident", minutes=30)
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "success"
 
     @pytest.mark.asyncio
@@ -160,7 +160,7 @@ class TestDebugTrace:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["debug_trace"](record_sys_id="abc^def", table="incident", minutes=60)
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         # Inspect the audit query: should contain abc^^def (single sanitization)
@@ -224,7 +224,7 @@ class TestDebugFlowExecution:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["debug_flow_execution"](context_id="ctx001")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["context"]["name"] == "Auto-assign flow"
@@ -267,7 +267,7 @@ class TestDebugFlowExecution:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["debug_flow_execution"](context_id="ctx002")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["steps"][0]["error_message"] == "NullPointerException at line 5"
@@ -311,7 +311,7 @@ class TestDebugEmailTrace:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["debug_email_trace"](record_sys_id="inc001")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert len(result["data"]["emails"]) == 2
@@ -326,7 +326,7 @@ class TestDebugEmailTrace:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["debug_email_trace"](record_sys_id="inc999")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["emails"] == []
@@ -360,7 +360,7 @@ class TestDebugIntegrationHealth:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["debug_integration_health"](kind="ecc_queue")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["kind"] == "ecc_queue"
@@ -391,7 +391,7 @@ class TestDebugIntegrationHealth:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["debug_integration_health"](kind="rest_message")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["kind"] == "rest_message"
@@ -407,7 +407,7 @@ class TestDebugIntegrationHealth:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["debug_integration_health"](kind="ecc_queue", hours=12)
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "success"
 
 
@@ -459,7 +459,7 @@ class TestDebugImportsetRun:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["debug_importset_run"](import_set_sys_id="imp001")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["import_set"]["sys_id"] == "imp001"
@@ -489,7 +489,7 @@ class TestDebugImportsetRun:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["debug_importset_run"](import_set_sys_id="imp002")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["summary"]["total"] == 0
@@ -531,7 +531,7 @@ class TestDebugFieldMutationStory:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["debug_field_mutation_story"](table="incident", sys_id="inc001", field="state")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         mutations = result["data"]["mutations"]
@@ -549,7 +549,7 @@ class TestDebugFieldMutationStory:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["debug_field_mutation_story"](table="incident", sys_id="inc001", field="state")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["mutations"] == []

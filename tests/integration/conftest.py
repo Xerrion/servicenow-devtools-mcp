@@ -76,3 +76,83 @@ async def business_rule_sys_id(live_settings: Settings, live_auth: BasicAuthProv
     if not records:
         return None
     return records[0].get("sys_id", "")
+
+
+@pytest_asyncio.fixture(scope="session")
+async def change_request_sys_id(live_settings: Settings, live_auth: BasicAuthProvider) -> str | None:
+    """Discover a real change request sys_id for domain tests."""
+    async with ServiceNowClient(live_settings, live_auth) as client:
+        result = await client.query_records(
+            "change_request",
+            "",
+            fields=["sys_id", "number"],
+            limit=1,
+        )
+    records = result["records"]
+    if not records:
+        return None
+    return records[0].get("sys_id", "")
+
+
+@pytest_asyncio.fixture(scope="session")
+async def cmdb_ci_sys_id(live_settings: Settings, live_auth: BasicAuthProvider) -> str | None:
+    """Discover a real CMDB configuration item sys_id for domain tests."""
+    async with ServiceNowClient(live_settings, live_auth) as client:
+        result = await client.query_records(
+            "cmdb_ci",
+            "",
+            fields=["sys_id", "name"],
+            limit=1,
+        )
+    records = result["records"]
+    if not records:
+        return None
+    return records[0].get("sys_id", "")
+
+
+@pytest_asyncio.fixture(scope="session")
+async def problem_sys_id(live_settings: Settings, live_auth: BasicAuthProvider) -> str | None:
+    """Discover a real problem sys_id for domain tests."""
+    async with ServiceNowClient(live_settings, live_auth) as client:
+        result = await client.query_records(
+            "problem",
+            "",
+            fields=["sys_id", "number"],
+            limit=1,
+        )
+    records = result["records"]
+    if not records:
+        return None
+    return records[0].get("sys_id", "")
+
+
+@pytest_asyncio.fixture(scope="session")
+async def sc_request_sys_id(live_settings: Settings, live_auth: BasicAuthProvider) -> str | None:
+    """Discover a real service catalog request sys_id for domain tests."""
+    async with ServiceNowClient(live_settings, live_auth) as client:
+        result = await client.query_records(
+            "sc_request",
+            "",
+            fields=["sys_id", "number"],
+            limit=1,
+        )
+    records = result["records"]
+    if not records:
+        return None
+    return records[0].get("sys_id", "")
+
+
+@pytest_asyncio.fixture(scope="session")
+async def kb_article_sys_id(live_settings: Settings, live_auth: BasicAuthProvider) -> str | None:
+    """Discover a real knowledge article sys_id for domain tests."""
+    async with ServiceNowClient(live_settings, live_auth) as client:
+        result = await client.query_records(
+            "kb_knowledge",
+            "",
+            fields=["sys_id", "number"],
+            limit=1,
+        )
+    records = result["records"]
+    if not records:
+        return None
+    return records[0].get("sys_id", "")

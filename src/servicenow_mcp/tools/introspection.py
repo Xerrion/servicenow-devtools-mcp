@@ -1,7 +1,5 @@
 """Introspection tools for ServiceNow table discovery and querying."""
 
-import json
-
 from mcp.server.fastmcp import FastMCP
 
 from servicenow_mcp.auth import BasicAuthProvider
@@ -12,11 +10,19 @@ from servicenow_mcp.policy import (
     enforce_query_safety,
     mask_sensitive_fields,
 )
-from servicenow_mcp.utils import format_response, generate_correlation_id, safe_tool_call, validate_identifier
+from servicenow_mcp.state import QueryTokenStore
+from servicenow_mcp.utils import (
+    format_response,
+    generate_correlation_id,
+    resolve_query_token,
+    safe_tool_call,
+    validate_identifier,
+)
 
 
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
     """Register introspection tools on the MCP server."""
+    query_store: QueryTokenStore = mcp._sn_query_store  # type: ignore[attr-defined]
 
     @mcp.tool()
     async def table_describe(table: str) -> str:
@@ -44,12 +50,9 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     "default_value": entry.get("default_value", ""),
                 }
                 fields.append(field_info)
-            return json.dumps(
-                format_response(
-                    data={"table": table, "fields": fields, "field_count": len(fields)},
-                    correlation_id=correlation_id,
-                ),
-                indent=2,
+            return format_response(
+                data={"table": table, "fields": fields, "field_count": len(fields)},
+                correlation_id=correlation_id,
             )
 
         return await safe_tool_call(_run, correlation_id)
@@ -78,17 +81,14 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             async with ServiceNowClient(settings, auth_provider) as client:
                 record = await client.get_record(table, sys_id, fields=field_list, display_values=display_values)
             record = mask_sensitive_fields(record)
-            return json.dumps(
-                format_response(data=record, correlation_id=correlation_id),
-                indent=2,
-            )
+            return format_response(data=record, correlation_id=correlation_id)
 
         return await safe_tool_call(_run, correlation_id)
 
     @mcp.tool()
     async def table_query(
         table: str,
-        query: str,
+        query_token: str = "",
         fields: str = "",
         limit: int = 100,
         offset: int = 0,
@@ -99,7 +99,9 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
 
         Args:
             table: The ServiceNow table name.
-            query: ServiceNow encoded query string (e.g., 'active=true^priority=1').
+            query_token: Token from the build_query tool representing a ServiceNow encoded query.
+                Use build_query to create a query first, then pass the returned query_token here.
+                Leave empty for no filter.
             fields: Comma-separated list of fields to return (empty for all).
             limit: Maximum number of records to return (capped by policy).
             offset: Number of records to skip for pagination.
@@ -110,6 +112,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         warnings: list[str] = []
 
         async def _run() -> str:
+            query = resolve_query_token(query_token, query_store, correlation_id)
             validate_identifier(table)
             check_table_access(table)
             safety = enforce_query_safety(table, query, limit, settings)
@@ -134,18 +137,15 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             # Mask sensitive fields in each record
             masked_records = [mask_sensitive_fields(r) for r in result["records"]]
 
-            return json.dumps(
-                format_response(
-                    data=masked_records,
-                    correlation_id=correlation_id,
-                    pagination={
-                        "offset": offset,
-                        "limit": effective_limit,
-                        "total": result["count"],
-                    },
-                    warnings=warnings if warnings else None,
-                ),
-                indent=2,
+            return format_response(
+                data=masked_records,
+                correlation_id=correlation_id,
+                pagination={
+                    "offset": offset,
+                    "limit": effective_limit,
+                    "total": result["count"],
+                },
+                warnings=warnings if warnings else None,
             )
 
         return await safe_tool_call(_run, correlation_id)
@@ -153,7 +153,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
     @mcp.tool()
     async def table_aggregate(
         table: str,
-        query: str,
+        query_token: str = "",
         group_by: str = "",
         avg_fields: str = "",
         min_fields: str = "",
@@ -167,7 +167,9 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
 
         Args:
             table: The ServiceNow table name.
-            query: ServiceNow encoded query string for filtering.
+            query_token: Token from the build_query tool representing a ServiceNow encoded query.
+                Use build_query to create a query first, then pass the returned query_token here.
+                Leave empty for no filter.
             group_by: Field to group results by (empty for no grouping).
             avg_fields: Comma-separated fields to compute average for.
             min_fields: Comma-separated fields to compute minimum for.
@@ -177,6 +179,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         correlation_id = generate_correlation_id()
 
         async def _run() -> str:
+            query = resolve_query_token(query_token, query_store, correlation_id)
             validate_identifier(table)
             check_table_access(table)
             enforce_query_safety(table, query, None, settings)
@@ -197,9 +200,6 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     sum_fields=_split(sum_fields),
                 )
 
-            return json.dumps(
-                format_response(data=result, correlation_id=correlation_id),
-                indent=2,
-            )
+            return format_response(data=result, correlation_id=correlation_id)
 
         return await safe_tool_call(_run, correlation_id)

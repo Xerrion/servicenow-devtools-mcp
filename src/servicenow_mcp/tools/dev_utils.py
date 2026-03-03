@@ -1,7 +1,5 @@
 """Developer utility tools for toggling artifacts and managing system properties."""
 
-import json
-
 from mcp.server.fastmcp import FastMCP
 
 from servicenow_mcp.auth import BasicAuthProvider
@@ -41,14 +39,12 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             # Resolve artifact type to table name
             table = ARTIFACT_TABLES.get(artifact_type)
             if table is None:
-                return json.dumps(
-                    format_response(
-                        data=None,
-                        correlation_id=correlation_id,
-                        status="error",
-                        error=f"Unknown artifact type: '{artifact_type}'. "
-                        f"Valid types: {', '.join(sorted(ARTIFACT_TABLES.keys()))}",
-                    )
+                return format_response(
+                    data=None,
+                    correlation_id=correlation_id,
+                    status="error",
+                    error=f"Unknown artifact type: '{artifact_type}'. "
+                    f"Valid types: {', '.join(sorted(ARTIFACT_TABLES.keys()))}",
                 )
 
             check_table_access(table)
@@ -57,13 +53,11 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             # Write gate
             reason = write_blocked_reason(table, settings)
             if reason:
-                return json.dumps(
-                    format_response(
-                        data=None,
-                        correlation_id=correlation_id,
-                        status="error",
-                        error=reason,
-                    )
+                return format_response(
+                    data=None,
+                    correlation_id=correlation_id,
+                    status="error",
+                    error=reason,
                 )
 
             async with ServiceNowClient(settings, auth_provider) as client:
@@ -75,17 +69,15 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 updated = await client.update_record(table, sys_id, {"active": str(active).lower()})
                 new_active = updated.get("active", "unknown")
 
-            return json.dumps(
-                format_response(
-                    data={
-                        "sys_id": sys_id,
-                        "artifact_type": artifact_type,
-                        "table": table,
-                        "old_active": old_active,
-                        "new_active": new_active,
-                    },
-                    correlation_id=correlation_id,
-                )
+            return format_response(
+                data={
+                    "sys_id": sys_id,
+                    "artifact_type": artifact_type,
+                    "table": table,
+                    "old_active": old_active,
+                    "new_active": new_active,
+                },
+                correlation_id=correlation_id,
             )
 
         return await safe_tool_call(_run, correlation_id)
@@ -105,13 +97,11 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             check_table_access("sys_properties")
             reason = write_blocked_reason("sys_properties", settings)
             if reason:
-                return json.dumps(
-                    format_response(
-                        data=None,
-                        correlation_id=correlation_id,
-                        status="error",
-                        error=reason,
-                    )
+                return format_response(
+                    data=None,
+                    correlation_id=correlation_id,
+                    status="error",
+                    error=reason,
                 )
 
             async with ServiceNowClient(settings, auth_provider) as client:
@@ -123,13 +113,11 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 )
                 records = result["records"]
                 if not records:
-                    return json.dumps(
-                        format_response(
-                            data=None,
-                            correlation_id=correlation_id,
-                            status="error",
-                            error=f"Property '{name}' not found",
-                        )
+                    return format_response(
+                        data=None,
+                        correlation_id=correlation_id,
+                        status="error",
+                        error=f"Property '{name}' not found",
                     )
 
                 prop = records[0]
@@ -144,16 +132,14 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             display_old = MASK_VALUE if is_sensitive_field(name) else old_value
             display_new = MASK_VALUE if is_sensitive_field(name) else new_value
 
-            return json.dumps(
-                format_response(
-                    data={
-                        "name": name,
-                        "sys_id": prop_sys_id,
-                        "old_value": display_old,
-                        "new_value": display_new,
-                    },
-                    correlation_id=correlation_id,
-                )
+            return format_response(
+                data={
+                    "name": name,
+                    "sys_id": prop_sys_id,
+                    "old_value": display_old,
+                    "new_value": display_new,
+                },
+                correlation_id=correlation_id,
             )
 
         return await safe_tool_call(_run, correlation_id)

@@ -1,13 +1,14 @@
 """Tests for ATF introspection tools (atf_list_tests, atf_get_test, atf_list_suites, atf_get_results)."""
 
-import json
 from urllib.parse import unquote
 
 import httpx
 import pytest
 import respx
+from toon_format import decode as toon_decode
 
 from servicenow_mcp.auth import BasicAuthProvider
+from servicenow_mcp.state import QueryTokenStore
 
 BASE_URL = "https://test.service-now.com"
 
@@ -19,14 +20,16 @@ def auth_provider(settings):
 
 
 def _register_and_get_tools(settings, auth_provider):
-    """Helper: register testing tools on a fresh MCP server and return tool map."""
+    """Helper: register testing tools on a fresh MCP server and return tool map + query store."""
     from mcp.server.fastmcp import FastMCP
 
     from servicenow_mcp.tools.testing import register_tools
 
     mcp = FastMCP("test")
+    query_store = QueryTokenStore()
+    mcp._sn_query_store = query_store  # type: ignore[attr-defined]
     register_tools(mcp, settings, auth_provider)
-    return {t.name: t.fn for t in mcp._tool_manager._tools.values()}
+    return {t.name: t.fn for t in mcp._tool_manager._tools.values()}, query_store
 
 
 class TestAtfListTests:
@@ -63,9 +66,9 @@ class TestAtfListTests:
             )
         )
 
-        tools = _register_and_get_tools(settings, auth_provider)
+        tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["atf_list_tests"]()
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["record_count"] == 2
@@ -95,9 +98,10 @@ class TestAtfListTests:
             )
         )
 
-        tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["atf_list_tests"](query="active=true")
-        result = json.loads(raw)
+        tools, query_store = _register_and_get_tools(settings, auth_provider)
+        token = query_store.create({"query": "active=true"})
+        raw = await tools["atf_list_tests"](query_token=token)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert route.called
@@ -116,9 +120,9 @@ class TestAtfListTests:
             )
         )
 
-        tools = _register_and_get_tools(settings, auth_provider)
+        tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["atf_list_tests"]()
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["record_count"] == 0
@@ -172,9 +176,9 @@ class TestAtfGetTest:
             )
         )
 
-        tools = _register_and_get_tools(settings, auth_provider)
+        tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["atf_get_test"](test_id="test123")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["test"]["sys_id"] == "test123"
@@ -192,9 +196,9 @@ class TestAtfGetTest:
             )
         )
 
-        tools = _register_and_get_tools(settings, auth_provider)
+        tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["atf_get_test"](test_id="missing")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "error"
 
@@ -247,9 +251,9 @@ class TestAtfGetTest:
             )
         )
 
-        tools = _register_and_get_tools(settings, auth_provider)
+        tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["atf_get_test"](test_id="test456")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["step_count"] == 3
@@ -291,9 +295,9 @@ class TestAtfListSuites:
             )
         )
 
-        tools = _register_and_get_tools(settings, auth_provider)
+        tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["atf_list_suites"]()
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["record_count"] == 1
@@ -312,9 +316,9 @@ class TestAtfListSuites:
             )
         )
 
-        tools = _register_and_get_tools(settings, auth_provider)
+        tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["atf_list_suites"]()
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["record_count"] == 0
@@ -348,9 +352,9 @@ class TestAtfGetResults:
             )
         )
 
-        tools = _register_and_get_tools(settings, auth_provider)
+        tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["atf_get_results"](test_id="test123")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["result_type"] == "test_results"
@@ -382,9 +386,9 @@ class TestAtfGetResults:
             )
         )
 
-        tools = _register_and_get_tools(settings, auth_provider)
+        tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["atf_get_results"](suite_id="suite456")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["result_type"] == "suite_results"
@@ -392,11 +396,21 @@ class TestAtfGetResults:
         assert result["data"]["results"][0]["status"] == "failure"
 
     @pytest.mark.asyncio
+    async def test_get_results_both_ids_provided(self, settings, auth_provider):
+        """Returns error when both test_id and suite_id are provided."""
+        tools, _query_store = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["atf_get_results"](test_id="test123", suite_id="suite456")
+        result = toon_decode(raw)
+
+        assert result["status"] == "error"
+        assert "not both" in result["error"].lower()
+
+    @pytest.mark.asyncio
     async def test_get_results_missing_both_ids(self, settings, auth_provider):
         """Returns error when neither test_id nor suite_id provided."""
-        tools = _register_and_get_tools(settings, auth_provider)
+        tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["atf_get_results"]()
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "error"
         assert "exactly one" in result["error"].lower()
@@ -413,9 +427,9 @@ class TestAtfGetResults:
             )
         )
 
-        tools = _register_and_get_tools(settings, auth_provider)
+        tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["atf_get_results"](test_id="test999")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["result_count"] == 0
@@ -444,9 +458,9 @@ class TestAtfRunTest:
             )
         )
 
-        tools = _register_and_get_tools(settings, auth_provider)
+        tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["atf_run_test"](test_id="test456", poll=True, poll_interval=2, max_poll_duration=10)
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["execution_id"] == "exec123"
@@ -465,9 +479,9 @@ class TestAtfRunTest:
             )
         )
 
-        tools = _register_and_get_tools(settings, auth_provider)
+        tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["atf_run_test"](test_id="test999", poll=False)
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["execution_id"] == "exec789"
@@ -484,14 +498,33 @@ class TestAtfRunTest:
 
         prod_auth = BasicAuthProvider(prod_settings)
         mcp = FastMCP("test")
+        mcp._sn_query_store = QueryTokenStore()  # type: ignore[attr-defined]
         register_tools(mcp, prod_settings, prod_auth)
         tools = {t.name: t.fn for t in mcp._tool_manager._tools.values()}
 
         raw = await tools["atf_run_test"](test_id="test123")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "error"
         assert "production" in result["error"].lower() or "blocked" in result["error"].lower()
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_run_test_no_execution_id(self, settings, auth_provider):
+        """Returns error when ATF run does not return an execution ID."""
+        respx.post(f"{BASE_URL}/api/now/sn_atf_tg/test_runner").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": {}},
+            )
+        )
+
+        tools, _query_store = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["atf_run_test"](test_id="test_no_id", poll=True)
+        result = toon_decode(raw)
+
+        assert result["status"] == "error"
+        assert "no execution id" in result["error"].lower()
 
     @pytest.mark.asyncio
     @respx.mock
@@ -511,9 +544,9 @@ class TestAtfRunTest:
             )
         )
 
-        tools = _register_and_get_tools(settings, auth_provider)
+        tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["atf_run_test"](test_id="test_long", poll=True, poll_interval=2, max_poll_duration=10)
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["status"] == "polling_timeout"
@@ -538,9 +571,9 @@ class TestAtfRunTest:
             )
         )
 
-        tools = _register_and_get_tools(settings, auth_provider)
+        tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["atf_run_test"](test_id="test_fail", poll=True, poll_interval=2, max_poll_duration=10)
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["status"] == "failure"
@@ -567,9 +600,9 @@ class TestAtfRunSuite:
             )
         )
 
-        tools = _register_and_get_tools(settings, auth_provider)
+        tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["atf_run_suite"](suite_id="suite789", poll=True, poll_interval=2, max_poll_duration=10)
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["execution_id"] == "suite_exec123"
@@ -587,9 +620,9 @@ class TestAtfRunSuite:
             )
         )
 
-        tools = _register_and_get_tools(settings, auth_provider)
+        tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["atf_run_suite"](suite_id="suite_fast", poll=False)
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["execution_id"] == "suite_no_poll"
@@ -605,14 +638,61 @@ class TestAtfRunSuite:
 
         prod_auth = BasicAuthProvider(prod_settings)
         mcp = FastMCP("test")
+        mcp._sn_query_store = QueryTokenStore()  # type: ignore[attr-defined]
         register_tools(mcp, prod_settings, prod_auth)
         tools = {t.name: t.fn for t in mcp._tool_manager._tools.values()}
 
         raw = await tools["atf_run_suite"](suite_id="suite999")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "error"
         assert "production" in result["error"].lower() or "blocked" in result["error"].lower()
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_run_suite_no_execution_id(self, settings, auth_provider):
+        """Returns error when ATF suite run does not return an execution ID."""
+        respx.post(f"{BASE_URL}/api/now/sn_atf_tg/test_runner").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": {}},
+            )
+        )
+
+        tools, _query_store = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["atf_run_suite"](suite_id="suite_no_id", poll=True)
+        result = toon_decode(raw)
+
+        assert result["status"] == "error"
+        assert "no execution id" in result["error"].lower()
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_run_suite_timeout(self, settings, auth_provider):
+        """Mock progress always returning In Progress. Assert timeout with warnings."""
+        respx.post(f"{BASE_URL}/api/now/sn_atf_tg/test_runner").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": {"snboqId": "suite_exec_timeout"}},
+            )
+        )
+        respx.get(f"{BASE_URL}/api/now/sn_atf_tg/test_runner_progress").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": {"state": "In Progress", "progress": 50}},
+            )
+        )
+
+        tools, _query_store = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["atf_run_suite"](suite_id="suite_long", poll=True, poll_interval=2, max_poll_duration=10)
+        result = toon_decode(raw)
+
+        assert result["status"] == "success"
+        assert result["data"]["status"] == "polling_timeout"
+        assert result["data"]["execution_id"] == "suite_exec_timeout"
+        assert result["data"]["suite_id"] == "suite_long"
+        assert result["data"]["last_known_state"] == "in progress"
+        assert "warnings" in result
 
     @pytest.mark.asyncio
     @respx.mock
@@ -631,9 +711,9 @@ class TestAtfRunSuite:
             )
         )
 
-        tools = _register_and_get_tools(settings, auth_provider)
+        tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["atf_run_suite"](suite_id="suite_cancel", poll=True, poll_interval=2, max_poll_duration=10)
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["status"] == "cancelled"
@@ -660,9 +740,9 @@ class TestAtfTestHealth:
             )
         )
 
-        tools = _register_and_get_tools(settings, auth_provider)
+        tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["atf_test_health"](test_id="test_stable", days=30, limit=50)
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["total_runs"] == 10
@@ -692,9 +772,9 @@ class TestAtfTestHealth:
             )
         )
 
-        tools = _register_and_get_tools(settings, auth_provider)
+        tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["atf_test_health"](test_id="test_flaky", days=30, limit=50)
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["flaky"] is True
@@ -723,9 +803,9 @@ class TestAtfTestHealth:
             )
         )
 
-        tools = _register_and_get_tools(settings, auth_provider)
+        tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["atf_test_health"](test_id="test_degrading", days=30, limit=50)
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["recent_trend"] == "degrading"
@@ -743,9 +823,9 @@ class TestAtfTestHealth:
             )
         )
 
-        tools = _register_and_get_tools(settings, auth_provider)
+        tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["atf_test_health"](test_id="test_no_data", days=30, limit=50)
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["total_runs"] == 0
@@ -756,9 +836,9 @@ class TestAtfTestHealth:
     @pytest.mark.asyncio
     async def test_health_missing_both_ids(self, settings, auth_provider):
         """Call with neither test_id nor suite_id. Assert error."""
-        tools = _register_and_get_tools(settings, auth_provider)
+        tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["atf_test_health"]()
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "error"
         assert "exactly one" in result["error"].lower()
@@ -766,12 +846,68 @@ class TestAtfTestHealth:
     @pytest.mark.asyncio
     async def test_health_both_ids_provided(self, settings, auth_provider):
         """Call with both test_id and suite_id. Assert error."""
-        tools = _register_and_get_tools(settings, auth_provider)
+        tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["atf_test_health"](test_id="test123", suite_id="suite456")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "error"
         assert "exactly one" in result["error"].lower() and "not both" in result["error"].lower()
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_health_trending_upward(self, settings, auth_provider):
+        """Mock early failures then later passes. Assert trend improving."""
+        respx.get(f"{BASE_URL}/api/now/table/sys_atf_test_result").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": [
+                        {"sys_id": "r1", "status": "failure", "sys_created_on": "2026-02-01 10:00:00"},
+                        {"sys_id": "r2", "status": "failure", "sys_created_on": "2026-02-02 10:00:00"},
+                        {"sys_id": "r3", "status": "failure", "sys_created_on": "2026-02-03 10:00:00"},
+                        {"sys_id": "r4", "status": "failure", "sys_created_on": "2026-02-04 10:00:00"},
+                        {"sys_id": "r5", "status": "success", "sys_created_on": "2026-02-05 10:00:00"},
+                        {"sys_id": "r6", "status": "success", "sys_created_on": "2026-02-06 10:00:00"},
+                        {"sys_id": "r7", "status": "success", "sys_created_on": "2026-02-07 10:00:00"},
+                        {"sys_id": "r8", "status": "success", "sys_created_on": "2026-02-08 10:00:00"},
+                    ]
+                },
+                headers={"X-Total-Count": "8"},
+            )
+        )
+
+        tools, _query_store = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["atf_test_health"](test_id="test_improving", days=30, limit=50)
+        result = toon_decode(raw)
+
+        assert result["status"] == "success"
+        assert result["data"]["recent_trend"] == "improving"
+        assert result["data"]["pass_rate"] == 0.5
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_health_insufficient_data_trend(self, settings, auth_provider):
+        """Mock fewer than 4 runs. Assert trend is insufficient_data."""
+        respx.get(f"{BASE_URL}/api/now/table/sys_atf_test_result").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": [
+                        {"sys_id": "r1", "status": "success", "sys_created_on": "2026-02-01 10:00:00"},
+                        {"sys_id": "r2", "status": "failure", "sys_created_on": "2026-02-02 10:00:00"},
+                    ]
+                },
+                headers={"X-Total-Count": "2"},
+            )
+        )
+
+        tools, _query_store = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["atf_test_health"](test_id="test_few_runs", days=30, limit=50)
+        result = toon_decode(raw)
+
+        assert result["status"] == "success"
+        assert result["data"]["total_runs"] == 2
+        assert result["data"]["recent_trend"] == "insufficient_data"
 
     @pytest.mark.asyncio
     @respx.mock
@@ -794,9 +930,9 @@ class TestAtfTestHealth:
             )
         )
 
-        tools = _register_and_get_tools(settings, auth_provider)
+        tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["atf_test_health"](suite_id="suite_healthy", days=30, limit=50)
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["total_runs"] == 5

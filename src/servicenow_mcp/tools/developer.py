@@ -14,27 +14,12 @@ from servicenow_mcp.policy import (
     check_table_access,
     is_sensitive_field,
     mask_sensitive_fields,
-    write_blocked_reason,
+    write_gate,
 )
 from servicenow_mcp.state import PreviewTokenStore
 from servicenow_mcp.utils import format_response, generate_correlation_id, safe_tool_call, validate_identifier
 
 logger = logging.getLogger(__name__)
-
-
-def _write_gate(table: str, settings: Settings, correlation_id: str) -> str | None:
-    """Check write access and return a JSON error envelope if blocked, or None if allowed."""
-    reason = write_blocked_reason(table, settings)
-    if reason:
-        return json.dumps(
-            format_response(
-                data=None,
-                correlation_id=correlation_id,
-                status="error",
-                error=reason,
-            )
-        )
-    return None
 
 
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
@@ -78,7 +63,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             validate_identifier(table)
             check_table_access(table)
 
-            blocked = _write_gate(table, settings, correlation_id)
+            blocked = write_gate(table, settings, correlation_id)
             if blocked:
                 return blocked
 
@@ -87,25 +72,21 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             async with ServiceNowClient(settings, auth_provider) as client:
                 missing = await _check_mandatory_fields(client, table, record_data)
                 if missing:
-                    return json.dumps(
-                        format_response(
-                            data={"table": table, "missing_fields": missing},
-                            correlation_id=correlation_id,
-                            status="error",
-                            error=f"Missing mandatory fields for table '{table}': {', '.join(missing)}",
-                        )
+                    return format_response(
+                        data={"table": table, "missing_fields": missing},
+                        correlation_id=correlation_id,
+                        status="error",
+                        error=f"Missing mandatory fields for table '{table}': {', '.join(missing)}",
                     )
                 created = await client.create_record(table, record_data)
 
-            return json.dumps(
-                format_response(
-                    data={
-                        "table": table,
-                        "sys_id": created["sys_id"],
-                        "record": mask_sensitive_fields(created),
-                    },
-                    correlation_id=correlation_id,
-                )
+            return format_response(
+                data={
+                    "table": table,
+                    "sys_id": created["sys_id"],
+                    "record": mask_sensitive_fields(created),
+                },
+                correlation_id=correlation_id,
             )
 
         return await safe_tool_call(_run, correlation_id)
@@ -124,7 +105,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             validate_identifier(table)
             check_table_access(table)
 
-            blocked = _write_gate(table, settings, correlation_id)
+            blocked = write_gate(table, settings, correlation_id)
             if blocked:
                 return blocked
 
@@ -133,13 +114,11 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             async with ServiceNowClient(settings, auth_provider) as client:
                 missing = await _check_mandatory_fields(client, table, record_data)
                 if missing:
-                    return json.dumps(
-                        format_response(
-                            data={"table": table, "missing_fields": missing},
-                            correlation_id=correlation_id,
-                            status="error",
-                            error=f"Missing mandatory fields for table '{table}': {', '.join(missing)}",
-                        )
+                    return format_response(
+                        data={"table": table, "missing_fields": missing},
+                        correlation_id=correlation_id,
+                        status="error",
+                        error=f"Missing mandatory fields for table '{table}': {', '.join(missing)}",
                     )
 
             # Store for later apply - no further HTTP call needed
@@ -151,16 +130,14 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 }
             )
 
-            return json.dumps(
-                format_response(
-                    data={
-                        "token": token,
-                        "table": table,
-                        "action": "create",
-                        "data": mask_sensitive_fields(record_data),
-                    },
-                    correlation_id=correlation_id,
-                )
+            return format_response(
+                data={
+                    "token": token,
+                    "table": table,
+                    "action": "create",
+                    "data": mask_sensitive_fields(record_data),
+                },
+                correlation_id=correlation_id,
             )
 
         return await safe_tool_call(_run, correlation_id)
@@ -181,7 +158,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             validate_identifier(sys_id)
             check_table_access(table)
 
-            blocked = _write_gate(table, settings, correlation_id)
+            blocked = write_gate(table, settings, correlation_id)
             if blocked:
                 return blocked
 
@@ -190,15 +167,13 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             async with ServiceNowClient(settings, auth_provider) as client:
                 updated = await client.update_record(table, sys_id, changes_dict)
 
-            return json.dumps(
-                format_response(
-                    data={
-                        "table": table,
-                        "sys_id": sys_id,
-                        "record": mask_sensitive_fields(updated),
-                    },
-                    correlation_id=correlation_id,
-                )
+            return format_response(
+                data={
+                    "table": table,
+                    "sys_id": sys_id,
+                    "record": mask_sensitive_fields(updated),
+                },
+                correlation_id=correlation_id,
             )
 
         return await safe_tool_call(_run, correlation_id)
@@ -219,7 +194,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             validate_identifier(sys_id)
             check_table_access(table)
 
-            blocked = _write_gate(table, settings, correlation_id)
+            blocked = write_gate(table, settings, correlation_id)
             if blocked:
                 return blocked
 
@@ -247,16 +222,14 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 }
             )
 
-            return json.dumps(
-                format_response(
-                    data={
-                        "token": token,
-                        "table": table,
-                        "sys_id": sys_id,
-                        "diff": diff,
-                    },
-                    correlation_id=correlation_id,
-                )
+            return format_response(
+                data={
+                    "token": token,
+                    "table": table,
+                    "sys_id": sys_id,
+                    "diff": diff,
+                },
+                correlation_id=correlation_id,
             )
 
         return await safe_tool_call(_run, correlation_id)
@@ -276,22 +249,20 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             validate_identifier(sys_id)
             check_table_access(table)
 
-            blocked = _write_gate(table, settings, correlation_id)
+            blocked = write_gate(table, settings, correlation_id)
             if blocked:
                 return blocked
 
             async with ServiceNowClient(settings, auth_provider) as client:
                 await client.delete_record(table, sys_id)
 
-            return json.dumps(
-                format_response(
-                    data={
-                        "table": table,
-                        "sys_id": sys_id,
-                        "deleted": True,
-                    },
-                    correlation_id=correlation_id,
-                )
+            return format_response(
+                data={
+                    "table": table,
+                    "sys_id": sys_id,
+                    "deleted": True,
+                },
+                correlation_id=correlation_id,
             )
 
         return await safe_tool_call(_run, correlation_id)
@@ -311,7 +282,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             validate_identifier(sys_id)
             check_table_access(table)
 
-            blocked = _write_gate(table, settings, correlation_id)
+            blocked = write_gate(table, settings, correlation_id)
             if blocked:
                 return blocked
 
@@ -328,16 +299,14 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 }
             )
 
-            return json.dumps(
-                format_response(
-                    data={
-                        "token": token,
-                        "table": table,
-                        "sys_id": sys_id,
-                        "record_snapshot": mask_sensitive_fields(record),
-                    },
-                    correlation_id=correlation_id,
-                )
+            return format_response(
+                data={
+                    "token": token,
+                    "table": table,
+                    "sys_id": sys_id,
+                    "record_snapshot": mask_sensitive_fields(record),
+                },
+                correlation_id=correlation_id,
             )
 
         return await safe_tool_call(_run, correlation_id)
@@ -355,13 +324,11 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             # Consume the token (single-use)
             payload = preview_store.consume(preview_token)
             if payload is None:
-                return json.dumps(
-                    format_response(
-                        data=None,
-                        correlation_id=correlation_id,
-                        status="error",
-                        error="Invalid or expired preview token",
-                    )
+                return format_response(
+                    data=None,
+                    correlation_id=correlation_id,
+                    status="error",
+                    error="Invalid or expired preview token",
                 )
 
             action = payload["action"]
@@ -369,7 +336,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
 
             # Defense in depth - re-check access and write gate
             check_table_access(table)
-            blocked = _write_gate(table, settings, correlation_id)
+            blocked = write_gate(table, settings, correlation_id)
             if blocked:
                 return blocked
 
@@ -377,65 +344,55 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 if action == "create":
                     missing = await _check_mandatory_fields(client, payload["table"], payload["data"])
                     if missing:
-                        return json.dumps(
-                            format_response(
-                                data={"table": payload["table"], "missing_fields": missing},
-                                correlation_id=correlation_id,
-                                status="error",
-                                error=f"Missing mandatory fields for table '{payload['table']}': {', '.join(missing)}",
-                            )
+                        return format_response(
+                            data={"table": payload["table"], "missing_fields": missing},
+                            correlation_id=correlation_id,
+                            status="error",
+                            error=f"Missing mandatory fields for table '{payload['table']}': {', '.join(missing)}",
                         )
                     result = await client.create_record(table, payload["data"])
-                    return json.dumps(
-                        format_response(
-                            data={
-                                "action": "create",
-                                "table": table,
-                                "sys_id": result["sys_id"],
-                                "record": mask_sensitive_fields(result),
-                            },
-                            correlation_id=correlation_id,
-                        )
+                    return format_response(
+                        data={
+                            "action": "create",
+                            "table": table,
+                            "sys_id": result["sys_id"],
+                            "record": mask_sensitive_fields(result),
+                        },
+                        correlation_id=correlation_id,
                     )
 
                 elif action == "update":
                     sys_id = payload["sys_id"]
                     result = await client.update_record(table, sys_id, payload["changes"])
-                    return json.dumps(
-                        format_response(
-                            data={
-                                "action": "update",
-                                "table": table,
-                                "sys_id": sys_id,
-                                "record": mask_sensitive_fields(result),
-                            },
-                            correlation_id=correlation_id,
-                        )
+                    return format_response(
+                        data={
+                            "action": "update",
+                            "table": table,
+                            "sys_id": sys_id,
+                            "record": mask_sensitive_fields(result),
+                        },
+                        correlation_id=correlation_id,
                     )
 
                 elif action == "delete":
                     sys_id = payload["sys_id"]
                     await client.delete_record(table, sys_id)
-                    return json.dumps(
-                        format_response(
-                            data={
-                                "action": "delete",
-                                "table": table,
-                                "sys_id": sys_id,
-                                "deleted": True,
-                            },
-                            correlation_id=correlation_id,
-                        )
+                    return format_response(
+                        data={
+                            "action": "delete",
+                            "table": table,
+                            "sys_id": sys_id,
+                            "deleted": True,
+                        },
+                        correlation_id=correlation_id,
                     )
 
                 else:
-                    return json.dumps(
-                        format_response(
-                            data=None,
-                            correlation_id=correlation_id,
-                            status="error",
-                            error=f"Unknown preview action: '{action}'",
-                        )
+                    return format_response(
+                        data=None,
+                        correlation_id=correlation_id,
+                        status="error",
+                        error=f"Unknown preview action: '{action}'",
                     )
 
         return await safe_tool_call(_run, correlation_id)

@@ -1,13 +1,13 @@
 """Tests for relationship tools (rel_references_to, rel_references_from)."""
 
 import asyncio
-import json
 from typing import Any
 from unittest.mock import patch
 
 import httpx
 import pytest
 import respx
+from toon_format import decode as toon_decode
 
 from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.policy import DENIED_TABLES
@@ -70,7 +70,7 @@ class TestRelReferencesTo:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["rel_references_to"](table="incident", sys_id="abc123")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["target"]["table"] == "incident"
@@ -92,7 +92,7 @@ class TestRelReferencesTo:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["rel_references_to"](table="incident", sys_id="abc123")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["incoming_references"] == []
@@ -103,7 +103,7 @@ class TestRelReferencesTo:
         denied = next(iter(DENIED_TABLES))
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["rel_references_to"](table=denied, sys_id="abc")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "error"
         assert "denied" in result["error"].lower()
@@ -161,7 +161,7 @@ class TestRelReferencesTo:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["rel_references_to"](table="sys_user", sys_id="user123")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         refs = result["data"]["incoming_references"]
@@ -224,7 +224,7 @@ class TestRelReferencesTo:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["rel_references_to"](table="sys_user", sys_id="user1")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         refs = result["data"]["incoming_references"]
@@ -287,7 +287,7 @@ class TestRelReferencesFrom:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["rel_references_from"](table="incident", sys_id="abc123")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["source"]["table"] == "incident"
@@ -373,7 +373,7 @@ class TestRelReferencesFrom:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["rel_references_from"](table="incident", sys_id="inc001")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         outgoing = result["data"]["outgoing_references"]
@@ -427,7 +427,7 @@ class TestRelReferencesFrom:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["rel_references_from"](table="task", sys_id="t1")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         outgoing = result["data"]["outgoing_references"]
@@ -464,7 +464,7 @@ class TestRelReferencesFrom:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["rel_references_from"](table="cmdb_ci", sys_id="ci1")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["outgoing_references"] == []
@@ -475,7 +475,7 @@ class TestRelReferencesFrom:
         denied = next(iter(DENIED_TABLES))
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["rel_references_from"](table=denied, sys_id="abc")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "error"
         assert "denied" in result["error"].lower()
@@ -525,7 +525,7 @@ class TestRelReferencesToBoundedConcurrency:
         with patch("servicenow_mcp.tools.relationships.asyncio.Semaphore", TrackingSemaphore):
             tools = _register_and_get_tools(settings, auth_provider)
             raw = await tools["rel_references_to"](table="incident", sys_id="abc123")
-            result = json.loads(raw)
+            result = toon_decode(raw)
 
         assert result["status"] == "success"
         # Verify the semaphore was actually created and used

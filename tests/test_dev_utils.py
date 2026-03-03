@@ -1,10 +1,9 @@
 """Tests for developer utility tools (dev_toggle, dev_set_property)."""
 
-import json
-
 import httpx
 import pytest
 import respx
+from toon_format import decode as toon_decode
 
 from servicenow_mcp.auth import BasicAuthProvider
 
@@ -65,7 +64,7 @@ class TestDevToggle:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["dev_toggle"](artifact_type="business_rule", sys_id="br001", active=False)
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["old_active"] == "true"
@@ -85,7 +84,7 @@ class TestDevToggle:
         tools = {t.name: t.fn for t in mcp._tool_manager._tools.values()}
 
         raw = await tools["dev_toggle"](artifact_type="business_rule", sys_id="br001", active=False)
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "error"
 
@@ -95,7 +94,7 @@ class TestDevToggle:
         """Returns error for unknown artifact type."""
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["dev_toggle"](artifact_type="unknown_type", sys_id="br001", active=False)
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "error"
 
@@ -115,7 +114,7 @@ class TestDevToggle:
         ):
             raw = await tools["dev_toggle"](artifact_type="business_rule", sys_id="br001", active=False)
 
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "error"
         assert "acl" in result["error"].lower() or "forbidden" in result["error"].lower()
 
@@ -160,7 +159,7 @@ class TestDevSetProperty:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["dev_set_property"](name="glide.ui.session_timeout", value="60")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["old_value"] == "30"
@@ -180,7 +179,7 @@ class TestDevSetProperty:
         tools = {t.name: t.fn for t in mcp._tool_manager._tools.values()}
 
         raw = await tools["dev_set_property"](name="glide.ui.session_timeout", value="60")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "error"
 
@@ -198,7 +197,7 @@ class TestDevSetProperty:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["dev_set_property"](name="nonexistent.property", value="x")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "error"
 
@@ -243,7 +242,7 @@ class TestDevUtilsSensitiveFieldMasking:
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["dev_set_property"](name="my.api_key_token", value="new_secret_key")
-        result = json.loads(raw)
+        result = toon_decode(raw)
 
         assert result["status"] == "success"
         assert result["data"]["old_value"] == "***MASKED***"
@@ -270,7 +269,7 @@ class TestDevToggleGenericException:
             side_effect=RuntimeError("connection failed"),
         ):
             raw = await tools["dev_toggle"](artifact_type="business_rule", sys_id="br001", active=False)
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "error"
         assert "connection failed" in result["error"]
 
@@ -291,6 +290,6 @@ class TestDevSetPropertyGenericException:
             side_effect=RuntimeError("network failure"),
         ):
             raw = await tools["dev_set_property"](name="glide.ui.session_timeout", value="60")
-        result = json.loads(raw)
+        result = toon_decode(raw)
         assert result["status"] == "error"
         assert "network failure" in result["error"]

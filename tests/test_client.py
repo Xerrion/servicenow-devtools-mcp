@@ -1103,7 +1103,7 @@ class TestUrlBuilderValidation:
 
         client = ServiceNowClient(settings, auth_provider)
         with pytest.raises(ValueError, match="Invalid identifier"):
-            client._field_descriptions_url("bad.table")
+            client._field_descriptions_url("bad-table")
 
     def test_table_url_accepts_valid_name(self, settings, auth_provider):
         """_table_url accepts valid snake_case table names."""
