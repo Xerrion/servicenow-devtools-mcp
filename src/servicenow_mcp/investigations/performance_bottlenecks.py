@@ -4,6 +4,7 @@ from collections import Counter
 from typing import Any
 
 from servicenow_mcp.client import ServiceNowClient
+from servicenow_mcp.investigation_helpers import build_investigation_result, parse_element_id, parse_int_param
 from servicenow_mcp.policy import INTERNAL_QUERY_LIMIT, check_table_access, mask_sensitive_fields
 from servicenow_mcp.utils import ServiceNowQuery, validate_identifier
 
@@ -22,10 +23,7 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
         hours: Optional lookback period in hours (default None, queries all).
         limit: Maximum findings per category (default 20).
     """
-    try:
-        limit = int(params.get("limit", 20))
-    except (TypeError, ValueError):
-        limit = 20
+    limit = parse_int_param(params, "limit", 20)
     raw_hours = params.get("hours")
     hours: int | None = None
     if raw_hours is not None:
@@ -110,12 +108,11 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
             }
         )
 
-    return {
-        "investigation": "performance_bottlenecks",
-        "finding_count": len(findings),
-        "findings": findings,
-        "params": {"hours": hours, "limit": limit},
-    }
+    return build_investigation_result(
+        "performance_bottlenecks",
+        findings,
+        params={"hours": hours, "limit": limit},
+    )
 
 
 async def explain(client: ServiceNowClient, element_id: str) -> dict[str, Any]:
@@ -124,8 +121,13 @@ async def explain(client: ServiceNowClient, element_id: str) -> dict[str, Any]:
     element_id can be "table:sys_id" or just a table name (for heavy_automation).
     """
     if ":" in element_id:
-        table, sys_id = element_id.split(":", 1)
-        validate_identifier(table)
+        try:
+            table, sys_id = parse_element_id(element_id)
+            validate_identifier(table)
+            validate_identifier(sys_id)
+        except ValueError as e:
+            return {"error": str(e)}
+
         check_table_access(table)
         record = mask_sensitive_fields(await client.get_record(table, sys_id))
         explanation_parts = [
@@ -140,7 +142,11 @@ async def explain(client: ServiceNowClient, element_id: str) -> dict[str, Any]:
         }
     else:
         # element_id is a table name (heavy_automation category)
-        validate_identifier(element_id)
+        try:
+            validate_identifier(element_id)
+        except ValueError as e:
+            return {"error": str(e)}
+
         check_table_access(element_id)
         stats_result = await client.aggregate(element_id, query="")
         record_count = int(stats_result.get("stats", {}).get("count", 0))

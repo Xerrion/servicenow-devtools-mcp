@@ -3,8 +3,13 @@
 from typing import Any
 
 from servicenow_mcp.client import ServiceNowClient
+from servicenow_mcp.investigation_helpers import (
+    build_investigation_result,
+    fetch_and_explain,
+    parse_int_param,
+)
 from servicenow_mcp.policy import check_table_access, mask_sensitive_fields
-from servicenow_mcp.utils import ServiceNowQuery, validate_identifier
+from servicenow_mcp.utils import ServiceNowQuery
 
 # ServiceNow performance pattern tables and their finding categories
 PERFORMANCE_TABLES = [
@@ -31,14 +36,8 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
         limit: Maximum findings per table (default 20).
         categories: Optional comma-separated list of categories to filter.
     """
-    try:
-        hours = max(1, int(params.get("hours", 24)))
-    except (TypeError, ValueError):
-        hours = 24
-    try:
-        limit = int(params.get("limit", 20))
-    except (TypeError, ValueError):
-        limit = 20
+    hours = max(1, parse_int_param(params, "hours", 24))
+    limit = parse_int_param(params, "limit", 20)
     categories_filter = params.get("categories")
     allowed_categories: set[str] | None = None
     if categories_filter:
@@ -86,32 +85,16 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
             # Table may not exist or be inaccessible; skip
             continue
 
-    return {
-        "investigation": "slow_transactions",
-        "finding_count": len(findings),
-        "findings": findings,
-        "params": {"hours": hours, "limit": limit, "categories": categories_filter},
-        "tables_queried": [t[0] for t in PERFORMANCE_TABLES],
-    }
+    return build_investigation_result(
+        "slow_transactions",
+        findings,
+        params={"hours": hours, "limit": limit, "categories": categories_filter},
+        tables_queried=[t[0] for t in PERFORMANCE_TABLES],
+    )
 
 
-async def explain(client: ServiceNowClient, element_id: str) -> dict[str, Any]:
-    """Provide rich context for a slow transaction finding.
-
-    element_id format: "table:sys_id".
-    """
-    if ":" not in element_id:
-        return {"error": f"Invalid element_id format: expected 'table:sys_id', got '{element_id}'"}
-    table, sys_id = element_id.split(":", 1)
-    if table not in _ALLOWED_TABLES:
-        return {
-            "element": element_id,
-            "error": f"Table '{table}' is not in the allowed tables for this investigation",
-        }
-    validate_identifier(sys_id)
-    check_table_access(table)
-    record = mask_sensitive_fields(await client.get_record(table, sys_id))
-
+def _build_explanation(table: str, sys_id: str, record: dict[str, Any]) -> list[str]:
+    """Build explanation parts for a slow transaction finding."""
     explanation_parts = [
         f"Performance pattern from '{table}'.",
         f"Name: {record.get('name', 'N/A')}.",
@@ -125,8 +108,15 @@ async def explain(client: ServiceNowClient, element_id: str) -> dict[str, Any]:
         "script optimization, or architecture changes are needed."
     )
 
-    return {
-        "element": element_id,
-        "explanation": " ".join(explanation_parts),
-        "record": record,
-    }
+    return explanation_parts
+
+
+async def explain(client: ServiceNowClient, element_id: str) -> dict[str, Any]:
+    """Provide rich context for a slow transaction finding.
+
+    element_id format: "table:sys_id".
+    """
+    try:
+        return await fetch_and_explain(client, element_id, _ALLOWED_TABLES, _build_explanation)
+    except ValueError as e:
+        return {"error": str(e)}

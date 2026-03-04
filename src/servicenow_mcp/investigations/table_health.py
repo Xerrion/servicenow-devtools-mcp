@@ -4,6 +4,7 @@ import asyncio
 from typing import Any
 
 from servicenow_mcp.client import ServiceNowClient
+from servicenow_mcp.investigation_helpers import build_investigation_result
 from servicenow_mcp.policy import INTERNAL_QUERY_LIMIT, check_table_access, mask_sensitive_fields
 from servicenow_mcp.utils import ServiceNowQuery, validate_identifier
 
@@ -20,12 +21,7 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
     """
     table = params.get("table")
     if not table:
-        return {
-            "investigation": "table_health",
-            "error": "Missing required parameter: table",
-            "finding_count": 0,
-            "findings": [],
-        }
+        return build_investigation_result("table_health", [], error="Missing required parameter: table")
 
     validate_identifier(table)
     check_table_access(table)
@@ -104,12 +100,13 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
     if len(recent_errors) > 0:
         health_indicators.append(f"{len(recent_errors)} recent errors in syslog")
 
-    return {
-        "investigation": "table_health",
-        "table": table,
-        "hours": hours,
-        "record_count": record_count,
-        "automation": {
+    return build_investigation_result(
+        "table_health",
+        [{"category": "health_indicator", "detail": ind} for ind in health_indicators],
+        table=table,
+        hours=hours,
+        record_count=record_count,
+        automation={
             "business_rules": {
                 "count": len(br_records),
                 "records": br_records,
@@ -124,11 +121,9 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
                 "records": uip_records,
             },
         },
-        "recent_errors": recent_errors,
-        "health_indicators": health_indicators,
-        "finding_count": len(health_indicators),
-        "findings": [{"category": "health_indicator", "detail": ind} for ind in health_indicators],
-    }
+        recent_errors=recent_errors,
+        health_indicators=health_indicators,
+    )
 
 
 async def explain(client: ServiceNowClient, element_id: str) -> dict[str, Any]:
@@ -136,9 +131,13 @@ async def explain(client: ServiceNowClient, element_id: str) -> dict[str, Any]:
 
     element_id is the table name itself.
     """
+    try:
+        validate_identifier(element_id)
+        check_table_access(element_id)
+    except ValueError as e:
+        return {"error": str(e)}
+
     # Re-run a lighter query to get basic table info
-    validate_identifier(element_id)
-    check_table_access(element_id)
     stats_result = await client.aggregate(element_id, query="")
     record_count = int(stats_result.get("stats", {}).get("count", 0))
 
