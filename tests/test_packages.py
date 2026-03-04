@@ -219,7 +219,8 @@ class TestPackageRegistry:
         assert "investigations" in groups
         assert "documentation" in groups
         assert "utility" in groups
-        assert len(groups) == 17
+        assert "testing" not in groups
+        assert len(groups) == 16
 
 
 class TestCommaSeparatedGroups:
@@ -452,11 +453,11 @@ class TestDomainPackages:
         assert groups == ["domain_incident", "domain_change", "utility"]
 
     def test_backward_compatibility_full_package_count(self):
-        """full package has 17 total groups (11 original + 6 domain)."""
+        """full package has 16 total groups (10 original + 6 domain)."""
         from servicenow_mcp.packages import get_package
 
         groups = get_package("full")
-        assert len(groups) == 17
+        assert len(groups) == 16
 
     def test_backward_compatibility_itil_package_count(self):
         """itil package has 11 total groups (7 original + 4 domain)."""
