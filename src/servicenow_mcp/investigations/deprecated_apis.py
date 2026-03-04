@@ -3,8 +3,11 @@
 from typing import Any
 
 from servicenow_mcp.client import ServiceNowClient
-from servicenow_mcp.policy import check_table_access, mask_sensitive_fields
-from servicenow_mcp.utils import validate_identifier
+from servicenow_mcp.investigation_helpers import (
+    build_investigation_result,
+    fetch_and_explain,
+    parse_int_param,
+)
 
 # Deprecated patterns to scan for
 DEPRECATED_PATTERNS = [
@@ -33,10 +36,7 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
     Params:
         limit: Maximum findings per pattern (default 20).
     """
-    try:
-        limit = int(params.get("limit", 20))
-    except (TypeError, ValueError):
-        limit = 20
+    limit = parse_int_param(params, "limit", 20)
     findings: list[dict[str, Any]] = []
 
     for pattern in DEPRECATED_PATTERNS:
@@ -57,13 +57,21 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
             # Code Search API may not be available; skip pattern
             continue
 
-    return {
-        "investigation": "deprecated_apis",
-        "finding_count": len(findings),
-        "findings": findings,
-        "params": {"limit": limit},
-        "patterns_searched": DEPRECATED_PATTERNS,
-    }
+    return build_investigation_result(
+        "deprecated_apis",
+        findings,
+        params={"limit": limit},
+        patterns_searched=DEPRECATED_PATTERNS,
+    )
+
+
+def _build_explanation(table: str, sys_id: str, record: dict[str, Any]) -> list[str]:
+    """Build explanation parts for a deprecated API finding."""
+    return [
+        f"Script '{record.get('name', '')}' in table '{table}' uses deprecated API patterns.",
+        "Deprecated APIs may be removed in future ServiceNow versions and can cause upgrade issues.",
+        "Review the script and replace deprecated calls with supported alternatives.",
+    ]
 
 
 async def explain(client: ServiceNowClient, element_id: str) -> dict[str, Any]:
@@ -71,27 +79,7 @@ async def explain(client: ServiceNowClient, element_id: str) -> dict[str, Any]:
 
     element_id format: "table:sys_id".
     """
-    if ":" not in element_id:
-        return {"error": f"Invalid element_id format: expected 'table:sys_id', got '{element_id}'"}
-    table, sys_id = element_id.split(":", 1)
-    validate_identifier(table)
-    if table not in _ALLOWED_TABLES:
-        return {
-            "element": element_id,
-            "error": f"Table '{table}' is not in the allowed tables for this investigation",
-        }
-    validate_identifier(sys_id)
-    check_table_access(table)
-    record = mask_sensitive_fields(await client.get_record(table, sys_id))
-
-    explanation_parts = [
-        f"Script '{record.get('name', '')}' in table '{table}' uses deprecated API patterns.",
-        "Deprecated APIs may be removed in future ServiceNow versions and can cause upgrade issues.",
-        "Review the script and replace deprecated calls with supported alternatives.",
-    ]
-
-    return {
-        "element": element_id,
-        "explanation": " ".join(explanation_parts),
-        "record": record,
-    }
+    try:
+        return await fetch_and_explain(client, element_id, _ALLOWED_TABLES, _build_explanation)
+    except ValueError as e:
+        return {"error": str(e)}

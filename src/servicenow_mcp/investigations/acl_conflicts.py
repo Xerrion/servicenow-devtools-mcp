@@ -4,6 +4,7 @@ from collections import defaultdict
 from typing import Any
 
 from servicenow_mcp.client import ServiceNowClient
+from servicenow_mcp.investigation_helpers import build_investigation_result
 from servicenow_mcp.policy import INTERNAL_QUERY_LIMIT, check_table_access, mask_sensitive_fields
 from servicenow_mcp.utils import ServiceNowQuery, validate_identifier
 
@@ -19,12 +20,7 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
     """
     table = params.get("table")
     if not table:
-        return {
-            "investigation": "acl_conflicts",
-            "error": "Missing required parameter: table",
-            "finding_count": 0,
-            "findings": [],
-        }
+        return build_investigation_result("acl_conflicts", [], error="Missing required parameter: table")
 
     check_table_access(table)
 
@@ -68,13 +64,12 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
                 }
             )
 
-    return {
-        "investigation": "acl_conflicts",
-        "table": table,
-        "finding_count": len(findings),
-        "findings": findings,
-        "total_acls_checked": len(acls),
-    }
+    return build_investigation_result(
+        "acl_conflicts",
+        findings,
+        table=table,
+        total_acls_checked=len(acls),
+    )
 
 
 async def explain(client: ServiceNowClient, element_id: str) -> dict[str, Any]:
@@ -82,7 +77,11 @@ async def explain(client: ServiceNowClient, element_id: str) -> dict[str, Any]:
 
     element_id is an ACL sys_id.
     """
-    validate_identifier(element_id)
+    try:
+        validate_identifier(element_id)
+    except ValueError as e:
+        return {"error": str(e)}
+
     check_table_access("sys_security_acl")
     record = mask_sensitive_fields(await client.get_record("sys_security_acl", element_id))
 

@@ -134,13 +134,13 @@ class TestPreviewTokenStore:
             store.create({"table": "problem"})
             store.create({"table": "change_request"})
 
-        assert len(store._store) == 3
+        assert len(store) == 3
 
         # Advance time past TTL and sweep
         with patch("servicenow_mcp.state.time.monotonic", return_value=fake_time + 61):
             store._sweep_expired()
 
-        assert len(store._store) == 0
+        assert len(store) == 0
 
 
 class TestQueryTokenStore:
@@ -259,10 +259,10 @@ class TestQueryTokenStore:
             store.create({"query": "state=1"})
             store.create({"query": "priority=1"})
 
-        assert len(store._store) == 3
+        assert len(store) == 3
 
         # Advance time past TTL and sweep
         with patch("servicenow_mcp.state.time.monotonic", return_value=fake_time + 61):
             store._sweep_expired()
 
-        assert len(store._store) == 0
+        assert len(store) == 0

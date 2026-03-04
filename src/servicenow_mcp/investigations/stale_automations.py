@@ -3,8 +3,13 @@
 from typing import Any
 
 from servicenow_mcp.client import ServiceNowClient
+from servicenow_mcp.investigation_helpers import (
+    build_investigation_result,
+    fetch_and_explain,
+    parse_int_param,
+)
 from servicenow_mcp.policy import check_table_access, mask_sensitive_fields
-from servicenow_mcp.utils import ServiceNowQuery, validate_identifier
+from servicenow_mcp.utils import ServiceNowQuery
 
 _ALLOWED_TABLES = {"flow_context", "sys_script", "sys_script_include", "sysauto_script"}
 
@@ -22,14 +27,8 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
         stale_days: Number of days to consider stale (default 30).
         limit: Maximum findings per category (default 20).
     """
-    try:
-        stale_days = max(1, int(params.get("stale_days", 30)))
-    except (TypeError, ValueError):
-        stale_days = 30
-    try:
-        limit = int(params.get("limit", 20))
-    except (TypeError, ValueError):
-        limit = 20
+    stale_days = max(1, parse_int_param(params, "stale_days", 30))
+    limit = parse_int_param(params, "limit", 20)
 
     findings: list[dict[str, Any]] = []
 
@@ -113,31 +112,15 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
             }
         )
 
-    return {
-        "investigation": "stale_automations",
-        "finding_count": len(findings),
-        "findings": findings,
-        "params": {"stale_days": stale_days, "limit": limit},
-    }
+    return build_investigation_result(
+        "stale_automations",
+        findings,
+        params={"stale_days": stale_days, "limit": limit},
+    )
 
 
-async def explain(client: ServiceNowClient, element_id: str) -> dict[str, Any]:
-    """Provide rich context for a stale automation finding.
-
-    element_id format: "table:sys_id" (e.g. "flow_context:fc001").
-    """
-    if ":" not in element_id:
-        return {"error": f"Invalid element_id format: expected 'table:sys_id', got '{element_id}'"}
-    table, sys_id = element_id.split(":", 1)
-    if table not in _ALLOWED_TABLES:
-        return {
-            "element": element_id,
-            "error": f"Table '{table}' is not in the allowed tables for this investigation",
-        }
-    validate_identifier(sys_id)
-    check_table_access(table)
-    record = mask_sensitive_fields(await client.get_record(table, sys_id))
-
+def _build_explanation(table: str, sys_id: str, record: dict[str, Any]) -> list[str]:
+    """Build explanation parts for a stale automation record."""
     explanation_parts = [f"Record from '{table}' with sys_id '{sys_id}'."]
 
     if table == "flow_context":
@@ -162,8 +145,15 @@ async def explain(client: ServiceNowClient, element_id: str) -> dict[str, Any]:
             f"Scheduled job '{record.get('name', '')}' last run was {last_run}. Verify it is still needed."
         )
 
-    return {
-        "element": element_id,
-        "explanation": " ".join(explanation_parts),
-        "record": record,
-    }
+    return explanation_parts
+
+
+async def explain(client: ServiceNowClient, element_id: str) -> dict[str, Any]:
+    """Provide rich context for a stale automation finding.
+
+    element_id format: "table:sys_id" (e.g. "flow_context:fc001").
+    """
+    try:
+        return await fetch_and_explain(client, element_id, _ALLOWED_TABLES, _build_explanation)
+    except ValueError as e:
+        return {"error": str(e)}

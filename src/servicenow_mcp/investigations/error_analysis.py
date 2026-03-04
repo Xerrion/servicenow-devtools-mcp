@@ -4,8 +4,13 @@ from collections import defaultdict
 from typing import Any
 
 from servicenow_mcp.client import ServiceNowClient
+from servicenow_mcp.investigation_helpers import (
+    build_investigation_result,
+    fetch_and_explain,
+    parse_int_param,
+)
 from servicenow_mcp.policy import check_table_access, mask_sensitive_fields
-from servicenow_mcp.utils import ServiceNowQuery, validate_identifier
+from servicenow_mcp.utils import ServiceNowQuery
 
 
 async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any]:
@@ -19,15 +24,9 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
         source: Optional source filter.
         limit: Maximum log entries to fetch (default 100).
     """
-    try:
-        hours = max(1, int(params.get("hours", 24)))
-    except (TypeError, ValueError):
-        hours = 24
+    hours = max(1, parse_int_param(params, "hours", 24))
     source_filter = params.get("source")
-    try:
-        limit = int(params.get("limit", 100))
-    except (TypeError, ValueError):
-        limit = 100
+    limit = parse_int_param(params, "limit", 100)
 
     check_table_access("syslog")
 
@@ -66,13 +65,23 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
             }
         )
 
-    return {
-        "investigation": "error_analysis",
-        "finding_count": len(findings),
-        "findings": findings,
-        "params": {"hours": hours, "source": source_filter, "limit": limit},
-        "total_errors": len(logs),
-    }
+    return build_investigation_result(
+        "error_analysis",
+        findings,
+        params={"hours": hours, "source": source_filter, "limit": limit},
+        total_errors=len(logs),
+    )
+
+
+def _build_explanation(table: str, sys_id: str, record: dict[str, Any]) -> list[str]:
+    """Build explanation parts for a syslog error record."""
+    source = record.get("source", "")
+    return [
+        f"Syslog error from source '{source}'.",
+        f"Message: {record.get('message', '')}",
+        f"Logged at: {record.get('sys_created_on', '')}.",
+        "Check the source script or process for the root cause of this error.",
+    ]
 
 
 async def explain(client: ServiceNowClient, element_id: str) -> dict[str, Any]:
@@ -80,29 +89,7 @@ async def explain(client: ServiceNowClient, element_id: str) -> dict[str, Any]:
 
     element_id format: "syslog:sys_id".
     """
-    if ":" not in element_id:
-        return {"error": f"Invalid element_id format: expected 'table:sys_id', got '{element_id}'"}
-    table, sys_id = element_id.split(":", 1)
-    validate_identifier(table)
-    validate_identifier(sys_id)
-    if table != "syslog":
-        return {
-            "element": element_id,
-            "error": f"Table '{table}' is not allowed for this investigation; expected 'syslog'",
-        }
-    check_table_access("syslog")
-    record = mask_sensitive_fields(await client.get_record(table, sys_id))
-
-    source = record.get("source", "")
-    explanation_parts = [
-        f"Syslog error from source '{source}'.",
-        f"Message: {record.get('message', '')}",
-        f"Logged at: {record.get('sys_created_on', '')}.",
-        "Check the source script or process for the root cause of this error.",
-    ]
-
-    return {
-        "element": element_id,
-        "explanation": " ".join(explanation_parts),
-        "record": record,
-    }
+    try:
+        return await fetch_and_explain(client, element_id, {"syslog"}, _build_explanation)
+    except ValueError as e:
+        return {"error": str(e)}
