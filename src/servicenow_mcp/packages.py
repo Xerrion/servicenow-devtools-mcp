@@ -32,7 +32,7 @@ PACKAGE_REGISTRY: dict[str, list[str]] = {
     "full": [
         "introspection",
         "relationships",
-        "testing",
+        # "testing",  # ATF - disabled
         "metadata",
         "changes",
         "debug",
