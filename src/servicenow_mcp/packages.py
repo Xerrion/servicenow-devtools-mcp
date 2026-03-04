@@ -18,6 +18,7 @@ _TOOL_GROUP_MODULES: dict[str, str] = {
     "domain_problem": "servicenow_mcp.tools.domains.problem",
     "domain_request": "servicenow_mcp.tools.domains.request",
     "domain_knowledge": "servicenow_mcp.tools.domains.knowledge",
+    "domain_service_catalog": "servicenow_mcp.tools.domains.service_catalog",
 }
 
 # Registry mapping package names to lists of tool group names.
@@ -47,6 +48,7 @@ PACKAGE_REGISTRY: dict[str, list[str]] = {
         "domain_problem",
         "domain_request",
         "domain_knowledge",
+        "domain_service_catalog",
     ],
     "none": [],
     "itil": [
@@ -125,6 +127,11 @@ PACKAGE_REGISTRY: dict[str, list[str]] = {
         "introspection",
         "utility",
         "domain_knowledge",
+    ],
+    "service_catalog": [
+        "introspection",
+        "utility",
+        "domain_service_catalog",
     ],
 }
 

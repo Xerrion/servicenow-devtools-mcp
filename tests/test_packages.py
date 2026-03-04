@@ -220,7 +220,7 @@ class TestPackageRegistry:
         assert "documentation" in groups
         assert "utility" in groups
         assert "testing" not in groups
-        assert len(groups) == 16
+        assert len(groups) == 17
 
 
 class TestCommaSeparatedGroups:
@@ -401,18 +401,19 @@ class TestDomainPackages:
         assert len(groups) == 3
 
     def test_full_package_includes_all_domain_groups(self):
-        """full package includes exactly 6 domain groups."""
+        """full package includes exactly 7 domain groups."""
         from servicenow_mcp.packages import get_package
 
         groups = get_package("full")
         domain_groups = [g for g in groups if g.startswith("domain_")]
-        assert len(domain_groups) == 6
+        assert len(domain_groups) == 7
         assert "domain_incident" in domain_groups
         assert "domain_change" in domain_groups
         assert "domain_cmdb" in domain_groups
         assert "domain_problem" in domain_groups
         assert "domain_request" in domain_groups
         assert "domain_knowledge" in domain_groups
+        assert "domain_service_catalog" in domain_groups
 
     def test_itil_package_includes_four_domain_groups(self):
         """itil package includes 4 domain groups (incident, change, problem, request)."""
@@ -427,7 +428,7 @@ class TestDomainPackages:
         assert "domain_request" in domain_groups
 
     def test_list_packages_includes_all_domain_packages(self):
-        """list_packages includes all 6 domain-specific packages."""
+        """list_packages includes all 7 domain-specific packages."""
         from servicenow_mcp.packages import list_packages
 
         packages = list_packages()
@@ -437,6 +438,7 @@ class TestDomainPackages:
         assert "problem_management" in packages
         assert "request_management" in packages
         assert "knowledge_management" in packages
+        assert "service_catalog" in packages
 
     def test_comma_syntax_with_domain_groups(self):
         """get_package accepts comma-separated syntax with domain groups."""
@@ -453,11 +455,11 @@ class TestDomainPackages:
         assert groups == ["domain_incident", "domain_change", "utility"]
 
     def test_backward_compatibility_full_package_count(self):
-        """full package has 16 total groups (10 original + 6 domain)."""
+        """full package has 17 total groups (10 original + 7 domain)."""
         from servicenow_mcp.packages import get_package
 
         groups = get_package("full")
-        assert len(groups) == 16
+        assert len(groups) == 17
 
     def test_backward_compatibility_itil_package_count(self):
         """itil package has 11 total groups (7 original + 4 domain)."""

@@ -513,6 +513,204 @@ class ServiceNowClient:
         self._raise_for_status(response)
         return self._extract_result(response.json())
 
+    # ── Service Catalog API ──────────────────────────────────────────────
+
+    def _sc_url(self, *segments: str) -> str:
+        """Build the Service Catalog REST API URL.
+
+        Examples:
+            _sc_url("catalogs")            -> .../api/sn_sc/servicecatalog/catalogs
+            _sc_url("items", sys_id)       -> .../api/sn_sc/servicecatalog/items/{sys_id}
+        """
+        path = "/".join(segments)
+        return f"{self._settings.servicenow_instance_url}/api/sn_sc/servicecatalog/{path}"
+
+    async def sc_get_catalogs(
+        self,
+        limit: int | None = None,
+        text: str = "",
+    ) -> Any:
+        """Retrieve list of catalogs the user has access to."""
+        http = self._ensure_client()
+        params: dict[str, str] = {"sysparm_text": text}
+        if limit is not None:
+            params["sysparm_limit"] = str(limit)
+
+        response = await http.get(
+            self._sc_url("catalogs"),
+            headers=await self._headers(),
+            params=params,
+        )
+        self._raise_for_status(response)
+        return self._extract_result(response.json())
+
+    async def sc_get_catalog(self, sys_id: str) -> Any:
+        """Retrieve details of a specific catalog."""
+        http = self._ensure_client()
+        response = await http.get(
+            self._sc_url("catalogs", sys_id),
+            headers=await self._headers(),
+        )
+        self._raise_for_status(response)
+        return self._extract_result(response.json())
+
+    async def sc_get_catalog_categories(
+        self,
+        catalog_sys_id: str,
+        limit: int | None = None,
+        offset: int | None = None,
+        top_level_only: bool = False,
+    ) -> Any:
+        """Retrieve categories for a specific catalog."""
+        http = self._ensure_client()
+        params: dict[str, str] = {}
+        if limit is not None:
+            params["sysparm_limit"] = str(limit)
+        if offset is not None:
+            params["sysparm_offset"] = str(offset)
+        if top_level_only:
+            params["sysparm_top_level_only"] = "true"
+
+        response = await http.get(
+            self._sc_url("catalogs", catalog_sys_id, "categories"),
+            headers=await self._headers(),
+            params=params,
+        )
+        self._raise_for_status(response)
+        return self._extract_result(response.json())
+
+    async def sc_get_category(self, sys_id: str) -> Any:
+        """Retrieve details of a specific category."""
+        http = self._ensure_client()
+        response = await http.get(
+            self._sc_url("categories", sys_id),
+            headers=await self._headers(),
+        )
+        self._raise_for_status(response)
+        return self._extract_result(response.json())
+
+    async def sc_get_items(
+        self,
+        limit: int | None = None,
+        offset: int | None = None,
+        text: str = "",
+        catalog: str = "",
+        category: str = "",
+    ) -> Any:
+        """Retrieve list of catalog items."""
+        http = self._ensure_client()
+        params: dict[str, str] = {"sysparm_text": text}
+        if limit is not None:
+            params["sysparm_limit"] = str(limit)
+        if offset is not None:
+            params["sysparm_offset"] = str(offset)
+        if catalog:
+            params["sysparm_catalog"] = catalog
+        if category:
+            params["sysparm_category"] = category
+
+        response = await http.get(
+            self._sc_url("items"),
+            headers=await self._headers(),
+            params=params,
+        )
+        self._raise_for_status(response)
+        return self._extract_result(response.json())
+
+    async def sc_get_item(self, sys_id: str) -> Any:
+        """Retrieve details of a specific catalog item."""
+        http = self._ensure_client()
+        response = await http.get(
+            self._sc_url("items", sys_id),
+            headers=await self._headers(),
+        )
+        self._raise_for_status(response)
+        return self._extract_result(response.json())
+
+    async def sc_get_item_variables(self, sys_id: str) -> Any:
+        """Retrieve variables for a specific catalog item."""
+        http = self._ensure_client()
+        response = await http.get(
+            self._sc_url("items", sys_id, "variables"),
+            headers=await self._headers(),
+        )
+        self._raise_for_status(response)
+        return self._extract_result(response.json())
+
+    async def sc_order_now(self, item_sys_id: str, variables: dict[str, Any] | None = None) -> Any:
+        """Order a catalog item immediately (skip cart).
+
+        Args:
+            item_sys_id: The sys_id of the catalog item.
+            variables: Variable name-value pairs for the item.
+        """
+        http = self._ensure_client()
+        body: dict[str, Any] = {}
+        if variables:
+            body["sysparm_quantity"] = "1"
+            body["variables"] = variables
+
+        response = await http.post(
+            self._sc_url("items", item_sys_id, "order_now"),
+            headers=await self._headers(),
+            json=body,
+        )
+        self._raise_for_status(response)
+        return self._extract_result(response.json())
+
+    async def sc_add_to_cart(self, item_sys_id: str, variables: dict[str, Any] | None = None) -> Any:
+        """Add a catalog item to the cart.
+
+        Args:
+            item_sys_id: The sys_id of the catalog item.
+            variables: Variable name-value pairs for the item.
+        """
+        http = self._ensure_client()
+        body: dict[str, Any] = {}
+        if variables:
+            body["sysparm_quantity"] = "1"
+            body["variables"] = variables
+
+        response = await http.post(
+            self._sc_url("items", item_sys_id, "add_to_cart"),
+            headers=await self._headers(),
+            json=body,
+        )
+        self._raise_for_status(response)
+        return self._extract_result(response.json())
+
+    async def sc_get_cart(self) -> Any:
+        """Retrieve the current user's cart."""
+        http = self._ensure_client()
+        response = await http.get(
+            self._sc_url("cart"),
+            headers=await self._headers(),
+        )
+        self._raise_for_status(response)
+        return self._extract_result(response.json())
+
+    async def sc_submit_order(self) -> Any:
+        """Submit the current cart as an order."""
+        http = self._ensure_client()
+        response = await http.post(
+            self._sc_url("cart", "submit_order"),
+            headers=await self._headers(),
+            json={},
+        )
+        self._raise_for_status(response)
+        return self._extract_result(response.json())
+
+    async def sc_checkout(self) -> Any:
+        """Checkout the current cart (two-step ordering)."""
+        http = self._ensure_client()
+        response = await http.post(
+            self._sc_url("cart", "checkout"),
+            headers=await self._headers(),
+            json={},
+        )
+        self._raise_for_status(response)
+        return self._extract_result(response.json())
+
     # ── ATF Cloud Runner API ───────────────────────────────────────────
 
     def _atf_cloud_runner_url(self, endpoint: str) -> str:
