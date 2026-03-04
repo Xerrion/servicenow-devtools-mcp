@@ -45,7 +45,6 @@ reviews:
 
   path_filters:
     - "!**/*.lock"
-    - "!uv.lock"
     - "!dist/**"
     - "!coverage.xml"
     - "!.coverage"
