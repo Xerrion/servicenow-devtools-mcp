@@ -64,6 +64,7 @@ _FIELD_OPERATORS = {
 
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
     """Register utility tools on the MCP server."""
+    _ = settings, auth_provider  # Required by register_tools interface contract
     query_store: QueryTokenStore = mcp._sn_query_store  # type: ignore[attr-defined]
 
     @mcp.tool()

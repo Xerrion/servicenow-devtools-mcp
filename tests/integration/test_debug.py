@@ -23,7 +23,6 @@ class TestDebug:
         if not incident_sys_id:
             pytest.skip("No incident found on instance")
 
-        timeline_count = 0
         async with ServiceNowClient(live_settings, live_auth) as client:
             audit_r = await client.query_records(
                 "sys_audit",
@@ -31,7 +30,6 @@ class TestDebug:
                 fields=["sys_id", "user", "fieldname", "sys_created_on"],
                 limit=20,
             )
-            timeline_count += len(audit_r["records"])
 
             journal_r = await client.query_records(
                 "sys_journal_field",
@@ -39,7 +37,6 @@ class TestDebug:
                 fields=["sys_id", "element", "sys_created_on"],
                 limit=20,
             )
-            timeline_count += len(journal_r["records"])
 
         # API calls succeed; may return 0 events on a fresh instance
         assert isinstance(audit_r["records"], list)

@@ -11,7 +11,7 @@ class BasicAuthProvider:
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
 
-    async def get_headers(self) -> dict[str, str]:
+    async def get_headers(self) -> dict[str, str]:  # async for extensibility (e.g. OAuth2 token refresh)
         """Return HTTP headers with Basic auth credentials."""
         credentials = f"{self._settings.servicenow_username}:{self._settings.servicenow_password.get_secret_value()}"
         encoded = base64.b64encode(credentials.encode("utf-8")).decode("ascii")

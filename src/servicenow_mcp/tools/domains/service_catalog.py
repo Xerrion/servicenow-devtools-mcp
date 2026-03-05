@@ -27,6 +27,7 @@ def register_tools(
         auth_provider: Authentication provider for ServiceNow API
         choices: Optional choice registry for resolving field values
     """
+    _ = choices  # Accepted for interface conformance with domain tool convention
 
     @mcp.tool()
     @tool_handler

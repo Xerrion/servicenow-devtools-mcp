@@ -535,15 +535,14 @@ class TestRelReferencesToBoundedConcurrency:
                 )
             )
 
-        semaphore_instance = None
+        semaphore_instances: list[Any] = []
 
         class TrackingSemaphore(asyncio.Semaphore):
             """Semaphore subclass that tracks __aenter__ calls."""
 
             def __init__(self, *args: Any, **kwargs: Any) -> None:
                 super().__init__(*args, **kwargs)
-                nonlocal semaphore_instance
-                semaphore_instance = self
+                semaphore_instances.append(self)
                 self.enter_count = 0
 
             async def __aenter__(self) -> None:
@@ -560,5 +559,5 @@ class TestRelReferencesToBoundedConcurrency:
 
         assert result["status"] == "success"
         # Verify the semaphore was actually created and used
-        assert semaphore_instance is not None
-        assert semaphore_instance.enter_count == 15
+        assert len(semaphore_instances) == 1
+        assert semaphore_instances[0].enter_count == 15

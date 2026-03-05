@@ -778,7 +778,7 @@ class TestAtfTestHealth:
         assert result["data"]["total_runs"] == 10
         assert result["data"]["pass_count"] == 10
         assert result["data"]["fail_count"] == 0
-        assert result["data"]["pass_rate"] == 1.0
+        assert result["data"]["pass_rate"] == pytest.approx(1.0)
         assert result["data"]["flaky"] is False
 
     @pytest.mark.asyncio()
@@ -871,7 +871,7 @@ class TestAtfTestHealth:
 
         assert result["status"] == "success"
         assert result["data"]["recent_trend"] == "degrading"
-        assert result["data"]["pass_rate"] == 0.5
+        assert result["data"]["pass_rate"] == pytest.approx(0.5)
 
     @pytest.mark.asyncio()
     @respx.mock
@@ -891,7 +891,7 @@ class TestAtfTestHealth:
 
         assert result["status"] == "success"
         assert result["data"]["total_runs"] == 0
-        assert result["data"]["pass_rate"] == 0.0
+        assert result["data"]["pass_rate"] == pytest.approx(0.0, abs=1e-9)
         assert result["data"]["recent_trend"] == "no_data"
         assert "warnings" in result
 
@@ -978,7 +978,7 @@ class TestAtfTestHealth:
 
         assert result["status"] == "success"
         assert result["data"]["recent_trend"] == "improving"
-        assert result["data"]["pass_rate"] == 0.5
+        assert result["data"]["pass_rate"] == pytest.approx(0.5)
 
     @pytest.mark.asyncio()
     @respx.mock
@@ -1041,4 +1041,4 @@ class TestAtfTestHealth:
         assert result["status"] == "success"
         assert result["data"]["total_runs"] == 5
         assert result["data"]["pass_count"] == 5
-        assert result["data"]["pass_rate"] == 1.0
+        assert result["data"]["pass_rate"] == pytest.approx(1.0)
