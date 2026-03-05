@@ -7,10 +7,11 @@ from toon_format import decode as toon_decode
 
 from servicenow_mcp.auth import BasicAuthProvider
 
+
 BASE_URL = "https://test.service-now.com"
 
 
-@pytest.fixture
+@pytest.fixture()
 def auth_provider(settings):
     """Create a BasicAuthProvider from test settings."""
     return BasicAuthProvider(settings)
@@ -33,7 +34,7 @@ def _register_and_get_tools(settings, auth_provider):
 class TestDevToggle:
     """Tests for the dev_toggle tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_toggles_active_field(self, settings, auth_provider):
         """Toggles the active field and returns old/new values."""
@@ -70,7 +71,7 @@ class TestDevToggle:
         assert result["data"]["old_active"] == "true"
         assert result["data"]["new_active"] == "false"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_blocked_in_prod(self, prod_settings, auth_provider):
         """Returns error when environment is production."""
@@ -88,7 +89,7 @@ class TestDevToggle:
 
         assert result["status"] == "error"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_unknown_artifact_type(self, settings, auth_provider):
         """Returns error for unknown artifact type."""
@@ -98,7 +99,7 @@ class TestDevToggle:
 
         assert result["status"] == "error"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_denied_table_returns_error(self, settings, auth_provider):
         """Returns error when resolved table is denied by policy."""
@@ -125,7 +126,7 @@ class TestDevToggle:
 class TestDevSetProperty:
     """Tests for the dev_set_property tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_updates_property_value(self, settings, auth_provider):
         """Updates a system property and returns old value."""
@@ -165,7 +166,7 @@ class TestDevSetProperty:
         assert result["data"]["old_value"] == "30"
         assert result["data"]["new_value"] == "60"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_blocked_in_prod(self, prod_settings):
         """Returns error when environment is production."""
@@ -183,7 +184,7 @@ class TestDevSetProperty:
 
         assert result["status"] == "error"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_property_not_found(self, settings, auth_provider):
         """Returns error when property doesn't exist."""
@@ -208,7 +209,7 @@ class TestDevSetProperty:
 class TestDevUtilsSensitiveFieldMasking:
     """Tests for sensitive field masking in dev_utils tool responses."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_dev_set_property_masks_sensitive_value(self, settings, auth_provider):
         """Setting a property with a sensitive name masks old/new values in response."""
@@ -256,7 +257,7 @@ class TestDevUtilsSensitiveFieldMasking:
 class TestDevToggleGenericException:
     """Tests for dev_toggle generic exception handler."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_unexpected_exception(self, settings, auth_provider):
         """dev_toggle returns error envelope when an unexpected exception occurs."""
@@ -277,7 +278,7 @@ class TestDevToggleGenericException:
 class TestDevSetPropertyGenericException:
     """Tests for dev_set_property generic exception handler."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_unexpected_exception(self, settings, auth_provider):
         """dev_set_property returns error envelope when an unexpected exception occurs."""

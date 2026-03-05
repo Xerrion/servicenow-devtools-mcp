@@ -10,10 +10,11 @@ from toon_format import decode as toon_decode
 from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.state import QueryTokenStore
 
+
 BASE_URL = "https://test.service-now.com"
 
 
-@pytest.fixture
+@pytest.fixture()
 def auth_provider(settings):
     """Create a BasicAuthProvider from test settings."""
     return BasicAuthProvider(settings)
@@ -35,7 +36,7 @@ def _register_and_get_tools(settings, auth_provider):
 class TestAtfListTests:
     """Tests for the atf_list_tests tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_list_tests_success(self, settings, auth_provider):
         """Returns ATF tests with expected fields."""
@@ -75,7 +76,7 @@ class TestAtfListTests:
         assert result["data"]["records"][0]["sys_id"] == "test1"
         assert result["data"]["records"][1]["sys_id"] == "test2"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_list_tests_with_query(self, settings, auth_provider):
         """Verify custom query param is passed through to API call."""
@@ -108,7 +109,7 @@ class TestAtfListTests:
         request = route.calls.last.request
         assert "active=true" in unquote(str(request.url))
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_list_tests_empty_results(self, settings, auth_provider):
         """Returns success with empty data when no tests found."""
@@ -132,7 +133,7 @@ class TestAtfListTests:
 class TestAtfGetTest:
     """Tests for the atf_get_test tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_get_test_success(self, settings, auth_provider):
         """Returns test record and steps in combined response."""
@@ -185,7 +186,7 @@ class TestAtfGetTest:
         assert result["data"]["step_count"] == 2
         assert len(result["data"]["steps"]) == 2
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_get_test_not_found(self, settings, auth_provider):
         """Returns error envelope when test not found."""
@@ -202,7 +203,7 @@ class TestAtfGetTest:
 
         assert result["status"] == "error"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_get_test_with_steps(self, settings, auth_provider):
         """Returns test with 3 steps ordered correctly."""
@@ -265,7 +266,7 @@ class TestAtfGetTest:
 class TestAtfListSuites:
     """Tests for the atf_list_suites tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_list_suites_success(self, settings, auth_provider):
         """Returns suites with member counts."""
@@ -304,7 +305,7 @@ class TestAtfListSuites:
         assert result["data"]["suites"][0]["sys_id"] == "suite1"
         assert result["data"]["suites"][0]["member_count"] == "5"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_list_suites_empty(self, settings, auth_provider):
         """Returns success with empty data when no suites found."""
@@ -328,7 +329,7 @@ class TestAtfListSuites:
 class TestAtfGetResults:
     """Tests for the atf_get_results tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_get_results_for_test(self, settings, auth_provider):
         """Returns test results from sys_atf_test_result table."""
@@ -361,7 +362,7 @@ class TestAtfGetResults:
         assert result["data"]["result_count"] == 1
         assert result["data"]["results"][0]["status"] == "success"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_get_results_for_suite(self, settings, auth_provider):
         """Returns suite results from sys_atf_test_suite_result table."""
@@ -395,7 +396,7 @@ class TestAtfGetResults:
         assert result["data"]["result_count"] == 1
         assert result["data"]["results"][0]["status"] == "failure"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_get_results_both_ids_provided(self, settings, auth_provider):
         """Returns error when both test_id and suite_id are provided."""
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
@@ -405,7 +406,7 @@ class TestAtfGetResults:
         assert result["status"] == "error"
         assert "not both" in result["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_get_results_missing_both_ids(self, settings, auth_provider):
         """Returns error when neither test_id nor suite_id provided."""
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
@@ -415,7 +416,7 @@ class TestAtfGetResults:
         assert result["status"] == "error"
         assert "exactly one" in result["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_get_results_empty(self, settings, auth_provider):
         """Returns success with empty results when no results found."""
@@ -439,7 +440,7 @@ class TestAtfGetResults:
 class TestAtfRunTest:
     """Tests for the atf_run_test tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_run_test_success_with_poll(self, settings, auth_provider):
         """Mock run + progress endpoints. Returns completed status with execution ID."""
@@ -468,7 +469,7 @@ class TestAtfRunTest:
         assert result["data"]["progress"] == 100
         assert result["data"]["test_id"] == "test456"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_run_test_no_poll(self, settings, auth_provider):
         """Call with poll=False. Returns immediately with execution ID."""
@@ -489,7 +490,7 @@ class TestAtfRunTest:
         assert result["data"]["polling"] is False
         assert result["data"]["test_id"] == "test999"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_run_test_write_gate_blocks(self, prod_settings):
         """Write gate blocks execution in production environment."""
         from mcp.server.fastmcp import FastMCP
@@ -508,7 +509,7 @@ class TestAtfRunTest:
         assert result["status"] == "error"
         assert "production" in result["error"]["message"].lower() or "blocked" in result["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_run_test_no_execution_id(self, settings, auth_provider):
         """Returns error when ATF run does not return an execution ID."""
@@ -526,7 +527,7 @@ class TestAtfRunTest:
         assert result["status"] == "error"
         assert "no execution id" in result["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_run_test_timeout(self, settings, auth_provider):
         """Mock progress endpoint always returning In Progress. Assert timeout."""
@@ -545,7 +546,12 @@ class TestAtfRunTest:
         )
 
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["atf_run_test"](test_id="test_long", poll=True, poll_interval=2, max_poll_duration=10)
+        raw = await tools["atf_run_test"](
+            test_id="test_long",
+            poll=True,
+            poll_interval=2,
+            max_poll_duration=10,
+        )
         result = toon_decode(raw)
 
         assert result["status"] == "success"
@@ -554,7 +560,7 @@ class TestAtfRunTest:
         assert result["data"]["last_known_state"] == "in progress"
         assert "warnings" in result
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_run_test_failed_execution(self, settings, auth_provider):
         """Mock progress returning Failure status. Assert failure captured."""
@@ -572,7 +578,12 @@ class TestAtfRunTest:
         )
 
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["atf_run_test"](test_id="test_fail", poll=True, poll_interval=2, max_poll_duration=10)
+        raw = await tools["atf_run_test"](
+            test_id="test_fail",
+            poll=True,
+            poll_interval=2,
+            max_poll_duration=10,
+        )
         result = toon_decode(raw)
 
         assert result["status"] == "success"
@@ -583,7 +594,7 @@ class TestAtfRunTest:
 class TestAtfRunSuite:
     """Tests for the atf_run_suite tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_run_suite_success_with_poll(self, settings, auth_provider):
         """Mock run + progress. Returns completed status."""
@@ -601,7 +612,12 @@ class TestAtfRunSuite:
         )
 
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["atf_run_suite"](suite_id="suite789", poll=True, poll_interval=2, max_poll_duration=10)
+        raw = await tools["atf_run_suite"](
+            suite_id="suite789",
+            poll=True,
+            poll_interval=2,
+            max_poll_duration=10,
+        )
         result = toon_decode(raw)
 
         assert result["status"] == "success"
@@ -609,7 +625,7 @@ class TestAtfRunSuite:
         assert result["data"]["status"] == "completed"
         assert result["data"]["suite_id"] == "suite789"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_run_suite_no_poll(self, settings, auth_provider):
         """Call with poll=False. Returns immediately."""
@@ -629,7 +645,7 @@ class TestAtfRunSuite:
         assert result["data"]["status"] == "started"
         assert result["data"]["polling"] is False
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_run_suite_write_gate_blocks(self, prod_settings):
         """Write gate blocks suite execution in production."""
         from mcp.server.fastmcp import FastMCP
@@ -648,7 +664,7 @@ class TestAtfRunSuite:
         assert result["status"] == "error"
         assert "production" in result["error"]["message"].lower() or "blocked" in result["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_run_suite_no_execution_id(self, settings, auth_provider):
         """Returns error when ATF suite run does not return an execution ID."""
@@ -666,7 +682,7 @@ class TestAtfRunSuite:
         assert result["status"] == "error"
         assert "no execution id" in result["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_run_suite_timeout(self, settings, auth_provider):
         """Mock progress always returning In Progress. Assert timeout with warnings."""
@@ -684,7 +700,12 @@ class TestAtfRunSuite:
         )
 
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["atf_run_suite"](suite_id="suite_long", poll=True, poll_interval=2, max_poll_duration=10)
+        raw = await tools["atf_run_suite"](
+            suite_id="suite_long",
+            poll=True,
+            poll_interval=2,
+            max_poll_duration=10,
+        )
         result = toon_decode(raw)
 
         assert result["status"] == "success"
@@ -694,7 +715,7 @@ class TestAtfRunSuite:
         assert result["data"]["last_known_state"] == "in progress"
         assert "warnings" in result
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_run_suite_cancelled(self, settings, auth_provider):
         """Mock progress returning Cancelled. Assert captured in response."""
@@ -712,7 +733,12 @@ class TestAtfRunSuite:
         )
 
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["atf_run_suite"](suite_id="suite_cancel", poll=True, poll_interval=2, max_poll_duration=10)
+        raw = await tools["atf_run_suite"](
+            suite_id="suite_cancel",
+            poll=True,
+            poll_interval=2,
+            max_poll_duration=10,
+        )
         result = toon_decode(raw)
 
         assert result["status"] == "success"
@@ -723,7 +749,7 @@ class TestAtfRunSuite:
 class TestAtfTestHealth:
     """Tests for the atf_test_health tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_health_all_passing(self, settings, auth_provider):
         """Mock 10 results all passed. Assert 100% pass rate, not flaky."""
@@ -732,7 +758,11 @@ class TestAtfTestHealth:
                 200,
                 json={
                     "result": [
-                        {"sys_id": f"res{i}", "status": "success", "sys_created_on": f"2026-02-{i + 1:02d} 10:00:00"}
+                        {
+                            "sys_id": f"res{i}",
+                            "status": "success",
+                            "sys_created_on": f"2026-02-{i + 1:02d} 10:00:00",
+                        }
                         for i in range(10)
                     ]
                 },
@@ -751,7 +781,7 @@ class TestAtfTestHealth:
         assert result["data"]["pass_rate"] == 1.0
         assert result["data"]["flaky"] is False
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_health_flaky_detection(self, settings, auth_provider):
         """Mock alternating pass/fail pattern. Assert flaky=true."""
@@ -780,7 +810,7 @@ class TestAtfTestHealth:
         assert result["data"]["flaky"] is True
         assert result["data"]["transition_count"] >= 3
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_health_trending_downward(self, settings, auth_provider):
         """Mock recent failures after earlier passes. Assert trend degrading."""
@@ -789,14 +819,46 @@ class TestAtfTestHealth:
                 200,
                 json={
                     "result": [
-                        {"sys_id": "r1", "status": "success", "sys_created_on": "2026-02-01 10:00:00"},
-                        {"sys_id": "r2", "status": "success", "sys_created_on": "2026-02-02 10:00:00"},
-                        {"sys_id": "r3", "status": "success", "sys_created_on": "2026-02-03 10:00:00"},
-                        {"sys_id": "r4", "status": "success", "sys_created_on": "2026-02-04 10:00:00"},
-                        {"sys_id": "r5", "status": "failure", "sys_created_on": "2026-02-05 10:00:00"},
-                        {"sys_id": "r6", "status": "failure", "sys_created_on": "2026-02-06 10:00:00"},
-                        {"sys_id": "r7", "status": "failure", "sys_created_on": "2026-02-07 10:00:00"},
-                        {"sys_id": "r8", "status": "failure", "sys_created_on": "2026-02-08 10:00:00"},
+                        {
+                            "sys_id": "r1",
+                            "status": "success",
+                            "sys_created_on": "2026-02-01 10:00:00",
+                        },
+                        {
+                            "sys_id": "r2",
+                            "status": "success",
+                            "sys_created_on": "2026-02-02 10:00:00",
+                        },
+                        {
+                            "sys_id": "r3",
+                            "status": "success",
+                            "sys_created_on": "2026-02-03 10:00:00",
+                        },
+                        {
+                            "sys_id": "r4",
+                            "status": "success",
+                            "sys_created_on": "2026-02-04 10:00:00",
+                        },
+                        {
+                            "sys_id": "r5",
+                            "status": "failure",
+                            "sys_created_on": "2026-02-05 10:00:00",
+                        },
+                        {
+                            "sys_id": "r6",
+                            "status": "failure",
+                            "sys_created_on": "2026-02-06 10:00:00",
+                        },
+                        {
+                            "sys_id": "r7",
+                            "status": "failure",
+                            "sys_created_on": "2026-02-07 10:00:00",
+                        },
+                        {
+                            "sys_id": "r8",
+                            "status": "failure",
+                            "sys_created_on": "2026-02-08 10:00:00",
+                        },
                     ]
                 },
                 headers={"X-Total-Count": "8"},
@@ -811,7 +873,7 @@ class TestAtfTestHealth:
         assert result["data"]["recent_trend"] == "degrading"
         assert result["data"]["pass_rate"] == 0.5
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_health_no_results(self, settings, auth_provider):
         """Mock empty results. Assert appropriate zero-state response."""
@@ -833,7 +895,7 @@ class TestAtfTestHealth:
         assert result["data"]["recent_trend"] == "no_data"
         assert "warnings" in result
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_health_missing_both_ids(self, settings, auth_provider):
         """Call with neither test_id nor suite_id. Assert error."""
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
@@ -843,7 +905,7 @@ class TestAtfTestHealth:
         assert result["status"] == "error"
         assert "exactly one" in result["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_health_both_ids_provided(self, settings, auth_provider):
         """Call with both test_id and suite_id. Assert error."""
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
@@ -851,9 +913,11 @@ class TestAtfTestHealth:
         result = toon_decode(raw)
 
         assert result["status"] == "error"
-        assert "exactly one" in result["error"]["message"].lower() and "not both" in result["error"]["message"].lower()
+        error_msg = result["error"]["message"].lower()
+        assert "exactly one" in error_msg
+        assert "not both" in error_msg
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_health_trending_upward(self, settings, auth_provider):
         """Mock early failures then later passes. Assert trend improving."""
@@ -862,14 +926,46 @@ class TestAtfTestHealth:
                 200,
                 json={
                     "result": [
-                        {"sys_id": "r1", "status": "failure", "sys_created_on": "2026-02-01 10:00:00"},
-                        {"sys_id": "r2", "status": "failure", "sys_created_on": "2026-02-02 10:00:00"},
-                        {"sys_id": "r3", "status": "failure", "sys_created_on": "2026-02-03 10:00:00"},
-                        {"sys_id": "r4", "status": "failure", "sys_created_on": "2026-02-04 10:00:00"},
-                        {"sys_id": "r5", "status": "success", "sys_created_on": "2026-02-05 10:00:00"},
-                        {"sys_id": "r6", "status": "success", "sys_created_on": "2026-02-06 10:00:00"},
-                        {"sys_id": "r7", "status": "success", "sys_created_on": "2026-02-07 10:00:00"},
-                        {"sys_id": "r8", "status": "success", "sys_created_on": "2026-02-08 10:00:00"},
+                        {
+                            "sys_id": "r1",
+                            "status": "failure",
+                            "sys_created_on": "2026-02-01 10:00:00",
+                        },
+                        {
+                            "sys_id": "r2",
+                            "status": "failure",
+                            "sys_created_on": "2026-02-02 10:00:00",
+                        },
+                        {
+                            "sys_id": "r3",
+                            "status": "failure",
+                            "sys_created_on": "2026-02-03 10:00:00",
+                        },
+                        {
+                            "sys_id": "r4",
+                            "status": "failure",
+                            "sys_created_on": "2026-02-04 10:00:00",
+                        },
+                        {
+                            "sys_id": "r5",
+                            "status": "success",
+                            "sys_created_on": "2026-02-05 10:00:00",
+                        },
+                        {
+                            "sys_id": "r6",
+                            "status": "success",
+                            "sys_created_on": "2026-02-06 10:00:00",
+                        },
+                        {
+                            "sys_id": "r7",
+                            "status": "success",
+                            "sys_created_on": "2026-02-07 10:00:00",
+                        },
+                        {
+                            "sys_id": "r8",
+                            "status": "success",
+                            "sys_created_on": "2026-02-08 10:00:00",
+                        },
                     ]
                 },
                 headers={"X-Total-Count": "8"},
@@ -884,7 +980,7 @@ class TestAtfTestHealth:
         assert result["data"]["recent_trend"] == "improving"
         assert result["data"]["pass_rate"] == 0.5
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_health_insufficient_data_trend(self, settings, auth_provider):
         """Mock fewer than 4 runs. Assert trend is insufficient_data."""
@@ -893,8 +989,16 @@ class TestAtfTestHealth:
                 200,
                 json={
                     "result": [
-                        {"sys_id": "r1", "status": "success", "sys_created_on": "2026-02-01 10:00:00"},
-                        {"sys_id": "r2", "status": "failure", "sys_created_on": "2026-02-02 10:00:00"},
+                        {
+                            "sys_id": "r1",
+                            "status": "success",
+                            "sys_created_on": "2026-02-01 10:00:00",
+                        },
+                        {
+                            "sys_id": "r2",
+                            "status": "failure",
+                            "sys_created_on": "2026-02-02 10:00:00",
+                        },
                     ]
                 },
                 headers={"X-Total-Count": "2"},
@@ -909,7 +1013,7 @@ class TestAtfTestHealth:
         assert result["data"]["total_runs"] == 2
         assert result["data"]["recent_trend"] == "insufficient_data"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_health_for_suite(self, settings, auth_provider):
         """Mock suite results. Assert rolled-up metrics computed."""

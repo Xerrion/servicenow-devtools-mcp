@@ -65,15 +65,72 @@ dev = [
 ]
 
 [tool.ruff]
-target-version = "py312"
 line-length = 120
+target-version = "py312"
+src = ["src", "tests"]
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
-ignore = ["E501"]
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "W",    # pycodestyle warnings
+    "I",    # isort
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "SIM",  # flake8-simplify
+    "RUF",  # ruff-specific rules
+    "C4",   # flake8-comprehensions
+    "DTZ",  # flake8-datetimez
+    "T20",  # flake8-print
+    "PTH",  # flake8-use-pathlib
+    "TC",   # flake8-type-checking
+    "RET",  # flake8-return
+    "PLW",  # pylint warnings
+    "PT",   # flake8-pytest-style
+    "A",    # flake8-builtins
+    "COM",  # flake8-commas
+    "PIE",  # flake8-pie
+    "ISC",  # flake8-implicit-str-concat
+    "G",    # flake8-logging-format
+    "INP",  # flake8-no-pep420
+    "TID",  # flake8-tidy-imports
+    "ERA",  # eradicate (commented-out code)
+]
+ignore = [
+    "E501",   # line too long (formatter handles this)
+    "COM812", # missing trailing comma (conflicts with formatter)
+    "ISC001", # implicit string concatenation (conflicts with formatter)
+    "TC001", # no future annotations; would break runtime type resolution
+    "TC002", # no future annotations; would break runtime type resolution
+    "TC003", # no future annotations; would break runtime type resolution
+    "RET504", # unnecessary assignment before return (reduces debuggability)
+    "RET505", # unnecessary else after return (sometimes clearer with else)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    "T20",    # print statements OK in tests
+    "ERA001", # commented-out code OK in tests
+]
+"src/servicenow_mcp/tools/domains/*.py" = [
+    "A002",   # shadowing built-in "type" used as ServiceNow parameter name
+]
+"src/servicenow_mcp/tools/changes.py" = [
+    "A002",   # same - "format" parameter from ServiceNow API
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["servicenow_mcp"]
+force-single-line = false
+lines-after-imports = 2
+
+[tool.ruff.lint.flake8-pytest-style]
+fixture-parentheses = true
+mark-parentheses = true
 
 [tool.ruff.format]
 quote-style = "double"
+indent-style = "space"
 
 [tool.mypy]
 python_version = "3.12"

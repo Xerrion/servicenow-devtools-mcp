@@ -9,10 +9,11 @@ from toon_format import decode as toon_decode
 
 from servicenow_mcp.auth import BasicAuthProvider
 
+
 BASE_URL = "https://test.service-now.com"
 
 
-@pytest.fixture
+@pytest.fixture()
 def auth_provider(settings):
     """Create a BasicAuthProvider from test settings."""
     return BasicAuthProvider(settings)
@@ -32,7 +33,7 @@ def _register_and_get_tools(settings, auth_provider):
 class TestDebugTrace:
     """Tests for the debug_trace tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_returns_merged_timeline(self, settings, auth_provider):
         """Returns merged timeline from sys_audit, syslog, sys_journal_field."""
@@ -104,7 +105,7 @@ class TestDebugTrace:
         timestamps = [e["timestamp"] for e in result["data"]["timeline"]]
         assert timestamps == sorted(timestamps)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_empty_trace(self, settings, auth_provider):
         """Returns empty timeline when no events found."""
@@ -125,7 +126,7 @@ class TestDebugTrace:
         assert result["status"] == "success"
         assert result["data"]["timeline"] == []
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_filters_by_minutes(self, settings, auth_provider):
         """Queries include gs.minutesAgoStart time filter."""
@@ -144,7 +145,7 @@ class TestDebugTrace:
         result = toon_decode(raw)
         assert result["status"] == "success"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_caret_in_sys_id_single_sanitized(self, settings, auth_provider):
         """Values with carets are single-sanitized (^ → ^^), not double (^ → ^^^^)."""
@@ -175,7 +176,7 @@ class TestDebugTrace:
 class TestDebugFlowExecution:
     """Tests for the debug_flow_execution tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_returns_flow_steps(self, settings, auth_provider):
         """Returns flow execution steps from sys_flow_context and sys_flow_log."""
@@ -230,7 +231,7 @@ class TestDebugFlowExecution:
         assert result["data"]["context"]["name"] == "Auto-assign flow"
         assert len(result["data"]["steps"]) == 2
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_handles_flow_with_errors(self, settings, auth_provider):
         """Returns error info when flow steps have errors."""
@@ -276,7 +277,7 @@ class TestDebugFlowExecution:
 class TestDebugEmailTrace:
     """Tests for the debug_email_trace tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_returns_email_chain(self, settings, auth_provider):
         """Reconstructs email chain for a record."""
@@ -316,7 +317,7 @@ class TestDebugEmailTrace:
         assert result["status"] == "success"
         assert len(result["data"]["emails"]) == 2
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_handles_no_emails(self, settings, auth_provider):
         """Returns empty list when no emails found."""
@@ -335,7 +336,7 @@ class TestDebugEmailTrace:
 class TestDebugIntegrationHealth:
     """Tests for the debug_integration_health tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_returns_ecc_queue_errors(self, settings, auth_provider):
         """Returns ECC queue error summary."""
@@ -366,7 +367,7 @@ class TestDebugIntegrationHealth:
         assert result["data"]["kind"] == "ecc_queue"
         assert len(result["data"]["errors"]) == 1
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_returns_rest_message_errors(self, settings, auth_provider):
         """Returns REST message error summary."""
@@ -397,7 +398,7 @@ class TestDebugIntegrationHealth:
         assert result["data"]["kind"] == "rest_message"
         assert len(result["data"]["errors"]) == 1
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_filters_by_hours(self, settings, auth_provider):
         """Queries include gs.hoursAgoStart time filter."""
@@ -414,7 +415,7 @@ class TestDebugIntegrationHealth:
 class TestDebugImportsetRun:
     """Tests for the debug_importset_run tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_returns_import_set_results(self, settings, auth_provider):
         """Returns import set run results."""
@@ -467,7 +468,7 @@ class TestDebugImportsetRun:
         assert result["data"]["summary"]["inserted"] == 1
         assert result["data"]["summary"]["error"] == 1
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_handles_empty_import_set(self, settings, auth_provider):
         """Handles import set with no rows."""
@@ -498,7 +499,7 @@ class TestDebugImportsetRun:
 class TestDebugFieldMutationStory:
     """Tests for the debug_field_mutation_story tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_returns_field_history(self, settings, auth_provider):
         """Returns chronological field mutation history."""
@@ -539,7 +540,7 @@ class TestDebugFieldMutationStory:
         assert mutations[0]["old_value"] == "1"
         assert mutations[1]["new_value"] == "6"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_handles_no_mutations(self, settings, auth_provider):
         """Returns empty when no mutations found for the field."""

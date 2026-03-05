@@ -10,10 +10,11 @@ from toon_format import decode as toon_decode
 from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.policy import DENIED_TABLES
 
+
 BASE_URL = "https://test.service-now.com"
 
 
-@pytest.fixture
+@pytest.fixture()
 def auth_provider(settings):
     """Create a BasicAuthProvider from test settings."""
     return BasicAuthProvider(settings)
@@ -36,7 +37,7 @@ def _register_and_get_tools(settings, auth_provider):
 class TestRecordCreate:
     """Tests for the record_create tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_creates_record_and_returns_masked(self, settings, auth_provider):
         """Creates a record and returns it with sensitive fields masked."""
@@ -67,7 +68,7 @@ class TestRecordCreate:
         assert result["data"]["record"]["short_description"] == "Test incident"
         assert result["data"]["record"]["password"] == "***MASKED***"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_blocked_in_prod(self, prod_settings):
         """Returns error when environment is production."""
         from mcp.server.fastmcp import FastMCP
@@ -88,7 +89,7 @@ class TestRecordCreate:
         assert result["status"] == "error"
         assert "production" in result["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_denied_table_returns_error(self, settings, auth_provider):
         """Returns error when table is denied by policy."""
         denied = next(iter(DENIED_TABLES))
@@ -103,7 +104,7 @@ class TestRecordCreate:
         assert result["status"] == "error"
         assert "denied" in result["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_invalid_json_returns_error(self, settings, auth_provider):
         """Returns error when data is not valid JSON."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -112,7 +113,7 @@ class TestRecordCreate:
 
         assert result["status"] == "error"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_acl_denied_returns_clear_error(self, settings, auth_provider):
         """Returns clear error when ServiceNow ACL denies the operation."""
@@ -130,7 +131,7 @@ class TestRecordCreate:
         assert result["status"] == "error"
         assert "acl" in result["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_generic_exception(self, settings, auth_provider):
         """Returns error envelope on unexpected exception."""
@@ -157,7 +158,7 @@ class TestRecordCreate:
 class TestRecordPreviewCreate:
     """Tests for the record_preview_create tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_returns_token_and_data(self, settings, auth_provider):
         """Returns a preview token and the masked data summary."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -173,7 +174,7 @@ class TestRecordPreviewCreate:
         assert result["data"]["action"] == "create"
         assert result["data"]["data"]["password"] == "***MASKED***"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_blocked_in_prod(self, prod_settings):
         """Returns error when environment is production."""
         from mcp.server.fastmcp import FastMCP
@@ -192,7 +193,7 @@ class TestRecordPreviewCreate:
         result = toon_decode(raw)
         assert result["status"] == "error"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_invalid_json_returns_error(self, settings, auth_provider):
         """Returns error when data is not valid JSON."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -207,7 +208,7 @@ class TestRecordPreviewCreate:
 class TestRecordUpdate:
     """Tests for the record_update tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_updates_record_and_returns_masked(self, settings, auth_provider):
         """Updates a record and returns it with sensitive fields masked."""
@@ -237,7 +238,7 @@ class TestRecordUpdate:
         assert result["data"]["record"]["state"] == "2"
         assert result["data"]["record"]["password"] == "***MASKED***"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_blocked_in_prod(self, prod_settings):
         """Returns error in production."""
         from mcp.server.fastmcp import FastMCP
@@ -257,7 +258,7 @@ class TestRecordUpdate:
         result = toon_decode(raw)
         assert result["status"] == "error"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_denied_table_returns_error(self, settings, auth_provider):
         """Returns error for denied table."""
         denied = next(iter(DENIED_TABLES))
@@ -271,7 +272,7 @@ class TestRecordUpdate:
         result = toon_decode(raw)
         assert result["status"] == "error"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_not_found_returns_error(self, settings, auth_provider):
         """Returns error when record doesn't exist."""
@@ -288,7 +289,7 @@ class TestRecordUpdate:
         result = toon_decode(raw)
         assert result["status"] == "error"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_acl_denied_returns_clear_error(self, settings, auth_provider):
         """Returns clear ACL error."""
@@ -313,7 +314,7 @@ class TestRecordUpdate:
 class TestRecordPreviewUpdate:
     """Tests for the record_preview_update tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_returns_diff_and_token(self, settings, auth_provider):
         """Fetches current record and returns field-level diff with token."""
@@ -345,7 +346,7 @@ class TestRecordPreviewUpdate:
         assert result["data"]["diff"]["short_description"]["old"] == "Original"
         assert result["data"]["diff"]["short_description"]["new"] == "Updated"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_masks_sensitive_fields_in_diff(self, settings, auth_provider):
         """Sensitive fields in the diff are masked."""
@@ -373,7 +374,7 @@ class TestRecordPreviewUpdate:
         assert result["data"]["diff"]["password"]["old"] == "***MASKED***"
         assert result["data"]["diff"]["password"]["new"] == "***MASKED***"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_blocked_in_prod(self, prod_settings):
         """Returns error in production."""
         from mcp.server.fastmcp import FastMCP
@@ -400,7 +401,7 @@ class TestRecordPreviewUpdate:
 class TestRecordDelete:
     """Tests for the record_delete tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_deletes_record(self, settings, auth_provider):
         """Deletes a record and returns confirmation."""
@@ -415,7 +416,7 @@ class TestRecordDelete:
         assert result["data"]["sys_id"] == "inc001"
         assert result["data"]["deleted"] is True
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_blocked_in_prod(self, prod_settings):
         """Returns error in production."""
         from mcp.server.fastmcp import FastMCP
@@ -431,7 +432,7 @@ class TestRecordDelete:
         result = toon_decode(raw)
         assert result["status"] == "error"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_denied_table_returns_error(self, settings, auth_provider):
         """Returns error for denied table."""
         denied = next(iter(DENIED_TABLES))
@@ -441,7 +442,7 @@ class TestRecordDelete:
         result = toon_decode(raw)
         assert result["status"] == "error"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_not_found_returns_error(self, settings, auth_provider):
         """Returns error when record doesn't exist."""
@@ -454,7 +455,7 @@ class TestRecordDelete:
         result = toon_decode(raw)
         assert result["status"] == "error"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_acl_denied_returns_clear_error(self, settings, auth_provider):
         """Returns clear ACL error on 403."""
@@ -475,7 +476,7 @@ class TestRecordDelete:
 class TestRecordPreviewDelete:
     """Tests for the record_preview_delete tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_returns_snapshot_and_token(self, settings, auth_provider):
         """Fetches record and returns snapshot with preview token."""
@@ -504,7 +505,7 @@ class TestRecordPreviewDelete:
         assert result["data"]["record_snapshot"]["short_description"] == "Test incident"
         assert result["data"]["record_snapshot"]["password"] == "***MASKED***"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_blocked_in_prod(self, prod_settings):
         """Returns error in production."""
         from mcp.server.fastmcp import FastMCP
@@ -520,7 +521,7 @@ class TestRecordPreviewDelete:
         result = toon_decode(raw)
         assert result["status"] == "error"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_not_found_returns_error(self, settings, auth_provider):
         """Returns error when record doesn't exist."""
@@ -540,7 +541,7 @@ class TestRecordPreviewDelete:
 class TestRecordApply:
     """Tests for the record_apply tool (applies any previewed action)."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_apply_create(self, settings, auth_provider):
         """Applies a previewed create action."""
@@ -574,7 +575,7 @@ class TestRecordApply:
         assert result["data"]["sys_id"] == "new001"
         assert result["data"]["record"]["short_description"] == "Test"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_apply_update(self, settings, auth_provider):
         """Applies a previewed update action."""
@@ -609,7 +610,7 @@ class TestRecordApply:
         assert result["data"]["action"] == "update"
         assert result["data"]["record"]["state"] == "2"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_apply_delete(self, settings, auth_provider):
         """Applies a previewed delete action."""
@@ -640,7 +641,7 @@ class TestRecordApply:
         assert result["data"]["action"] == "delete"
         assert result["data"]["deleted"] is True
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_invalid_token_returns_error(self, settings, auth_provider):
         """Returns error for an invalid/unknown token."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -650,7 +651,7 @@ class TestRecordApply:
         assert result["status"] == "error"
         assert "invalid" in result["error"]["message"].lower() or "expired" in result["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_token_consumed_only_once(self, settings, auth_provider):
         """Token is single-use - second apply with same token fails."""
@@ -679,7 +680,7 @@ class TestRecordApply:
         assert result2["status"] == "error"
         assert "invalid" in result2["error"]["message"].lower() or "expired" in result2["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_apply_masks_sensitive_fields(self, settings, auth_provider):
         """Applied create masks sensitive fields in the returned record."""
@@ -709,7 +710,7 @@ class TestRecordApply:
         assert result["status"] == "success"
         assert result["data"]["record"]["password"] == "***MASKED***"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_apply_acl_denied(self, settings, auth_provider):
         """Returns clear ACL error when ServiceNow denies the apply operation."""
@@ -737,16 +738,36 @@ METADATA_URL = f"{BASE_URL}/api/now/table/sys_dictionary"
 
 METADATA_WITH_TWO_MANDATORY = {
     "result": [
-        {"element": "short_description", "mandatory": "true", "internal_type": "string"},
-        {"element": "category", "mandatory": "true", "internal_type": "string"},
-        {"element": "description", "mandatory": "false", "internal_type": "string"},
+        {
+            "element": "short_description",
+            "mandatory": "true",
+            "internal_type": "string",
+        },
+        {
+            "element": "category",
+            "mandatory": "true",
+            "internal_type": "string",
+        },
+        {
+            "element": "description",
+            "mandatory": "false",
+            "internal_type": "string",
+        },
     ]
 }
 
 METADATA_NO_MANDATORY = {
     "result": [
-        {"element": "short_description", "mandatory": "false", "internal_type": "string"},
-        {"element": "description", "mandatory": "false", "internal_type": "string"},
+        {
+            "element": "short_description",
+            "mandatory": "false",
+            "internal_type": "string",
+        },
+        {
+            "element": "description",
+            "mandatory": "false",
+            "internal_type": "string",
+        },
     ]
 }
 
@@ -754,7 +775,7 @@ METADATA_NO_MANDATORY = {
 class TestMandatoryFieldValidation:
     """Tests for mandatory field pre-flight validation on record creation."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_record_create_missing_mandatory_fields(self, settings, auth_provider):
         """Returns error when mandatory fields are missing from create data."""
@@ -772,7 +793,7 @@ class TestMandatoryFieldValidation:
         assert "category" in result["data"]["missing_fields"]
         assert "Missing mandatory fields" in result["error"]["message"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_record_create_all_mandatory_present(self, settings, auth_provider):
         """Proceeds with create when all mandatory fields are present."""
@@ -800,7 +821,7 @@ class TestMandatoryFieldValidation:
         assert result["status"] == "success"
         assert result["data"]["sys_id"] == "new001"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_record_preview_create_missing_mandatory_fields(self, settings, auth_provider):
         """Returns error when mandatory fields are missing from preview create data."""
@@ -817,7 +838,7 @@ class TestMandatoryFieldValidation:
         assert "category" in result["data"]["missing_fields"]
         assert "Missing mandatory fields" in result["error"]["message"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_record_preview_create_all_mandatory_present(self, settings, auth_provider):
         """Returns preview token when all mandatory fields are present."""
@@ -834,7 +855,7 @@ class TestMandatoryFieldValidation:
         assert "token" in result["data"]
         assert result["data"]["action"] == "create"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_record_apply_create_missing_mandatory_fields(self, settings, auth_provider):
         """record_apply catches newly mandatory fields at apply time."""
@@ -844,7 +865,11 @@ class TestMandatoryFieldValidation:
                 200,
                 json={
                     "result": [
-                        {"element": "short_description", "mandatory": "true", "internal_type": "string"},
+                        {
+                            "element": "short_description",
+                            "mandatory": "true",
+                            "internal_type": "string",
+                        },
                     ]
                 },
             )
@@ -867,7 +892,7 @@ class TestMandatoryFieldValidation:
         assert "category" in result["data"]["missing_fields"]
         assert "Missing mandatory fields" in result["error"]["message"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_record_create_no_mandatory_fields(self, settings, auth_provider):
         """Proceeds normally when table has no mandatory fields."""
@@ -894,7 +919,7 @@ class TestMandatoryFieldValidation:
         assert result["status"] == "success"
         assert result["data"]["sys_id"] == "new002"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_record_create_metadata_unavailable(self, settings, auth_provider):
         """Create proceeds when metadata endpoint returns 500 (best-effort)."""

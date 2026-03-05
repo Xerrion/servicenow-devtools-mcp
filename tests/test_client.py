@@ -6,10 +6,11 @@ import respx
 
 from servicenow_mcp.auth import BasicAuthProvider
 
+
 BASE_URL = "https://test.service-now.com"
 
 
-@pytest.fixture
+@pytest.fixture()
 def auth_provider(settings):
     """Create a BasicAuthProvider from test settings."""
     return BasicAuthProvider(settings)
@@ -18,7 +19,7 @@ def auth_provider(settings):
 class TestServiceNowClientGetRecord:
     """Test get_record method."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_get_record_success(self, settings, auth_provider):
         """Fetches a single record by sys_id."""
@@ -37,7 +38,7 @@ class TestServiceNowClientGetRecord:
         assert record == {"sys_id": "abc123", "number": "INC0001"}
         assert route.called
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_get_record_with_fields(self, settings, auth_provider):
         """Respects field selection parameter."""
@@ -55,7 +56,7 @@ class TestServiceNowClientGetRecord:
 
         assert "sysparm_fields" in str(route.calls[0].request.url)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_get_record_with_display_values(self, settings, auth_provider):
         """Passes display_value parameter."""
@@ -73,7 +74,7 @@ class TestServiceNowClientGetRecord:
 
         assert "sysparm_display_value=true" in str(route.calls[0].request.url)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_get_record_without_display_values(self, settings, auth_provider):
         """Omits display_value param when display_values is False."""
@@ -91,7 +92,7 @@ class TestServiceNowClientGetRecord:
 
         assert "sysparm_display_value" not in str(route.calls[0].request.url)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_get_record_not_found(self, settings, auth_provider):
         """Raises NotFoundError for 404."""
@@ -106,7 +107,7 @@ class TestServiceNowClientGetRecord:
             with pytest.raises(NotFoundError):
                 await client.get_record("incident", "missing")
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_get_record_auth_error(self, settings, auth_provider):
         """Raises AuthError for 401."""
@@ -125,7 +126,7 @@ class TestServiceNowClientGetRecord:
 class TestServiceNowClientQueryRecords:
     """Test query_records method."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_query_records_success(self, settings, auth_provider):
         """Returns list of matching records."""
@@ -150,7 +151,7 @@ class TestServiceNowClientQueryRecords:
         assert len(result["records"]) == 2
         assert result["count"] == 2
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_query_records_with_limit_and_offset(self, settings, auth_provider):
         """Passes limit and offset parameters."""
@@ -171,7 +172,7 @@ class TestServiceNowClientQueryRecords:
         assert "sysparm_limit=10" in url
         assert "sysparm_offset=20" in url
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_query_records_with_order_by(self, settings, auth_provider):
         """Passes order_by parameter."""
@@ -191,7 +192,7 @@ class TestServiceNowClientQueryRecords:
         url = str(route.calls[0].request.url)
         assert "sysparm_orderby" in url
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_query_records_empty_results(self, settings, auth_provider):
         """Handles empty result set."""
@@ -211,7 +212,7 @@ class TestServiceNowClientQueryRecords:
         assert result["records"] == []
         assert result["count"] == 0
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_query_records_with_display_values(self, settings, auth_provider):
         """Passes display_value parameter when display_values=True."""
@@ -230,7 +231,7 @@ class TestServiceNowClientQueryRecords:
 
         assert "sysparm_display_value=true" in str(route.calls[0].request.url)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_query_records_without_display_values(self, settings, auth_provider):
         """Omits display_value param when display_values is False."""
@@ -253,7 +254,7 @@ class TestServiceNowClientQueryRecords:
 class TestServiceNowClientGetMetadata:
     """Test get_metadata method."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_get_metadata_queries_sys_dictionary(self, settings, auth_provider):
         """Queries sys_dictionary for the given table."""
@@ -279,14 +280,13 @@ class TestServiceNowClientGetMetadata:
 
         assert route.called
         url = str(route.calls[0].request.url)
-        # URL-encoded = becomes %3D in query params
-        assert "name" in url and "incident" in url
+        assert "name%3Dincident" in url
 
 
 class TestServiceNowClientAggregate:
     """Test aggregate method."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_aggregate_count(self, settings, auth_provider):
         """Performs aggregate query for counts."""
@@ -308,7 +308,7 @@ class TestServiceNowClientAggregate:
 
         assert result is not None
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_aggregate_with_field_specific_stats(self, settings, auth_provider):
         """Passes field-specific avg/min/max/sum params."""
@@ -337,7 +337,7 @@ class TestServiceNowClientAggregate:
         assert "sysparm_max_fields" in url
         assert "sysparm_sum_fields" in url
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_aggregate_with_having_and_order_by(self, settings, auth_provider):
         """Passes having and order_by parameters."""
@@ -363,7 +363,7 @@ class TestServiceNowClientAggregate:
         assert "sysparm_orderby" in url
         assert "sysparm_having" in url
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_aggregate_with_display_value(self, settings, auth_provider):
         """Passes display_value parameter."""
@@ -390,7 +390,7 @@ class TestServiceNowClientAggregate:
 class TestServiceNowClientCreateRecord:
     """Test create_record method."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_create_record_success(self, settings, auth_provider):
         """Creates a record via POST."""
@@ -412,7 +412,7 @@ class TestServiceNowClientCreateRecord:
 class TestServiceNowClientUpdateRecord:
     """Test update_record method."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_update_record_success(self, settings, auth_provider):
         """Updates a record via PATCH."""
@@ -434,7 +434,7 @@ class TestServiceNowClientUpdateRecord:
 class TestServiceNowClientDeleteRecord:
     """Test delete_record method."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_delete_record_success(self, settings, auth_provider):
         """Deletes a record via DELETE."""
@@ -451,7 +451,7 @@ class TestServiceNowClientDeleteRecord:
 class TestServiceNowClientErrorHandling:
     """Test error mapping for various HTTP status codes."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_403_raises_forbidden_error(self, settings, auth_provider):
         """403 maps to ForbiddenError."""
@@ -466,7 +466,7 @@ class TestServiceNowClientErrorHandling:
             with pytest.raises(ForbiddenError):
                 await client.get_record("incident", "abc123")
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_500_raises_server_error(self, settings, auth_provider):
         """500 maps to ServerError."""
@@ -485,7 +485,7 @@ class TestServiceNowClientErrorHandling:
 class TestServiceNowClientCorrelationId:
     """Test that correlation ID is included in requests."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_correlation_id_in_headers(self, settings, auth_provider):
         """Every request includes an X-Correlation-ID header."""
@@ -505,7 +505,7 @@ class TestServiceNowClientCorrelationId:
 class TestServiceNowClientGetEmail:
     """Test get_email method."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_get_email_success(self, settings, auth_provider):
         """Fetches an email record by ID."""
@@ -530,7 +530,7 @@ class TestServiceNowClientGetEmail:
         assert result["sys_id"] == "email123"
         assert result["subject"] == "Test email"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_get_email_with_fields(self, settings, auth_provider):
         """Passes sysparm_fields parameter."""
@@ -552,7 +552,7 @@ class TestServiceNowClientGetEmail:
 class TestServiceNowClientGetImportSetRecord:
     """Test get_import_set_record method."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_get_import_set_record_success(self, settings, auth_provider):
         """Retrieves an import set record."""
@@ -577,7 +577,7 @@ class TestServiceNowClientGetImportSetRecord:
         assert result["sys_id"] == "rec123"
         assert result["status"] == "inserted"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_get_import_set_record_not_found(self, settings, auth_provider):
         """Raises NotFoundError for missing import set record."""
@@ -596,7 +596,7 @@ class TestServiceNowClientGetImportSetRecord:
 class TestServiceNowClientReportingAPIs:
     """Test reporting API methods."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_list_reports_success(self, settings, auth_provider):
         """Returns a list of reports."""
@@ -620,7 +620,7 @@ class TestServiceNowClientReportingAPIs:
         assert len(result) == 2
         assert result[0]["title"] == "Incident Report"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_list_reports_with_params(self, settings, auth_provider):
         """Passes search, sort, and pagination parameters."""
@@ -644,7 +644,7 @@ class TestServiceNowClientReportingAPIs:
         assert "sysparm_page" in url
         assert "sysparm_per_page" in url
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_get_table_description_success(self, settings, auth_provider):
         """Returns table description."""
@@ -662,7 +662,7 @@ class TestServiceNowClientReportingAPIs:
 
         assert result["label"] == "Incident"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_get_field_descriptions_success(self, settings, auth_provider):
         """Returns field descriptions for a table."""
@@ -690,7 +690,7 @@ class TestServiceNowClientReportingAPIs:
 class TestServiceNowClientCodeSearch:
     """Test Code Search API methods."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_code_search_success(self, settings, auth_provider):
         """Performs code search and returns results."""
@@ -718,7 +718,7 @@ class TestServiceNowClientCodeSearch:
 
         assert result is not None
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_code_search_with_table_and_group(self, settings, auth_provider):
         """Passes table and search_group parameters."""
@@ -739,7 +739,7 @@ class TestServiceNowClientCodeSearch:
         assert "table" in url
         assert "search_group" in url
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_code_search_with_limit(self, settings, auth_provider):
         """Passes limit parameter."""
@@ -755,7 +755,7 @@ class TestServiceNowClientCodeSearch:
         url = str(route.calls[0].request.url)
         assert "limit=50" in url
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_code_search_tables_success(self, settings, auth_provider):
         """Returns list of searchable tables."""
@@ -784,7 +784,7 @@ class TestServiceNowClientCodeSearch:
 class TestServiceNowClientCMDB:
     """Test CMDB API methods."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_cmdb_query_success(self, settings, auth_provider):
         """Queries CMDB instances for a class."""
@@ -809,7 +809,7 @@ class TestServiceNowClientCMDB:
         assert len(result["records"]) == 2
         assert result["count"] == 2
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_cmdb_query_with_params(self, settings, auth_provider):
         """Passes query, limit, and offset parameters."""
@@ -836,7 +836,7 @@ class TestServiceNowClientCMDB:
         assert "sysparm_limit=10" in url
         assert "sysparm_offset=5" in url
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_cmdb_get_instance_success(self, settings, auth_provider):
         """Retrieves a CMDB CI with relationships."""
@@ -860,7 +860,7 @@ class TestServiceNowClientCMDB:
 
         assert result["attributes"]["sys_id"] == "ci123"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_cmdb_get_instance_not_found(self, settings, auth_provider):
         """Raises NotFoundError for missing CI."""
@@ -875,7 +875,7 @@ class TestServiceNowClientCMDB:
             with pytest.raises(NotFoundError):
                 await client.cmdb_get_instance("cmdb_ci_linux_server", "missing")
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_cmdb_get_meta_success(self, settings, auth_provider):
         """Retrieves CMDB class metadata."""
@@ -903,7 +903,7 @@ class TestServiceNowClientCMDB:
 class TestServiceNowClientEncodedQueryTranslator:
     """Test encoded query translator method."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_translate_encoded_query_success(self, settings, auth_provider):
         """Translates encoded query to human-readable form."""
@@ -921,7 +921,7 @@ class TestServiceNowClientEncodedQueryTranslator:
 
         assert result is not None
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_translate_encoded_query_passes_params(self, settings, auth_provider):
         """Passes table and query parameters correctly."""
@@ -942,7 +942,7 @@ class TestServiceNowClientEncodedQueryTranslator:
 class TestClientNotInitialized:
     """Test that calling methods without async with context raises RuntimeError."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_get_record_without_context_manager(self, settings, auth_provider):
         """get_record raises RuntimeError when client is not initialized."""
         from servicenow_mcp.client import ServiceNowClient
@@ -951,7 +951,7 @@ class TestClientNotInitialized:
         with pytest.raises(RuntimeError, match="Client not initialized"):
             await client.get_record("incident", "abc123")
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_query_records_without_context_manager(self, settings, auth_provider):
         """query_records raises RuntimeError when client is not initialized."""
         from servicenow_mcp.client import ServiceNowClient
@@ -964,7 +964,7 @@ class TestClientNotInitialized:
 class TestMissingResultKey:
     """Test that missing 'result' key in API response raises ServerError."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_get_record_missing_result_key(self, settings, auth_provider):
         """ServerError raised when API response lacks 'result' key."""
@@ -982,7 +982,7 @@ class TestMissingResultKey:
             with pytest.raises(ServerError, match="missing 'result' key"):
                 await client.get_record("incident", "abc123")
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_query_records_missing_result_key(self, settings, auth_provider):
         """ServerError raised when query response lacks 'result' key."""
@@ -1005,7 +1005,7 @@ class TestMissingResultKey:
 class TestInvalidTotalCount:
     """Test that invalid X-Total-Count header defaults to 0."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_query_records_invalid_total_count(self, settings, auth_provider):
         """Non-numeric X-Total-Count defaults to 0."""
@@ -1025,7 +1025,7 @@ class TestInvalidTotalCount:
         assert result["count"] == 0
         assert len(result["records"]) == 1
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_cmdb_query_invalid_total_count(self, settings, auth_provider):
         """Non-numeric X-Total-Count in CMDB query defaults to 0."""

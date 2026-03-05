@@ -8,6 +8,7 @@ import pytest
 from servicenow_mcp.packages import PACKAGE_REGISTRY
 from servicenow_mcp.server import create_mcp_server
 
+
 pytestmark = pytest.mark.integration
 
 # Expected tool counts per package (verified in Wave FINAL F3).
@@ -33,7 +34,7 @@ class TestPackageLoading:
     """Test that each package preset creates an MCP server with the correct tool count."""
 
     @pytest.mark.parametrize(
-        "package_name,expected_count",
+        ("package_name", "expected_count"),
         list(EXPECTED_TOOL_COUNTS.items()),
         ids=list(EXPECTED_TOOL_COUNTS.keys()),
     )
@@ -84,7 +85,11 @@ class TestPackageLoading:
             "domain_incident,domain_change",
             "metadata,documentation,utility",
         ],
-        ids=["introspection+relationships", "incident+change", "metadata+docs+utility"],
+        ids=[
+            "introspection+relationships",
+            "incident+change",
+            "metadata+docs+utility",
+        ],
     )
     def test_comma_separated_groups_load(self, groups_csv: str) -> None:
         """Verify comma-separated group syntax creates a working server."""

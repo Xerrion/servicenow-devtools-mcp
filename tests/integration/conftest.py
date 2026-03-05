@@ -14,6 +14,7 @@ from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.config import Settings
 
+
 # Apply the integration marker to every test in this directory
 pytestmark = pytest.mark.integration
 

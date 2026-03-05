@@ -10,6 +10,7 @@ from toon_format import decode as toon_decode
 from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.state import QueryTokenStore
 
+
 BASE_URL = "https://test.service-now.com"
 
 # Artifact type → ServiceNow table mapping (must match implementation)
@@ -34,7 +35,7 @@ SCRIPT_TABLES = [
 ]
 
 
-@pytest.fixture
+@pytest.fixture()
 def auth_provider(settings):
     """Create a BasicAuthProvider from test settings."""
     return BasicAuthProvider(settings)
@@ -56,7 +57,7 @@ def _register_and_get_tools(settings, auth_provider):
 class TestMetaListArtifacts:
     """Tests for the meta_list_artifacts tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_lists_artifacts_by_type(self, settings, auth_provider):
         """Lists artifacts filtered by type (e.g., business_rule)."""
@@ -92,7 +93,7 @@ class TestMetaListArtifacts:
         assert result["data"]["artifacts"][0]["name"] == "Set Priority"
         assert result["data"]["artifact_type"] == "business_rule"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_lists_artifacts_with_query_filter(self, settings, auth_provider):
         """Filters artifacts by a user-provided query string."""
@@ -121,7 +122,7 @@ class TestMetaListArtifacts:
         assert result["status"] == "success"
         assert len(result["data"]["artifacts"]) == 1
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_unknown_type_returns_error(self, settings, auth_provider):
         """Unknown artifact type returns an error."""
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
@@ -131,7 +132,7 @@ class TestMetaListArtifacts:
         assert result["status"] == "error"
         assert "unknown" in result["error"]["message"].lower() or "type" in result["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_includes_correlation_id(self, settings, auth_provider):
         """Response always contains a correlation_id."""
@@ -150,7 +151,7 @@ class TestMetaListArtifacts:
         assert "correlation_id" in result
         assert len(result["correlation_id"]) > 0
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_meta_list_artifacts_limit_capped(self, settings, auth_provider):
         """Limit exceeding max_row_limit is capped via enforce_query_safety."""
@@ -181,7 +182,7 @@ class TestMetaListArtifacts:
 class TestMetaGetArtifact:
     """Tests for the meta_get_artifact tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_returns_full_artifact(self, settings, auth_provider):
         """Returns full artifact details including script body."""
@@ -209,7 +210,7 @@ class TestMetaGetArtifact:
         assert result["data"]["sys_id"] == "br1"
         assert result["data"]["script"] == "current.priority = 1;"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_not_found_returns_error(self, settings, auth_provider):
         """404 from ServiceNow produces an error response."""
@@ -227,7 +228,7 @@ class TestMetaGetArtifact:
 class TestMetaFindReferences:
     """Tests for the meta_find_references tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_uses_code_search_api_when_available(self, settings, auth_provider):
         """Prefers Code Search API and returns results from it."""
@@ -258,7 +259,7 @@ class TestMetaFindReferences:
         assert len(result["data"]["matches"]) >= 1
         assert result["data"]["search_method"] == "code_search_api"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_falls_back_to_table_search(self, settings, auth_provider):
         """Falls back to per-table scriptCONTAINS when Code Search API fails."""
@@ -304,7 +305,7 @@ class TestMetaFindReferences:
         tables_found = [m["table"] for m in result["data"]["matches"]]
         assert "sys_script" in tables_found
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_no_references_found(self, settings, auth_provider):
         """Returns empty matches when target string is not found anywhere."""
@@ -323,7 +324,7 @@ class TestMetaFindReferences:
         assert result["status"] == "success"
         assert result["data"]["matches"] == []
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_meta_find_references_limit_capped(self, settings, auth_provider):
         """Limit exceeding max_row_limit is capped in fallback per-table queries."""
@@ -360,7 +361,7 @@ class TestMetaFindReferences:
             qs = parse_qs(parsed.query)
             assert qs["sysparm_limit"] == [str(settings.max_row_limit)], f"Table '{table}' should have capped limit"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_caret_in_target_single_sanitized(self, settings, auth_provider):
         """Target with carets is single-sanitized (^ → ^^) in fallback CONTAINS queries."""
@@ -400,7 +401,7 @@ class TestMetaFindReferences:
 class TestMetaWhatWrites:
     """Tests for the meta_what_writes tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_finds_business_rules_writing_to_table(self, settings, auth_provider):
         """Finds business rules that write to the specified table."""
@@ -433,7 +434,7 @@ class TestMetaWhatWrites:
         assert result["data"]["writers"][0]["name"] == "Set Priority"
         assert result["data"]["table"] == "incident"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_filters_by_field(self, settings, auth_provider):
         """When field is specified, filters business rules whose script references the field."""
@@ -475,7 +476,7 @@ class TestMetaWhatWrites:
         assert len(writers) == 1
         assert writers[0]["name"] == "Set Priority"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_no_writers_found(self, settings, auth_provider):
         """Returns empty writers when no BRs write to the table."""

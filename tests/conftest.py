@@ -7,7 +7,7 @@ import pytest
 from servicenow_mcp.config import Settings
 
 
-@pytest.fixture
+@pytest.fixture()
 def settings():
     """Create test settings with valid defaults."""
     env = {
@@ -21,7 +21,7 @@ def settings():
         return Settings(_env_file=None)
 
 
-@pytest.fixture
+@pytest.fixture()
 def prod_settings():
     """Create test settings for production environment."""
     env = {

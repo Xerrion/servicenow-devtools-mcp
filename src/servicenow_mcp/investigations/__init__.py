@@ -7,6 +7,8 @@ Each module exports:
 The INVESTIGATION_REGISTRY maps investigation names to their modules.
 """
 
+import types
+
 from servicenow_mcp.investigations import (
     acl_conflicts,
     deprecated_apis,
@@ -17,7 +19,8 @@ from servicenow_mcp.investigations import (
     table_health,
 )
 
-INVESTIGATION_REGISTRY: dict = {
+
+INVESTIGATION_REGISTRY: dict[str, types.ModuleType] = {
     "stale_automations": stale_automations,
     "deprecated_apis": deprecated_apis,
     "table_health": table_health,

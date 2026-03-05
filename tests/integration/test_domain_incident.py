@@ -6,6 +6,7 @@ from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.config import Settings
 
+
 pytestmark = pytest.mark.integration
 
 
@@ -49,7 +50,13 @@ class TestDomainIncident:
             record = await client.get_record(
                 "incident",
                 incident_sys_id,
-                fields=["sys_id", "number", "short_description", "state", "priority"],
+                fields=[
+                    "sys_id",
+                    "number",
+                    "short_description",
+                    "state",
+                    "priority",
+                ],
             )
         assert record["sys_id"] == incident_sys_id
         assert "number" in record
