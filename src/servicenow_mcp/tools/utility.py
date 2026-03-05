@@ -337,7 +337,14 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 )
 
             query = ServiceNowQuery()
-            for condition in parsed:
+            for idx, condition in enumerate(parsed):
+                if not isinstance(condition, dict):
+                    return format_response(
+                        data=None,
+                        correlation_id=correlation_id,
+                        status="error",
+                        error=f"conditions[{idx}] must be a JSON object, got {type(condition).__name__}",
+                    )
                 err = _apply_condition(query, condition, correlation_id)
                 if err:
                     return err

@@ -327,7 +327,7 @@ def _extract_gliderecord_tables(script: str) -> list[str]:
 
 
 _WHILE_BLOCK_RE: re.Pattern[str] = re.compile(r"\bwhile\s*\(")
-_GR_IN_BLOCK_RE: re.Pattern[str] = re.compile(r"new\s+GlideRecord\s*\(")
+_GR_IN_BLOCK_RE: re.Pattern[str] = re.compile(r"new\s+GlideRecord(?:Secure)?\s*\(")
 
 _SCENARIO_PATTERNS: list[tuple[re.Pattern[str], dict[str, str]]] = [
     (
