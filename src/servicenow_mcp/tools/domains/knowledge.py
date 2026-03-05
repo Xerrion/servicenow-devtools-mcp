@@ -36,6 +36,44 @@ def register_tools(
     """
     _ = choices  # Accepted for interface conformance with domain tool convention
 
+    async def _resolve_article_sys_id(
+        client: ServiceNowClient,
+        number_or_sys_id: str,
+        correlation_id: str,
+    ) -> tuple[str | None, str | None]:
+        """Resolve a KB article identifier to its sys_id.
+
+        Tries lookup by number first, then falls back to sys_id if the input
+        matches the 32-char hex pattern.
+
+        Returns:
+            Tuple of (sys_id, None) on success, or (None, error_response) on failure.
+        """
+        is_sys_id = bool(_SYS_ID_PATTERN.match(number_or_sys_id.lower()))
+
+        result = await client.query_records(
+            table="kb_knowledge",
+            query=ServiceNowQuery().equals("number", number_or_sys_id.upper()).build(),
+            limit=1,
+        )
+
+        if not result["records"] and is_sys_id:
+            result = await client.query_records(
+                table="kb_knowledge",
+                query=ServiceNowQuery().equals("sys_id", number_or_sys_id).build(),
+                limit=1,
+            )
+
+        if not result["records"]:
+            return None, format_response(
+                data=None,
+                correlation_id=correlation_id,
+                status="error",
+                error=f"Knowledge article '{number_or_sys_id}' not found.",
+            )
+
+        return result["records"][0]["sys_id"], None
+
     @mcp.tool()
     @tool_handler
     async def knowledge_search(
@@ -212,34 +250,11 @@ def register_tools(
         if gate_error:
             return gate_error
 
-        # Detect if input is sys_id (32-char lowercase hex string)
-        is_sys_id = bool(_SYS_ID_PATTERN.match(number_or_sys_id.lower()))
-
         async with ServiceNowClient(settings, auth_provider) as client:
-            # Try lookup by number first
-            result = await client.query_records(
-                table="kb_knowledge",
-                query=ServiceNowQuery().equals("number", number_or_sys_id.upper()).build(),
-                limit=1,
-            )
-
-            # If not found and looks like sys_id, try sys_id lookup
-            if not result["records"] and is_sys_id:
-                result = await client.query_records(
-                    table="kb_knowledge",
-                    query=ServiceNowQuery().equals("sys_id", number_or_sys_id).build(),
-                    limit=1,
-                )
-
-            if not result["records"]:
-                return format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error=f"Knowledge article '{number_or_sys_id}' not found.",
-                )
-
-            sys_id = result["records"][0]["sys_id"]
+            sys_id, error = await _resolve_article_sys_id(client, number_or_sys_id, correlation_id)
+            if error:
+                return error
+            assert sys_id is not None  # Guaranteed when error is None
 
             # Build changes dict (only include non-empty params)
             changes: dict[str, str] = {}
@@ -313,34 +328,11 @@ def register_tools(
         if gate_error:
             return gate_error
 
-        # Detect if input is sys_id (32-char lowercase hex string)
-        is_sys_id = bool(_SYS_ID_PATTERN.match(number_or_sys_id.lower()))
-
         async with ServiceNowClient(settings, auth_provider) as client:
-            # Try lookup by number first
-            result = await client.query_records(
-                table="kb_knowledge",
-                query=ServiceNowQuery().equals("number", number_or_sys_id.upper()).build(),
-                limit=1,
-            )
-
-            # If not found and looks like sys_id, try sys_id lookup
-            if not result["records"] and is_sys_id:
-                result = await client.query_records(
-                    table="kb_knowledge",
-                    query=ServiceNowQuery().equals("sys_id", number_or_sys_id).build(),
-                    limit=1,
-                )
-
-            if not result["records"]:
-                return format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error=f"Knowledge article '{number_or_sys_id}' not found.",
-                )
-
-            article_sys_id = result["records"][0]["sys_id"]
+            article_sys_id, error = await _resolve_article_sys_id(client, number_or_sys_id, correlation_id)
+            if error:
+                return error
+            assert article_sys_id is not None  # Guaranteed when error is None
 
             feedback_data: dict[str, str] = {"article": article_sys_id}
             if rating is not None:
