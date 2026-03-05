@@ -1,137 +1,504 @@
-# AGENTS.md — servicenow-devtools-mcp
+# AGENTS.md - servicenow-devtools-mcp
 
-## Project Overview
+## 📋 Project Overview
 
 - Python 3.12+ async MCP server for ServiceNow platform introspection, debugging, and change intelligence.
 - Package manager: **uv** (not pip/poetry). Build system: hatchling.
 - Source layout: `src/servicenow_mcp/` (src-layout). Entry point: `servicenow_mcp.server:main`.
 - Config via `pydantic-settings` loading env vars from `.env` / `.env.local`.
-- Key deps: `mcp`, `httpx`, `pydantic`, `pydantic-settings`, `uvicorn`, `starlette`.
+- Version: 0.6.0. Supported Python: 3.12, 3.13, 3.14.
 
-## Setup
+### Dependencies
 
-- `uv sync --group dev` — install all dependencies including dev tools.
-- Copy `.env.example` → `.env.local` and fill in ServiceNow credentials.
-- Supported Python versions: 3.12, 3.13, 3.14.
-- No build step needed for development; `uv build` creates the distribution wheel.
+| Type          | Packages                                                                   |
+| ------------- | -------------------------------------------------------------------------- |
+| Core          | `mcp`, `httpx`, `pydantic`, `pydantic-settings`, `python-dotenv`, `uvicorn`, `starlette` |
+| Serialization | `toon-format` (external git dep from `github.com/toon-format/toon-python.git`) |
+| Dev           | `pytest`, `pytest-asyncio`, `respx`, `ruff`, `mypy`, `pytest-cov`                      |
 
-## Lint / Format / Type-check
+## 🚀 Setup
 
-- `uv run ruff check .` — lint (rules: E, F, W, I, UP, B, SIM, RUF; E501 ignored).
-- `uv run ruff check --fix .` — auto-fix lint issues.
-- `uv run ruff format .` — auto-format code.
-- `uv run ruff format --check .` — verify formatting without changes.
-- `uv run mypy src/` — type checking (`disallow_untyped_defs = true`).
-- mypy override: `servicenow_mcp.server` has `call-arg` error code disabled.
+```bash
+uv sync --group dev          # Install all deps including dev tools
+cp .env.example .env.local   # Then fill in ServiceNow credentials
+```
 
-## Test Commands
+No build step needed for development. `uv build` creates the distribution wheel.
 
-- `uv run pytest` — run all unit tests (integration excluded by default via `-m 'not integration'`).
-- `uv run pytest tests/test_client.py` — run a single test file.
-- `uv run pytest tests/test_client.py::TestServiceNowClientGetRecord` — run a single test class.
-- `uv run pytest tests/test_client.py::TestServiceNowClientGetRecord::test_get_record_success` — run a single test method.
-- `uv run pytest -k "keyword"` — run tests matching a keyword expression.
-- `uv run pytest -m integration` — run integration tests (requires `.env.local` with real credentials).
-- `uv run pytest --no-cov` — skip coverage for faster iteration.
-- Default addopts: `-m 'not integration' --cov=servicenow_mcp --cov-report=xml --cov-report=term-missing`.
-- `asyncio_mode = "auto"` — no manual asyncio event loop configuration needed.
+## 🔧 Lint / Format / Type-check
+
+| Command                      | Purpose                                                                 |
+| ---------------------------- | ----------------------------------------------------------------------- |
+| `uv run ruff check .`          | Lint (rules: E, F, W, I, UP, B, SIM, RUF; E501 ignored)                 |
+| `uv run ruff check --fix .`    | Auto-fix lint issues                                                    |
+| `uv run ruff format .`         | Format code                                                             |
+| `uv run ruff format --check .` | Verify formatting without changes                                       |
+| `uv run mypy src/`             | Type checking (`disallow_untyped_defs=true`, `ignore_missing_imports=true`) |
+
+mypy override: `servicenow_mcp.server` has `call-arg` error code disabled.
+
+## 🧪 Test Commands
+
+| Command                                                    | Purpose                                                        |
+| ---------------------------------------------------------- | -------------------------------------------------------------- |
+| `uv run pytest`                                              | All unit tests (integration excluded via `-m 'not integration'`) |
+| `uv run pytest tests/test_client.py`                         | Single file                                                    |
+| `uv run pytest tests/test_client.py::TestClass::test_method` | Single test                                                    |
+| `uv run pytest -k "keyword"`                                 | Keyword match                                                  |
+| `uv run pytest -m integration`                               | Integration tests (requires `.env.local`)                        |
+| `uv run pytest --no-cov`                                     | Skip coverage for speed                                        |
+
+- Default addopts: `-m 'not integration' --cov=servicenow_mcp --cov-report=xml --cov-report=term-missing`
+- `asyncio_mode = "auto"` - no manual event loop configuration needed.
 - **ALWAYS** test changes before considering a task complete; check console output for warnings/errors.
 
-## Code Style & Formatting
+## 📐 Code Style & Formatting
 
 - Formatter: **Ruff**, line length **120**, **double quotes**, target Python 3.12.
-- Ruff lint rule sets: E (pycodestyle errors), F (pyflakes), W (pycodestyle warnings), I (isort), UP (pyupgrade), B (flake8-bugbear), SIM (flake8-simplify), RUF (ruff-specific).
-- E501 (line-too-long) is ignored — the formatter handles wrapping at 120 chars.
-- Use trailing commas in multi-line constructs (lists, dicts, function args).
+- Lint rules: E (pycodestyle errors), F (pyflakes), W (pycodestyle warnings), I (isort), UP (pyupgrade), B (flake8-bugbear), SIM (flake8-simplify), RUF (ruff-specific).
+- E501 (line-too-long) is ignored - the formatter handles wrapping at 120 chars.
+- Trailing commas in multi-line constructs (lists, dicts, function args).
 - All files end with a single trailing newline.
 
-## Import Conventions
+## 📦 Import Conventions
 
-- Import order enforced by ruff/isort: **stdlib → third-party → local**.
+- Order enforced by ruff/isort: **stdlib -> third-party -> local**.
 - **Absolute imports only**: `from servicenow_mcp.client import ServiceNowClient`.
-- Group specific imports: `from servicenow_mcp.errors import AuthError, NotFoundError, ServerError`.
 - No wildcard imports.
-- Third-party: `httpx`, `mcp`, `pydantic`, `pydantic_settings`, `python-dotenv`, `uvicorn`, `starlette`.
-- Dev-only: `pytest`, `pytest-asyncio`, `respx`, `ruff`, `mypy`, `pytest-cov`.
 
-## Type Annotations
+## 🏷 Type Annotations
 
-- **All** function signatures must have full type hints (enforced by mypy `disallow_untyped_defs`).
+- **ALL** function signatures must have full type hints (enforced by mypy `disallow_untyped_defs`).
 - Return types always explicit, including `-> None` for void functions.
 - Modern union syntax: `str | None` (not `Optional[str]`).
 - Lowercase generic types (PEP 585): `dict[str, Any]`, `list[str]`, `set[str]`.
 - Primary typing import: `from typing import Any`.
 - Regex patterns typed as `re.Pattern[str]`.
 
-## Naming Conventions
+## 🏷 Naming Conventions
 
-- Functions/methods/variables: `snake_case`.
-- Classes: `PascalCase` (e.g., `ServiceNowClient`, `BasicAuthProvider`).
-- Constants: `UPPER_SNAKE_CASE` (e.g., `DENIED_TABLES`, `MASK_VALUE`, `PACKAGE_REGISTRY`).
-- Private methods/attributes: single underscore prefix `_` (e.g., `_table_url`, `_http_client`).
-- Module-level logger: `logger = logging.getLogger(__name__)`.
-- Test classes: `Test` prefix + feature (e.g., `TestServiceNowClientGetRecord`, `TestTableDescribe`).
-- Test methods: `test_` prefix with descriptive name (e.g., `test_get_record_success`).
+| Category                    | Convention                 | Examples                                                            |
+| --------------------------- | -------------------------- | ------------------------------------------------------------------- |
+| Functions/methods/variables | `snake_case`                 | `check_table_access`, `query_store`                                     |
+| Classes                     | `PascalCase`                 | `ServiceNowClient`, `BasicAuthProvider`, `ChoiceRegistry`                 |
+| Constants                   | `UPPER_SNAKE_CASE`           | `DENIED_TABLES`, `MASK_VALUE`, `PACKAGE_REGISTRY`, `INVESTIGATION_REGISTRY` |
+| Private                     | Single underscore `_` prefix | `_table_url`, `_http_client`, `_ensure_client`                            |
+| Logger                      | Module-level               | `logger = logging.getLogger(__name__)`                                |
+| Test classes                | `Test` prefix + feature      | `TestServiceNowClientGetRecord`, `TestTableDescribe`                    |
+| Test methods                | `test_` prefix + descriptive | `test_get_record_success`                                             |
 
-## Docstrings
+## 📝 Docstrings
 
 - Every module starts with a module-level docstring: `"""Brief description."""`
 - Classes and public functions have triple-double-quote docstrings.
 - Tool functions use `Args:` section with indented param descriptions (MCP uses these for tool schemas).
 - Fixtures have one-line docstrings explaining their purpose.
 
-## Error Handling
+## ⚠️ Error Handling
 
-- Custom exception hierarchy in `errors.py`, rooted at `ServiceNowMCPError(Exception)`.
-- HTTP-mapped errors: `AuthError` (401), `ForbiddenError` (403), `NotFoundError` (404), `ServerError` (5xx).
-- Policy errors: `PolicyError`, `QuerySafetyError`, `WriteGatingError`.
-- HTTP status mapping in `client.py:_raise_for_status()` — always call after API responses.
-- **Tool functions never raise to MCP** — they catch all exceptions and return JSON error envelopes:
-  ```python
-  except Exception as e:
-      return json.dumps(format_response(data=None, correlation_id=correlation_id, status="error", error=str(e)))
-  ```
-- Use `assert self._http_client is not None` to guard against uninitialized client state.
+Custom exception hierarchy in `errors.py`:
 
-## Async Patterns
+```text
+ServiceNowMCPError(Exception)     # Root; has status_code attribute
+  ├── AuthError                   # 401
+  ├── ForbiddenError              # 403
+  ├── NotFoundError               # 404
+  ├── ServerError                 # 5xx
+  └── PolicyError                 # 403
+        └── QuerySafetyError      # 403
+```
+
+HTTP status mapping in `client.py:_raise_for_status()`:
+
+| HTTP Status  | Exception          |
+| ------------ | ------------------ |
+| 401          | `AuthError`          |
+| 403          | `ForbiddenError`     |
+| 404          | `NotFoundError`      |
+| 500+         | `ServerError`        |
+| 400+ (other) | `ServiceNowMCPError` |
+
+### Write Gating (Function-Based - No Exception Class)
+
+Write gating uses a function-based approach. There is **no** `WriteGatingError` class.
+
+```python
+from servicenow_mcp.policy import write_gate, can_write, write_blocked_reason
+
+# In tool functions - returns error envelope string if blocked, None if allowed
+gate = write_gate("incident", settings, correlation_id)
+if gate:
+    return gate  # Already a serialized error response
+
+# Boolean check
+if can_write("incident", settings, override=False):
+    ...
+
+# Get human-readable reason (checks denied tables + is_production)
+reason = write_blocked_reason("incident", settings)
+```
+
+### Tool Error Safety
+
+**Tool functions never raise to MCP.** The `@tool_handler` decorator combined with `safe_tool_call()` catches all exceptions and returns serialized error envelopes automatically. Manual try/except blocks are NOT needed in tool functions.
+
+## 🎯 @tool_handler Decorator - THE CENTRAL PATTERN
+
+This is the most important pattern in the codebase. Located in `decorators.py`.
+
+```python
+@mcp.tool()
+@tool_handler
+async def my_tool(param: str, correlation_id: str = "") -> str:
+    # correlation_id is auto-injected, never passed by MCP caller
+    ...
+    return format_response(data=result, correlation_id=correlation_id)
+```
+
+What `@tool_handler` does:
+
+1. Auto-generates `correlation_id` via `generate_correlation_id()` (UUID4).
+2. Wraps the function call in `safe_tool_call()` which catches `ForbiddenError` and `Exception`, returning serialized error envelopes.
+3. Hides `correlation_id` from the FastMCP tool schema by overriding `__signature__` and deleting `__wrapped__`.
+4. Tool functions do **NOT** need manual try/except blocks.
+
+## 📄 TOON Serialization
+
+All tool output uses **TOON format**, not raw JSON. This is a critical difference from typical MCP servers.
+
+- `toon-format` is an external dep from git: `github.com/toon-format/toon-python.git`
+- `utils.py:serialize(data)` uses `toon_encode()` with JSON fallback
+- `format_response()` returns a serialized TOON string (not a dict) - it calls `serialize()` internally
+- Error strings are wrapped as `{"message": error}` dicts before serialization
+
+### Parsing Tool Output
+
+```python
+# CORRECT - use toon_decode
+from toon_format import decode as toon_decode
+result = toon_decode(raw_output)
+
+# WRONG - do NOT use json.loads
+import json
+result = json.loads(raw_output)  # This will fail on TOON-formatted output
+```
+
+## 📊 Response Format
+
+All tools return a serialized TOON string via `format_response()`:
+
+```python
+format_response(
+    data=...,               # Any serializable data
+    correlation_id=...,     # Auto-injected by @tool_handler
+    status="success",       # "success" or "error"
+    error=None,             # str | dict | None
+    pagination=None,        # dict | None
+    warnings=None,          # list | None
+) -> str                    # Returns serialized TOON string
+```
+
+Error response example:
+
+```python
+return format_response(data=None, correlation_id=correlation_id, status="error", error="Something failed")
+```
+
+## 🛡 Policy Layer
+
+### Table Access
+
+- `check_table_access(table)` - raises `PolicyError` for denied tables.
+- 8 denied tables: `sys_user_has_role`, `sys_user_grmember`, `sys_user_group`, `sys_user_role`, `sys_security_acl`, `sys_security_acl_role`, `sys_glide_object`, `sys_db_object`.
+
+### Field Sensitivity
+
+- `is_sensitive_field(field_name) -> bool` - 6 regex patterns
+- `mask_sensitive_fields(record) -> dict` - masks values with `MASK_VALUE = '***MASKED***'`
+- `mask_audit_entry(entry) -> dict` - separate masking for `sys_audit` records
+
+### Query Safety
+
+- `enforce_query_safety(table, query, limit, settings) -> dict` - returns dict with `limit` key, raises `QuerySafetyError`
+- `validate_identifier(name)` - regex `^[a-z0-9_]+(\.[a-z0-9_]+)*$` for field/table names
+- `INTERNAL_QUERY_LIMIT = 1000`
+
+## 🔑 State Management
+
+Two token store classes built on a common base:
+
+```text
+_BaseTokenStore(ttl_seconds=300, max_size=1000)
+  ├── PreviewTokenStore    # Single-use tokens (has consume() method)
+  └── QueryTokenStore      # Reusable tokens (no consume method)
+```
+
+- `create(payload) -> str` - stores data, returns UUID key
+- `get(token) -> dict | None` - retrieves data (both stores)
+- `consume(token) -> dict | None` - retrieves and deletes (PreviewTokenStore only)
+- `_sweep_expired()` - TTL-based cleanup
+
+**Note:** There is no `SeededRecordTracker` in this codebase.
+
+## 🔗 build_query + QueryTokenStore Workflow
+
+The `build_query` tool creates structured queries and stores them in `QueryTokenStore`. Other tools receive the `query_token` and resolve it via:
+
+```python
+resolved_query = resolve_query_token(token, store, correlation_id)
+# Returns the encoded query string
+```
+
+This bridges structured query building with query-consuming tools, allowing complex queries to be built once and reused across multiple tool calls.
+
+## 🏗 Tool Registration
+
+### Standard Tools
+
+```python
+def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
+    query_store = mcp._sn_query_store  # Access shared state from FastMCP instance
+
+    @mcp.tool()
+    @tool_handler
+    async def tool_name(param: str, correlation_id: str = "") -> str:
+        validate_identifier(param)
+        check_table_access(param)
+        async with ServiceNowClient(settings, auth_provider) as client:
+            result = await client.some_method(param)
+        return format_response(data=result, correlation_id=correlation_id)
+```
+
+### Domain Tools (extra `choices` kwarg)
+
+Domain tool modules (with `domain_` prefix) receive an additional `choices` parameter:
+
+```python
+def register_tools(
+    mcp: FastMCP,
+    settings: Settings,
+    auth_provider: BasicAuthProvider,
+    choices: ChoiceRegistry | None = None,
+) -> None:
+    @mcp.tool()
+    @tool_handler
+    async def incident_list(state: str = "", correlation_id: str = "") -> str:
+        # Use choices.resolve() for label-to-value mapping
+        if state and choices:
+            state = await choices.resolve("incident", "state", state)
+        # Use ServiceNowQuery fluent builder
+        query = ServiceNowQuery()
+        if state:
+            query.field("state").equals(state)
+        ...
+```
+
+### Write Operations in Domain Tools
+
+```python
+# Always check write_gate before mutations
+gate = write_gate("incident", settings, correlation_id)
+if gate:
+    return gate  # Pre-formatted error envelope
+```
+
+## 🔄 ChoiceRegistry
+
+- `ChoiceRegistry(settings, auth_provider)` - lazy-loaded from `sys_choice` table.
+- Uses `asyncio.Lock` with double-check pattern on first access.
+- Falls back to `_DEFAULTS` on fetch failure.
+- Labels normalized: lowercase, spaces to underscores.
+
+### 6 Default Mappings
+
+| Table          | Field              |
+| -------------- | ------------------ |
+| `incident`       | `state`              |
+| `change_request` | `state`              |
+| `problem`        | `state`              |
+| `cmdb_ci`        | `operational_status` |
+| `sc_request`     | `state`              |
+| `sc_req_item`    | `state`              |
+
+### API
+
+```python
+await choices.resolve("incident", "state", "open")  # Returns mapped value or passthrough
+choices.get_choices("incident", "state")             # Returns dict of all choices
+```
+
+## 🔍 Investigation Modules
+
+Located in `investigations/*.py`, registered in `INVESTIGATION_REGISTRY`.
+
+### 7 Available Investigations
+
+| Investigation           | Purpose                                  |
+| ----------------------- | ---------------------------------------- |
+| `stale_automations`       | Find unused or stale automation rules    |
+| `deprecated_apis`         | Detect deprecated API usage              |
+| `table_health`            | Analyze table structure and data quality |
+| `acl_conflicts`           | Find conflicting ACL rules               |
+| `error_analysis`          | Analyze error patterns                   |
+| `slow_transactions`       | Identify slow-running transactions       |
+| `performance_bottlenecks` | Find performance issues                  |
+
+### Module Contract
+
+Each module exports:
+
+```python
+async def run(client, params) -> dict:
+    ...
+
+async def explain(client, element_id) -> dict:
+    ...
+```
+
+### Shared Helpers (`investigation_helpers.py`)
+
+| Helper                                                                           | Purpose                        |
+| -------------------------------------------------------------------------------- | ------------------------------ |
+| `parse_int_param(params, key, default) -> int`                                     | Safe integer parameter parsing |
+| `parse_element_id(element_id, allowed_tables) -> tuple[str, str]`                  | Parse `'table:sys_id'` format    |
+| `build_investigation_result(name, findings, **extra) -> dict`                      | Standard result envelope       |
+| `fetch_and_explain(client, element_id, allowed_tables, build_explanation) -> dict` | Common explain pattern         |
+
+## 🖥 Server Bootstrap
+
+`create_mcp_server()` performs the following:
+
+1. Creates `Settings` and auth via `create_auth()`.
+2. Creates `FastMCP('servicenow-dev-debug')`.
+3. Attaches shared state to the FastMCP instance:
+   - `mcp._sn_settings` - Settings instance
+   - `mcp._sn_auth` - Auth provider
+   - `mcp._sn_query_store` - `QueryTokenStore` instance
+   - `mcp._sn_choices` - `ChoiceRegistry` instance
+4. Always registers the `list_tool_packages` tool.
+5. Loads tool groups via `importlib`; `domain_` prefix modules get `choices=choices` kwarg.
+6. `main()` runs with stdio transport.
+
+## 🌐 Client
+
+- `ServiceNowClient(settings, auth_provider)` - async context manager.
+- `_ensure_client() -> httpx.AsyncClient` - raises `RuntimeError` if not initialized (not assert).
+- Timeout: 30s.
+- Uses `validate_identifier()` for table/field names.
+- 30+ API methods covering: records, metadata, aggregation, CRUD, CMDB, email, import sets, reports, code search, service catalog, ATF.
+
+## ⚙️ Configuration (Settings)
+
+| Field                   | Type      | Default                                              | Env Var                 |
+| ----------------------- | --------- | ---------------------------------------------------- | ----------------------- |
+| `servicenow_instance_url` | `str`       | required                                             | `SERVICENOW_INSTANCE_URL` |
+| `servicenow_username`     | `str`       | required                                             | `SERVICENOW_USERNAME`     |
+| `servicenow_password`     | `SecretStr` | required                                             | `SERVICENOW_PASSWORD`     |
+| `mcp_tool_package`        | `str`       | `"full"`                                               | `MCP_TOOL_PACKAGE`        |
+| `servicenow_env`          | `str`       | `"dev"`                                                | `SERVICENOW_ENV`          |
+| `max_row_limit`           | `int`       | `100` (range 1-10000)                                  | `MAX_ROW_LIMIT`           |
+| `large_table_names_csv`   | `str`       | `"syslog,sys_audit,sys_log_transaction,sys_email_log"` | `LARGE_TABLE_NAMES_CSV`   |
+
+### Computed Properties
+
+- `large_table_names` - `@cached_property`, returns `frozenset` from CSV
+- `is_production` - `@property`, checks if `servicenow_env` contains `'prod'` or `'production'`
+
+### Validators
+
+- `instance_url` must start with `https://`, trailing slash stripped.
+- `mcp_tool_package` validated against `get_package()`.
+- `model_config`: `env_file=['.env', '.env.local']`, `extra='ignore'`.
+
+## 📦 Packages & Tool Groups
+
+14 named packages with 19 tool groups total.
+
+### Preset Packages
+
+| Package              | Groups | Description                        |
+| -------------------- | ------ | ---------------------------------- |
+| `full`                 | 17     | Default - all standard tool groups |
+| `introspection_only`   | 4      | Read-only introspection tools      |
+| `none`                 | 0      | No tools loaded                    |
+| `itil`                 | 12     | ITIL process tools                 |
+| `developer`            | 11     | Development-focused tools          |
+| `readonly`             | 10     | Read-only operations               |
+| `analyst`              | 8      | Analysis and reporting             |
+| `incident_management`  | 5      | Incident lifecycle tools           |
+| `change_management`    | 4      | Change request tools               |
+| `cmdb`                 | 4      | CMDB management tools              |
+| `problem_management`   | 5      | Problem lifecycle tools            |
+| `request_management`   | 4      | Request/RITM tools                 |
+| `knowledge_management` | 3      | Knowledge base tools               |
+| `service_catalog`      | 3      | Service catalog tools              |
+
+### Custom Packages
+
+Comma-separated group names are supported as a custom package value. Validated to ensure no collisions with preset package names.
+
+## 🔀 Async Patterns
 
 - All ServiceNow API calls are `async`.
 - `ServiceNowClient` is an async context manager: `async with ServiceNowClient(settings, auth_provider) as client:`.
 - Auth `get_headers()` is async for extensibility.
-- Tests use `@pytest.mark.asyncio` decorator (asyncio_mode is auto).
+- Tests use `@pytest.mark.asyncio` decorator (`asyncio_mode` is auto).
 
-## Architecture & Key Patterns
+## 🧪 Testing Patterns
 
-- **Tool registration**: Each `tools/*.py` exports `register_tools(mcp, settings, auth_provider)` registering `@mcp.tool()` async functions.
-- **Response format**: All tools return `json.dumps(format_response(...))` with a `correlation_id` via `utils.format_response()`.
-- **Policy layer**: Call `check_table_access(table)` before table access; `enforce_query_safety()` for queries; `mask_sensitive_fields()` on returned records; `can_write()` before mutations.
-- **Investigation modules**: `investigations/*.py` export `async def run(client, params) -> dict` and `async def explain(client, element_id) -> dict`; registered in `INVESTIGATION_REGISTRY`.
-- **Tool packages**: Bundled in `packages.py:PACKAGE_REGISTRY` — `full` (default), `introspection_only`, `none`.
-- **State management**: `PreviewTokenStore` for preview/apply workflows (UUID tokens with TTL); `SeededRecordTracker` for test data cleanup by tag.
-- **Config**: `Settings(BaseSettings)` loads from env vars — `servicenow_instance_url`, `servicenow_username`, `servicenow_password`, `mcp_tool_package`, `servicenow_env`, `max_row_limit`.
+### HTTP Mocking
 
-## Testing Patterns
+Use **respx** library with `@respx.mock` decorator on async test methods.
 
-- HTTP mocking: **respx** library with `@respx.mock` decorator on async test methods.
-- Fixtures in `tests/conftest.py` provide `settings` and `prod_settings` using `patch.dict("os.environ", ...)`.
+### Fixtures
+
+- `tests/conftest.py` provides `settings` and `prod_settings` using `patch.dict("os.environ", ...)`.
+- `tests/domains/conftest.py` provides domain-specific fixtures (same pattern, separate scope).
 - Always construct `Settings(_env_file=None)` in tests to avoid loading real env files.
-- Tool tests use a helper to register and extract tool callables:
-  ```python
-  def _register_and_get_tools(settings, auth_provider):
-      mcp = FastMCP("test")
-      register_tools(mcp, settings, auth_provider)
-      return {t.name: t.fn for t in mcp._tool_manager._tools.values()}
-  ```
-- Test classes group related tests (e.g., `TestServiceNowClientGetRecord`).
-- Integration tests in `tests/integration/` marked `@pytest.mark.integration`; require `.env.local`.
-- Integration fixtures are session-scoped: `live_settings`, `live_auth`, discovered sys_ids.
-- Parse tool JSON output with `json.loads()` and assert on response envelope fields (`status`, `data`, `error`).
 
-## Git Workflow
+### Standard Tool Test Helper
 
-- **NEVER work on main/master** — always create feature branches.
+```python
+def _register_and_get_tools(settings, auth_provider):
+    mcp = FastMCP("test")
+    register_tools(mcp, settings, auth_provider)
+    return {t.name: t.fn for t in mcp._tool_manager._tools.values()}
+```
+
+### Domain Tool Test Helper
+
+```python
+def _register_and_get_tools(settings, auth_provider, choices=None):
+    mcp = FastMCP("test")
+    register_tools(mcp, settings, auth_provider, choices=choices)
+    return {t.name: t.fn for t in mcp._tool_manager._tools.values()}
+```
+
+### Parsing Tool Output in Tests
+
+```python
+from toon_format import decode as toon_decode
+
+raw = await tools["my_tool"](param="value")
+result = toon_decode(raw)
+assert result["status"] == "success"
+assert result["data"]["field"] == "expected"
+```
+
+**Critical:** Use `toon_decode(raw)`, **NOT** `json.loads(raw)`.
+
+### Integration Tests
+
+- Located in `tests/integration/`.
+- Marked with `@pytest.mark.integration`.
+- Require `.env.local` with real ServiceNow credentials.
+- Fixtures are session-scoped: `live_settings`, `live_auth`, discovered sys_ids.
+
+## 🌿 Git Workflow
+
+- **NEVER** work on main/master - always create feature branches.
 - **Conventional commits**: `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, etc.
-- **Small commits** — atomic, focused changes.
+- **Small commits** - atomic, focused changes.
 - **release-please** automates versioning and releases on push to main.
 - **Use `gh` CLI** for all GitHub operations (PRs, issues, etc.).
 - CI runs lint, type-check, and tests on Python 3.12/3.13/3.14 for every PR.
