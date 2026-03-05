@@ -27,7 +27,7 @@ def _register_and_get_tools(settings: Settings, auth_provider: BasicAuthProvider
 class TestCmdbList:
     """Tests for cmdb_list tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_list_default_cmdb_ci(self, settings: Settings, auth_provider: BasicAuthProvider):
         """Test listing CIs from default cmdb_ci table."""
@@ -61,7 +61,7 @@ class TestCmdbList:
         assert len(data["data"]) == 2
         assert data["data"][0]["name"] == "server-01"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_list_with_ci_class_param(self, settings: Settings, auth_provider: BasicAuthProvider):
         """Test listing CIs from specific CI class table."""
@@ -90,7 +90,7 @@ class TestCmdbList:
         assert len(data["data"]) == 1
         assert data["data"][0]["name"] == "web-server-01"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_list_with_operational_status_filter(self, settings: Settings, auth_provider: BasicAuthProvider):
         """Test filtering by operational status."""
@@ -124,7 +124,7 @@ class TestCmdbList:
 class TestCmdbGet:
     """Tests for cmdb_get tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_get_by_sys_id(self, settings: Settings, auth_provider: BasicAuthProvider):
         """Test fetching CI by sys_id."""
@@ -155,7 +155,7 @@ class TestCmdbGet:
         request = respx.calls.last.request
         assert "sys_id%3D" in str(request.url) or f"sys_id={sys_id}" in str(request.url)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_get_by_name(self, settings: Settings, auth_provider: BasicAuthProvider):
         """Test fetching CI by name."""
@@ -186,7 +186,7 @@ class TestCmdbGet:
         request = respx.calls.last.request
         assert "name%3Dserver-01" in str(request.url)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_get_not_found(self, settings: Settings, auth_provider: BasicAuthProvider):
         """Test fetching non-existent CI."""
@@ -210,7 +210,7 @@ class TestCmdbGet:
 class TestCmdbRelationships:
     """Tests for cmdb_relationships tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_relationships_both_directions(self, settings: Settings, auth_provider: BasicAuthProvider):
         """Test fetching relationships in both directions."""
@@ -244,7 +244,7 @@ class TestCmdbRelationships:
         assert data["status"] == "success"
         assert len(data["data"]) == 2
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_relationships_parent_only(self, settings: Settings, auth_provider: BasicAuthProvider):
         """Test fetching parent relationships only."""
@@ -275,7 +275,7 @@ class TestCmdbRelationships:
         request = respx.calls.last.request
         assert f"child.sys_id%3D{sys_id}" in str(request.url)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_relationships_by_name_lookup(self, settings: Settings, auth_provider: BasicAuthProvider):
         """Test fetching relationships by CI name (requires sys_id lookup first)."""
@@ -315,7 +315,7 @@ class TestCmdbRelationships:
 
         assert data["status"] == "success"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_relationships_name_not_found(self, settings: Settings, auth_provider: BasicAuthProvider):
         """Test that name lookup returning no records produces an error."""
@@ -336,7 +336,7 @@ class TestCmdbRelationships:
         assert data["status"] == "error"
         assert "not found" in data["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_relationships_child_only(self, settings: Settings, auth_provider: BasicAuthProvider):
         """Test fetching child relationships only."""
@@ -368,7 +368,7 @@ class TestCmdbRelationships:
         request = respx.calls.last.request
         assert f"parent.sys_id%3D{sys_id}" in str(request.url)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_relationships_invalid_direction(self, settings: Settings, auth_provider: BasicAuthProvider):
         """Test that an invalid direction produces an error."""
@@ -386,7 +386,7 @@ class TestCmdbRelationships:
 class TestCmdbClasses:
     """Tests for cmdb_classes tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_classes_aggregate(self, settings: Settings, auth_provider: BasicAuthProvider):
         """Test listing unique CI classes via aggregate API."""
@@ -418,7 +418,7 @@ class TestCmdbClasses:
         assert isinstance(data["data"], list)
         assert len(data["data"]) == 2
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_classes_respects_limit(self, settings: Settings, auth_provider: BasicAuthProvider):
         """Test that cmdb_classes respects limit parameter."""
@@ -448,7 +448,7 @@ class TestCmdbClasses:
 class TestCmdbHealth:
     """Tests for cmdb_health tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_health_default_table(self, settings: Settings, auth_provider: BasicAuthProvider):
         """Test CMDB health check on default cmdb_ci table."""
@@ -484,7 +484,7 @@ class TestCmdbHealth:
         assert isinstance(data["data"], list)
         assert len(data["data"]) == 3
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_health_specific_ci_class(self, settings: Settings, auth_provider: BasicAuthProvider):
         """Test CMDB health check on specific CI class."""
@@ -517,7 +517,7 @@ class TestCmdbHealth:
 class TestErrorHandling:
     """Tests for error handling across CMDB tools."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_denied_table_access(self, settings: Settings, auth_provider: BasicAuthProvider):
         """Test that denied tables are blocked."""
@@ -531,7 +531,7 @@ class TestErrorHandling:
         assert data["status"] == "error"
         assert "denied" in data["error"]["message"].lower() or "forbidden" in data["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_safe_tool_call_exception_handling(self, settings: Settings, auth_provider: BasicAuthProvider):
         """Test that exceptions are caught and returned as error responses."""

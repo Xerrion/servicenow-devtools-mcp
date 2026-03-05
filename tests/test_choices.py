@@ -10,10 +10,11 @@ from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.choices import ChoiceRegistry
 from servicenow_mcp.config import Settings
 
+
 BASE_URL = "https://test.service-now.com"
 
 
-@pytest.fixture
+@pytest.fixture()
 def auth_provider(settings: Settings) -> BasicAuthProvider:
     """Test auth provider fixture."""
     return BasicAuthProvider(settings)
@@ -30,7 +31,7 @@ def _make_registry_with_defaults(settings: Settings, auth_provider: BasicAuthPro
 class TestChoiceRegistryDefaults:
     """Test default (OOTB) choice resolution without network access."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_resolve_known_label_returns_value(self, settings, auth_provider):
         """resolve() should return the stored value for a known label."""
         registry = _make_registry_with_defaults(settings, auth_provider)
@@ -38,7 +39,7 @@ class TestChoiceRegistryDefaults:
         result = await registry.resolve("incident", "state", "open")
         assert result == "1"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_resolve_unknown_label_returns_passthrough(self, settings, auth_provider):
         """resolve() should passthrough an unrecognized label as-is."""
         registry = _make_registry_with_defaults(settings, auth_provider)
@@ -46,7 +47,7 @@ class TestChoiceRegistryDefaults:
         result = await registry.resolve("incident", "state", "nonexistent")
         assert result == "nonexistent"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_resolve_unknown_table_returns_passthrough(self, settings, auth_provider):
         """resolve() should passthrough when the table is not tracked."""
         registry = _make_registry_with_defaults(settings, auth_provider)
@@ -54,7 +55,7 @@ class TestChoiceRegistryDefaults:
         result = await registry.resolve("fake_table", "state", "open")
         assert result == "open"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_resolve_unknown_field_returns_passthrough(self, settings, auth_provider):
         """resolve() should passthrough when the field is not tracked."""
         registry = _make_registry_with_defaults(settings, auth_provider)
@@ -62,7 +63,7 @@ class TestChoiceRegistryDefaults:
         result = await registry.resolve("incident", "fake_field", "open")
         assert result == "open"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_get_choices_returns_default_map(self, settings, auth_provider):
         """get_choices() should return the full label-to-value dict for a known table/field."""
         registry = _make_registry_with_defaults(settings, auth_provider)
@@ -75,7 +76,7 @@ class TestChoiceRegistryDefaults:
         assert choices["closed"] == "7"
         assert choices["canceled"] == "8"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_get_choices_unknown_returns_empty(self, settings, auth_provider):
         """get_choices() should return an empty dict for an unknown table/field pair."""
         registry = _make_registry_with_defaults(settings, auth_provider)
@@ -87,7 +88,7 @@ class TestChoiceRegistryDefaults:
 class TestChoiceRegistryFetch:
     """Test HTTP-fetching behavior using respx mocks."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_fetch_merges_instance_data_over_defaults(self, settings, auth_provider):
         """Instance data should override defaults while preserving non-overridden entries."""
@@ -118,7 +119,7 @@ class TestChoiceRegistryFetch:
         closed = await registry.resolve("incident", "state", "closed")
         assert closed == "7"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_fetch_only_happens_once(self, settings, auth_provider):
         """Repeated resolve() calls should only trigger one HTTP fetch."""
@@ -137,7 +138,7 @@ class TestChoiceRegistryFetch:
 
         assert route.call_count == 1
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_fetch_adds_custom_instance_values(self, settings, auth_provider):
         """Instance-only choices not in defaults should be available after fetch."""
@@ -163,7 +164,7 @@ class TestChoiceRegistryFetch:
 
         assert result == "77"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_concurrent_fetch_uses_lock(self, settings, auth_provider):
         """Concurrent resolve() calls should only trigger one HTTP fetch via asyncio.Lock."""
@@ -189,7 +190,7 @@ class TestChoiceRegistryFetch:
 class TestChoiceRegistryLabelNormalization:
     """Test label normalization behavior (spaces, case)."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_label_with_spaces_normalized(self, settings, auth_provider):
         """Labels with spaces should be stored as underscore-separated lowercase keys."""
@@ -214,7 +215,7 @@ class TestChoiceRegistryLabelNormalization:
         result = await registry.resolve("incident", "state", "in_progress")
         assert result == "2"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_label_case_insensitive(self, settings, auth_provider):
         """Labels like 'NEW' should be stored as the lowercase key 'new'."""
@@ -239,7 +240,7 @@ class TestChoiceRegistryLabelNormalization:
         result = await registry.resolve("problem", "state", "new")
         assert result == "1"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_label_with_mixed_case_and_spaces(self, settings, auth_provider):
         """'Root Cause Analysis' should normalize to 'root_cause_analysis'."""

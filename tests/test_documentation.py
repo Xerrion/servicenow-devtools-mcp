@@ -7,10 +7,11 @@ from toon_format import decode as toon_decode
 
 from servicenow_mcp.auth import BasicAuthProvider
 
+
 BASE_URL = "https://test.service-now.com"
 
 
-@pytest.fixture
+@pytest.fixture()
 def auth_provider(settings):
     """Create a BasicAuthProvider from test settings."""
     return BasicAuthProvider(settings)
@@ -33,7 +34,7 @@ def _register_and_get_tools(settings, auth_provider):
 class TestDocsLogicMap:
     """Tests for the docs_logic_map tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_returns_lifecycle_map(self, settings, auth_provider):
         """Returns automation grouped by lifecycle phase."""
@@ -103,7 +104,7 @@ class TestDocsLogicMap:
         # Should have at least before_insert and after_update
         assert len(data["phases"]) > 0
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_empty_table_no_automation(self, settings, auth_provider):
         """Table with no automation returns empty phases."""
@@ -124,7 +125,7 @@ class TestDocsLogicMap:
         assert result["status"] == "success"
         assert result["data"]["total_automations"] == 0
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_br_delete_action_and_no_operations(self, settings, auth_provider):
         """Covers delete action branch and fallback to 'all' when no operations are set."""
@@ -177,7 +178,7 @@ class TestDocsLogicMap:
         assert "before_all" in phases
         assert phases["before_all"][0]["name"] == "On all"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_ui_policies_and_ui_actions_populated(self, settings, auth_provider):
         """Covers non-empty UI policies and UI actions phases."""
@@ -238,7 +239,7 @@ class TestDocsLogicMap:
 class TestDocsArtifactSummary:
     """Tests for the docs_artifact_summary tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_returns_summary_with_dependencies(self, settings, auth_provider):
         """Returns artifact summary with referenced tables and referenced_by."""
@@ -275,7 +276,7 @@ class TestDocsArtifactSummary:
         # Should detect GlideRecord('cmdb_ci') in script
         assert "cmdb_ci" in data["referenced_tables"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_not_found_returns_error(self, settings, auth_provider):
         """Returns error for non-existent artifact."""
@@ -289,7 +290,7 @@ class TestDocsArtifactSummary:
 
         assert result["status"] == "error"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_invalid_artifact_type_returns_error(self, settings, auth_provider):
         """Unknown artifact_type returns an error with valid types listed."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -300,7 +301,7 @@ class TestDocsArtifactSummary:
         assert "bogus_type" in result["error"]["message"]
         assert "Valid:" in result["error"]["message"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_code_search_failure_is_silent(self, settings, auth_provider):
         """Code search exception is caught silently; referenced_by is empty."""
@@ -331,7 +332,7 @@ class TestDocsArtifactSummary:
         assert result["data"]["referenced_by"] == []
         assert "task" in result["data"]["referenced_tables"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_masks_sensitive_fields(self, settings, auth_provider):
         """Sensitive fields in the artifact record are masked in the response."""
@@ -379,7 +380,7 @@ class TestDocsArtifactSummary:
 class TestDocsTestScenarios:
     """Tests for the docs_test_scenarios tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_detects_condition_branches(self, settings, auth_provider):
         """Detects if/else conditions and suggests test scenarios."""
@@ -407,7 +408,7 @@ class TestDocsTestScenarios:
         scenario_names = [s["scenario"] for s in result["data"]["scenarios"]]
         assert any("condition" in s.lower() or "branch" in s.lower() for s in scenario_names)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_detects_insert_vs_update(self, settings, auth_provider):
         """Detects insert/update operation checks."""
@@ -433,7 +434,7 @@ class TestDocsTestScenarios:
         scenario_names = [s["scenario"] for s in result["data"]["scenarios"]]
         assert any("insert" in s.lower() for s in scenario_names)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_empty_script_returns_generic(self, settings, auth_provider):
         """Empty script returns generic suggestions."""
@@ -459,7 +460,7 @@ class TestDocsTestScenarios:
         # Should still return at least generic scenarios
         assert len(result["data"]["scenarios"]) >= 1
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_invalid_artifact_type_returns_error(self, settings, auth_provider):
         """Unknown artifact_type returns an error with valid types listed."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -470,7 +471,7 @@ class TestDocsTestScenarios:
         assert "bogus_type" in result["error"]["message"]
         assert "Valid:" in result["error"]["message"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_detects_delete_operation(self, settings, auth_provider):
         """Detects delete operation check in script."""
@@ -496,7 +497,7 @@ class TestDocsTestScenarios:
         scenario_names = [s["scenario"] for s in result["data"]["scenarios"]]
         assert any("delete" in s.lower() for s in scenario_names)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_detects_is_new_record(self, settings, auth_provider):
         """Detects isNewRecord() check in script."""
@@ -522,7 +523,7 @@ class TestDocsTestScenarios:
         scenario_names = [s["scenario"] for s in result["data"]["scenarios"]]
         assert any("new record" in s.lower() for s in scenario_names)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_detects_role_check(self, settings, auth_provider):
         """Detects gs.hasRole() check in script."""
@@ -548,7 +549,7 @@ class TestDocsTestScenarios:
         scenario_names = [s["scenario"] for s in result["data"]["scenarios"]]
         assert any("admin" in s for s in scenario_names)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_detects_abort_action(self, settings, auth_provider):
         """Detects setAbortAction(true) in script."""
@@ -574,7 +575,7 @@ class TestDocsTestScenarios:
         scenario_names = [s["scenario"] for s in result["data"]["scenarios"]]
         assert any("abort" in s.lower() for s in scenario_names)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_detects_gliderecord_dependency(self, settings, auth_provider):
         """Detects GlideRecord table dependencies in script."""
@@ -600,7 +601,7 @@ class TestDocsTestScenarios:
         scenario_names = [s["scenario"] for s in result["data"]["scenarios"]]
         assert any("sys_user" in s for s in scenario_names)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_no_patterns_returns_generic(self, settings, auth_provider):
         """Script with no detectable patterns returns generic fallback scenario."""
@@ -628,7 +629,7 @@ class TestDocsTestScenarios:
         scenario_names = [s["scenario"] for s in result["data"]["scenarios"]]
         assert any("basic" in s.lower() for s in scenario_names)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_masks_sensitive_fields_in_record(self, settings, auth_provider):
         """Sensitive fields in the artifact record are masked before generating scenarios."""
@@ -664,7 +665,7 @@ class TestDocsTestScenarios:
 class TestDocsReviewNotes:
     """Tests for the docs_review_notes tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_invalid_artifact_type_returns_error(self, settings, auth_provider):
         """Unknown artifact_type returns an error with valid types listed."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -675,7 +676,7 @@ class TestDocsReviewNotes:
         assert "bogus_type" in result["error"]["message"]
         assert "Valid:" in result["error"]["message"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_empty_script_no_findings(self, settings, auth_provider):
         """Empty script returns empty findings list."""
@@ -701,7 +702,7 @@ class TestDocsReviewNotes:
         assert result["data"]["findings"] == []
         assert result["data"]["finding_count"] == 0
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_detects_current_update(self, settings, auth_provider):
         """Detects current.update() anti-pattern in script."""
@@ -728,7 +729,7 @@ class TestDocsReviewNotes:
         categories = [f["category"] for f in result["data"]["findings"]]
         assert "current_update_in_br" in categories
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_detects_gliderecord_in_loop(self, settings, auth_provider):
         """Detects GlideRecord query inside a loop."""
@@ -764,7 +765,7 @@ class TestDocsReviewNotes:
         categories = [f["category"] for f in findings]
         assert "gliderecord_in_loop" in categories
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_detects_hardcoded_sysid(self, settings, auth_provider):
         """Detects hardcoded 32-char hex sys_ids in script."""
@@ -791,7 +792,7 @@ class TestDocsReviewNotes:
         categories = [f["category"] for f in result["data"]["findings"]]
         assert "hardcoded_sys_id" in categories
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_clean_script_no_findings(self, settings, auth_provider):
         """Clean script returns no findings."""
@@ -817,7 +818,7 @@ class TestDocsReviewNotes:
         assert result["status"] == "success"
         assert len(result["data"]["findings"]) == 0
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_masks_sensitive_fields_in_record(self, settings, auth_provider):
         """Sensitive fields in the artifact record are masked before scanning."""

@@ -9,6 +9,7 @@ from servicenow_mcp.investigation_helpers import (
     parse_int_param,
 )
 
+
 # Deprecated patterns to scan for
 DEPRECATED_PATTERNS = [
     "Packages.",

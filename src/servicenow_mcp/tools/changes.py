@@ -21,6 +21,7 @@ from servicenow_mcp.utils import (
     validate_identifier,
 )
 
+
 # Artifact types that are considered risky when modified
 RISKY_TYPES = {
     "sys_security_acl",

@@ -9,10 +9,11 @@ from toon_format import decode as toon_decode
 
 from servicenow_mcp.auth import BasicAuthProvider
 
+
 BASE_URL = "https://test.service-now.com"
 
 
-@pytest.fixture
+@pytest.fixture()
 def auth_provider(settings):
     """Create a BasicAuthProvider from test settings."""
     return BasicAuthProvider(settings)
@@ -32,7 +33,7 @@ def _register_and_get_tools(settings, auth_provider):
 class TestChangesUpdatesetInspect:
     """Tests for the changes_updateset_inspect tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_returns_grouped_summary(self, settings, auth_provider):
         """Returns update set members grouped by table/type."""
@@ -98,7 +99,7 @@ class TestChangesUpdatesetInspect:
         assert "groups" in data
         assert len(data["groups"]) == 3
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_flags_risk_indicators(self, settings, auth_provider):
         """Flags risk when dangerous artifact types are present (ACLs, scripts)."""
@@ -139,7 +140,7 @@ class TestChangesUpdatesetInspect:
         assert result["status"] == "success"
         assert len(result["data"]["risk_flags"]) > 0
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_empty_update_set(self, settings, auth_provider):
         """Handles update set with no members."""
@@ -170,7 +171,7 @@ class TestChangesUpdatesetInspect:
         assert result["status"] == "success"
         assert result["data"]["total_members"] == 0
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_rejects_invalid_update_set_id(self, settings, auth_provider):
         """Returns error when update_set_id contains invalid characters."""
@@ -185,7 +186,7 @@ class TestChangesUpdatesetInspect:
 class TestChangesDiffArtifact:
     """Tests for the changes_diff_artifact tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_returns_diff_between_versions(self, settings, auth_provider):
         """Returns a text diff between the two most recent versions."""
@@ -229,7 +230,7 @@ class TestChangesDiffArtifact:
         qs = parse_qs(parsed.query)
         assert "sysparm_orderby" not in qs
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_returns_error_when_no_versions(self, settings, auth_provider):
         """Returns error when fewer than 2 versions exist."""
@@ -247,7 +248,7 @@ class TestChangesDiffArtifact:
 
         assert result["status"] == "error"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_diff_version_ordering(self, settings, auth_provider):
         """Verifies that versions[1] (older) is treated as the base 'Old' in the diff output."""
@@ -291,7 +292,7 @@ class TestChangesDiffArtifact:
         assert "// old version" in diff_text
         assert "// new version" in diff_text
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_diff_artifact_uses_builder_order_by(self, settings, auth_provider):
         """Verifies the query uses ServiceNowQuery builder with inline ORDERBYDESC."""
@@ -337,7 +338,7 @@ class TestChangesDiffArtifact:
         qs = parse_qs(parsed.query)
         assert "sysparm_orderby" not in qs
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_caret_in_sys_id_single_sanitized(self, settings, auth_provider):
         """sys_id with carets produces single-sanitized update_name (^ → ^^), not double (^ → ^^^^)."""
@@ -384,7 +385,7 @@ class TestChangesDiffArtifact:
 class TestChangesLastTouched:
     """Tests for the changes_last_touched tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_returns_audit_history(self, settings, auth_provider):
         """Returns who/when/what from sys_audit."""
@@ -425,7 +426,7 @@ class TestChangesLastTouched:
         assert len(result["data"]["changes"]) == 2
         assert result["data"]["changes"][0]["user"] == "admin"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_returns_empty_for_no_audit(self, settings, auth_provider):
         """Returns success with empty changes when no audit trail exists."""
@@ -448,7 +449,7 @@ class TestChangesLastTouched:
 class TestChangesReleaseNotes:
     """Tests for the changes_release_notes tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_generates_markdown_release_notes(self, settings, auth_provider):
         """Generates Markdown release notes from update set."""
@@ -501,7 +502,7 @@ class TestChangesReleaseNotes:
         assert "Sprint 42 Release" in notes
         assert "IncidentUtils" in notes
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_handles_empty_update_set(self, settings, auth_provider):
         """Generates notes even for empty update set."""
@@ -532,7 +533,7 @@ class TestChangesReleaseNotes:
         assert result["status"] == "success"
         assert "Empty Release" in result["data"]["release_notes"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_rejects_invalid_update_set_id(self, settings, auth_provider):
         """Returns error when update_set_id contains invalid characters."""

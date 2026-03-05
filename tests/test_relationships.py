@@ -12,10 +12,11 @@ from toon_format import decode as toon_decode
 from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.policy import DENIED_TABLES
 
+
 BASE_URL = "https://test.service-now.com"
 
 
-@pytest.fixture
+@pytest.fixture()
 def auth_provider(settings):
     """Create a BasicAuthProvider from test settings."""
     return BasicAuthProvider(settings)
@@ -35,7 +36,7 @@ def _register_and_get_tools(settings, auth_provider):
 class TestRelReferencesTo:
     """Tests for the rel_references_to tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_finds_incoming_references(self, settings, auth_provider):
         """Finds records in other tables that reference the target record."""
@@ -78,7 +79,7 @@ class TestRelReferencesTo:
         assert len(result["data"]["incoming_references"]) == 1
         assert result["data"]["incoming_references"][0]["table"] == "task_sla"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_handles_no_references(self, settings, auth_provider):
         """Returns empty incoming_references when no references exist."""
@@ -97,7 +98,7 @@ class TestRelReferencesTo:
         assert result["status"] == "success"
         assert result["data"]["incoming_references"] == []
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_denied_table_returns_error(self, settings, auth_provider):
         """Denied table returns error without making HTTP call."""
         denied = next(iter(DENIED_TABLES))
@@ -108,7 +109,7 @@ class TestRelReferencesTo:
         assert result["status"] == "error"
         assert "denied" in result["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_paginates_all_dictionary_entries(self, settings, auth_provider):
         """Paginated sys_dictionary fetches collect fields across all pages."""
@@ -189,7 +190,7 @@ class TestRelReferencesTo:
         # Verify that two sys_dictionary pages were fetched
         assert dict_route.call_count == 2
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_filters_denied_and_internal_tables(self, settings, auth_provider):
         """Denied tables and system-internal var__m_ entries are skipped."""
@@ -257,7 +258,7 @@ class TestRelReferencesTo:
 class TestRelReferencesFrom:
     """Tests for the rel_references_from tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_finds_outgoing_references(self, settings, auth_provider):
         """Finds what a record references via its reference fields."""
@@ -317,7 +318,7 @@ class TestRelReferencesFrom:
         assert "caller_id" in fields
         assert "assignment_group" in fields
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_finds_inherited_reference_fields(self, settings, auth_provider):
         """Inherited reference fields from parent tables are included."""
@@ -404,7 +405,7 @@ class TestRelReferencesFrom:
         assert "opened_by" in fields
         assert len(outgoing) == 3
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_hierarchy_stops_at_root(self, settings, auth_provider):
         """Hierarchy walk terminates when there is no super_class."""
@@ -456,7 +457,7 @@ class TestRelReferencesFrom:
         # Only one sys_db_object query should have been made (for "task" itself)
         # and it stopped immediately since super_class was empty
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_handles_no_reference_fields(self, settings, auth_provider):
         """Returns empty outgoing_references when record has no reference fields."""
@@ -489,7 +490,7 @@ class TestRelReferencesFrom:
         assert result["status"] == "success"
         assert result["data"]["outgoing_references"] == []
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_denied_table_returns_error(self, settings, auth_provider):
         """Denied table returns error."""
         denied = next(iter(DENIED_TABLES))
@@ -504,7 +505,7 @@ class TestRelReferencesFrom:
 class TestRelReferencesToBoundedConcurrency:
     """Tests that rel_references_to limits concurrency via asyncio.Semaphore."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_rel_references_to_bounded_concurrency(self, settings, auth_provider):
         """Verifies that rel_references_to uses a Semaphore to bound concurrent lookups."""

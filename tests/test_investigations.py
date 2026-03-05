@@ -7,10 +7,11 @@ from toon_format import decode as toon_decode
 
 from servicenow_mcp.auth import BasicAuthProvider
 
+
 BASE_URL = "https://test.service-now.com"
 
 
-@pytest.fixture
+@pytest.fixture()
 def auth_provider(settings):
     """Create a BasicAuthProvider from test settings."""
     return BasicAuthProvider(settings)
@@ -33,7 +34,7 @@ def _register_and_get_tools(settings, auth_provider):
 class TestInvestigateRun:
     """Tests for the investigate_run dispatcher tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_dispatches_to_stale_automations(self, settings, auth_provider):
         """Dispatches to stale_automations and returns findings."""
@@ -86,7 +87,7 @@ class TestInvestigateRun:
         assert result["status"] == "success"
         assert result["data"]["finding_count"] >= 1
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_rejects_unknown_investigation(self, settings, auth_provider):
         """Returns error for unknown investigation name."""
@@ -96,7 +97,7 @@ class TestInvestigateRun:
 
         assert result["status"] == "error"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_investigate_explain_returns_context(self, settings, auth_provider):
         """investigate_explain returns contextual explanation for a finding."""
@@ -133,7 +134,7 @@ class TestInvestigateRun:
 class TestStaleAutomations:
     """Tests for the stale_automations investigation module."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_finds_stuck_flow(self, settings, auth_provider):
         """Finds a stuck Flow Designer context."""
@@ -171,7 +172,7 @@ class TestStaleAutomations:
         assert result["data"]["finding_count"] == 1
         assert result["data"]["findings"][0]["category"] == "stuck_flow"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_clean_instance_no_findings(self, settings, auth_provider):
         """Clean instance returns no findings."""
@@ -192,7 +193,7 @@ class TestStaleAutomations:
         assert result["status"] == "success"
         assert result["data"]["finding_count"] == 0
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_uses_gs_days_ago(self, settings, auth_provider):
         """Queries use gs.daysAgoEnd instead of Python datetime strings."""
@@ -225,7 +226,7 @@ class TestStaleAutomations:
 class TestDeprecatedApis:
     """Tests for the deprecated_apis investigation module."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_finds_deprecated_pattern(self, settings, auth_provider):
         """Finds scripts using deprecated Packages. API."""
@@ -261,7 +262,7 @@ class TestDeprecatedApis:
         patterns_found = [f["pattern"] for f in result["data"]["findings"]]
         assert "Packages." in patterns_found
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_clean_code_no_findings(self, settings, auth_provider):
         """Clean code returns no findings."""
@@ -286,7 +287,7 @@ class TestDeprecatedApis:
 class TestTableHealth:
     """Tests for the table_health investigation module."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_returns_health_report(self, settings, auth_provider):
         """Returns a complete health report for a table."""
@@ -356,7 +357,7 @@ class TestTableHealth:
         assert data["automation"]["client_scripts"]["count"] == 1
         assert data["automation"]["acl_count"] == 2
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_filters_by_hours(self, settings, auth_provider):
         """All queries include time filter when hours is specified."""
@@ -384,7 +385,7 @@ class TestTableHealth:
         assert result["status"] == "success"
         assert result["data"]["hours"] == 24
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_rejects_invalid_table_identifier(self, settings, auth_provider):
         """Rejects a table name containing injection characters."""
@@ -405,7 +406,7 @@ class TestTableHealth:
 class TestAclConflicts:
     """Tests for the acl_conflicts investigation module."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_detects_overlapping_acls(self, settings, auth_provider):
         """Detects two ACLs with the same name but different conditions."""
@@ -446,7 +447,7 @@ class TestAclConflicts:
         assert result["status"] == "success"
         assert result["data"]["finding_count"] >= 1
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_no_conflicts(self, settings, auth_provider):
         """Unique ACL names produce no conflicts."""
@@ -494,7 +495,7 @@ class TestAclConflicts:
 class TestErrorAnalysis:
     """Tests for the error_analysis investigation module."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_clusters_errors_by_source(self, settings, auth_provider):
         """Clusters syslog errors by source field."""
@@ -540,7 +541,7 @@ class TestErrorAnalysis:
         top = result["data"]["findings"][0]
         assert top["frequency"] == 2
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_no_errors_clean_report(self, settings, auth_provider):
         """No syslog errors returns clean report."""
@@ -555,7 +556,7 @@ class TestErrorAnalysis:
         assert result["status"] == "success"
         assert result["data"]["finding_count"] == 0
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_filters_by_hours(self, settings, auth_provider):
         """syslog query includes time filter."""
@@ -576,7 +577,7 @@ class TestErrorAnalysis:
 class TestSlowTransactions:
     """Tests for the slow_transactions investigation module."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_finds_slow_query_pattern(self, settings, auth_provider):
         """Finds a slow query pattern from sys_query_pattern."""
@@ -618,7 +619,7 @@ class TestSlowTransactions:
         assert result["data"]["finding_count"] >= 1
         assert result["data"]["findings"][0]["category"] == "slow_query"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_filters_by_hours(self, settings, auth_provider):
         """Queries include gs.hoursAgoStart time filter."""
@@ -642,7 +643,7 @@ class TestSlowTransactions:
         assert result["status"] == "success"
         assert result["data"]["params"]["hours"] == 12
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_default_hours_is_24(self, settings, auth_provider):
         """Default hours is 24 when not specified."""
@@ -672,7 +673,7 @@ class TestSlowTransactions:
 class TestPerformanceBottlenecks:
     """Tests for the performance_bottlenecks investigation module."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_finds_heavy_automation_table(self, settings, auth_provider):
         """Finds a table with excessive active business rules."""
@@ -711,7 +712,7 @@ class TestPerformanceBottlenecks:
         assert result["data"]["finding_count"] >= 1
         assert result["data"]["findings"][0]["category"] == "heavy_automation"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_filters_by_hours(self, settings, auth_provider):
         """Queries include time filter when hours is specified."""
@@ -731,7 +732,7 @@ class TestPerformanceBottlenecks:
         assert result["status"] == "success"
         assert result["data"]["params"]["hours"] == 12
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_no_hours_defaults_to_none(self, settings, auth_provider):
         """Hours defaults to None when not specified."""
@@ -758,7 +759,7 @@ class TestPerformanceBottlenecks:
 class TestExplainStaleAutomations:
     """Tests for stale_automations explain() — all four table branches."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_explain_flow_context(self, settings, auth_provider):
         """explain() returns context for a stuck flow_context record."""
@@ -789,7 +790,7 @@ class TestExplainStaleAutomations:
         assert "Approval Flow" in result["data"]["explanation"]
         assert result["data"]["record"]["sys_id"] == "fc001"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_explain_sys_script(self, settings, auth_provider):
         """explain() returns context for a disabled business rule."""
@@ -818,7 +819,7 @@ class TestExplainStaleAutomations:
         assert "disabled" in result["data"]["explanation"].lower()
         assert "Old BR" in result["data"]["explanation"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_explain_sys_script_include(self, settings, auth_provider):
         """explain() returns context for a disabled script include."""
@@ -847,7 +848,7 @@ class TestExplainStaleAutomations:
         assert "disabled" in result["data"]["explanation"].lower()
         assert "LegacyHelper" in result["data"]["explanation"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_explain_sysauto_script(self, settings, auth_provider):
         """explain() returns context for a stale scheduled job."""
@@ -880,7 +881,7 @@ class TestExplainStaleAutomations:
 class TestExplainDeprecatedApis:
     """Tests for deprecated_apis explain()."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_explain_deprecated_script(self, settings, auth_provider):
         """explain() returns context for a script using deprecated APIs."""
@@ -914,7 +915,7 @@ class TestExplainDeprecatedApis:
 class TestExplainErrorAnalysis:
     """Tests for error_analysis explain()."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_explain_syslog_error(self, settings, auth_provider):
         """explain() returns context for a syslog error entry."""
@@ -949,7 +950,7 @@ class TestExplainErrorAnalysis:
 class TestExplainSlowTransactions:
     """Tests for slow_transactions explain()."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_explain_query_pattern(self, settings, auth_provider):
         """explain() returns context for a slow query pattern."""
@@ -984,7 +985,7 @@ class TestExplainSlowTransactions:
 class TestExplainPerformanceBottlenecks:
     """Tests for performance_bottlenecks explain() — both branches."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_explain_table_with_colon(self, settings, auth_provider):
         """explain() with table:sys_id returns record context."""
@@ -1013,7 +1014,7 @@ class TestExplainPerformanceBottlenecks:
         assert "bottleneck" in result["data"]["explanation"].lower()
         assert result["data"]["record"]["sys_id"] == "sj001"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_explain_invalid_table_identifier(self, settings, auth_provider):
         """explain() with an invalid table name in element_id returns an error."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -1026,7 +1027,7 @@ class TestExplainPerformanceBottlenecks:
         assert result["status"] == "error"
         assert "Invalid identifier" in result["error"]["message"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_explain_denied_table(self, settings, auth_provider):
         """explain() with a denied table name in element_id returns an error."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -1039,7 +1040,7 @@ class TestExplainPerformanceBottlenecks:
         assert result["status"] == "error"
         assert "denied" in result["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_explain_heavy_automation_table(self, settings, auth_provider):
         """explain() with a plain table name returns aggregate context."""
@@ -1084,7 +1085,7 @@ class TestExplainPerformanceBottlenecks:
 class TestExplainAclConflicts:
     """Tests for acl_conflicts explain()."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_explain_acl_record(self, settings, auth_provider):
         """explain() returns context for an ACL conflict finding."""
@@ -1124,7 +1125,7 @@ class TestExplainAclConflicts:
 class TestExplainTableHealth:
     """Tests for table_health explain()."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_explain_table_health(self, settings, auth_provider):
         """explain() returns aggregate context for a table."""
@@ -1154,7 +1155,7 @@ class TestExplainTableHealth:
 class TestExplainSecurityRestrictions:
     """Tests that explain() rejects element_ids referencing disallowed tables or invalid sys_ids."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_deprecated_apis_rejects_disallowed_table(self, settings, auth_provider):
         """deprecated_apis explain() returns error for a table not in _ALLOWED_TABLES."""
@@ -1169,7 +1170,7 @@ class TestExplainSecurityRestrictions:
         assert "error" in result["data"]
         assert "sys_user" in result["data"]["error"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_error_analysis_rejects_non_syslog_table(self, settings, auth_provider):
         """error_analysis explain() returns error for a table other than syslog."""
@@ -1184,7 +1185,7 @@ class TestExplainSecurityRestrictions:
         assert "error" in result["data"]
         assert "incident" in result["data"]["error"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_slow_transactions_rejects_disallowed_table(self, settings, auth_provider):
         """slow_transactions explain() returns error for a table not in PERFORMANCE_TABLES."""
@@ -1199,7 +1200,7 @@ class TestExplainSecurityRestrictions:
         assert "error" in result["data"]
         assert "sys_user" in result["data"]["error"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_stale_automations_rejects_disallowed_table(self, settings, auth_provider):
         """stale_automations explain() returns error for a table not in _ALLOWED_TABLES."""
@@ -1214,7 +1215,7 @@ class TestExplainSecurityRestrictions:
         assert "error" in result["data"]
         assert "sys_user" in result["data"]["error"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_invalid_sys_id_format(self, settings, auth_provider):
         """Any investigation rejects element_id with an invalid sys_id format."""
@@ -1235,7 +1236,7 @@ class TestExplainSecurityRestrictions:
 class TestExplainElementIdSplitGuard:
     """Tests that explain() returns an error dict for element_ids with no colon."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_deprecated_apis_no_colon(self, settings, auth_provider):
         """deprecated_apis explain() returns error for element_id without colon."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -1249,7 +1250,7 @@ class TestExplainElementIdSplitGuard:
         assert "error" in result["data"]
         assert "expected 'table:sys_id'" in result["data"]["error"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_error_analysis_no_colon(self, settings, auth_provider):
         """error_analysis explain() returns error for element_id without colon."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -1263,7 +1264,7 @@ class TestExplainElementIdSplitGuard:
         assert "error" in result["data"]
         assert "expected 'table:sys_id'" in result["data"]["error"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_slow_transactions_no_colon(self, settings, auth_provider):
         """slow_transactions explain() returns error for element_id without colon."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -1277,7 +1278,7 @@ class TestExplainElementIdSplitGuard:
         assert "error" in result["data"]
         assert "expected 'table:sys_id'" in result["data"]["error"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_stale_automations_no_colon(self, settings, auth_provider):
         """stale_automations explain() returns error for element_id without colon."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -1298,7 +1299,7 @@ class TestExplainElementIdSplitGuard:
 class TestTypeCoercion:
     """Tests that numeric params passed as strings are properly coerced."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_slow_transactions_string_limit(self, settings, auth_provider):
         """slow_transactions run() accepts limit as a string."""
@@ -1324,7 +1325,7 @@ class TestTypeCoercion:
         assert result["status"] == "success"
         assert result["data"]["params"]["limit"] == 50
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_stale_automations_string_stale_days(self, settings, auth_provider):
         """stale_automations run() accepts stale_days as a string."""
@@ -1348,7 +1349,7 @@ class TestTypeCoercion:
         assert result["data"]["params"]["stale_days"] == 30
         assert result["data"]["params"]["limit"] == 10
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_performance_bottlenecks_string_hours_and_limit(self, settings, auth_provider):
         """performance_bottlenecks run() accepts hours and limit as strings."""
@@ -1372,7 +1373,7 @@ class TestTypeCoercion:
         assert result["data"]["params"]["hours"] == 12
         assert result["data"]["params"]["limit"] == 5
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_table_health_string_hours(self, settings, auth_provider):
         """table_health run() accepts hours as a string."""
@@ -1399,7 +1400,7 @@ class TestTypeCoercion:
         assert result["status"] == "success"
         assert result["data"]["hours"] == 48
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_deprecated_apis_string_limit(self, settings, auth_provider):
         """deprecated_apis run() accepts limit as a string."""
@@ -1423,7 +1424,7 @@ class TestTypeCoercion:
 class TestErrorAnalysisCheckTableAccess:
     """Tests that error_analysis run() calls check_table_access."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_check_table_access_propagates_through_dispatcher(self, settings, auth_provider):
         """error_analysis run() propagates PolicyError through the dispatcher."""
         from unittest.mock import patch
@@ -1449,7 +1450,7 @@ class TestErrorAnalysisCheckTableAccess:
 class TestPerformanceBottlenecksElseBranch:
     """Tests for performance_bottlenecks explain() else-branch (table name only)."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_explain_invalid_table_chars(self, settings, auth_provider):
         """explain() with invalid chars in table name raises ValueError."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -1462,7 +1463,7 @@ class TestPerformanceBottlenecksElseBranch:
         assert result["status"] == "error"
         assert "Invalid identifier" in result["error"]["message"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_explain_special_chars_table(self, settings, auth_provider):
         """explain() with special chars in table name (no colon) raises ValueError."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -1475,7 +1476,7 @@ class TestPerformanceBottlenecksElseBranch:
         assert result["status"] == "error"
         assert "Invalid identifier" in result["error"]["message"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_explain_denied_table_else_branch(self, settings, auth_provider):
         """explain() with a denied table name in the else-branch returns error."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -1495,7 +1496,7 @@ class TestPerformanceBottlenecksElseBranch:
 class TestPerformanceBottlenecksCoverage:
     """Tests for performance_bottlenecks coverage gaps: invalid params and non-empty loop bodies."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_invalid_params_and_nonempty_records(self, settings, auth_provider):
         """Invalid limit/hours fall back to defaults; non-empty sysauto_script and flow_context records hit loop bodies."""
@@ -1563,7 +1564,7 @@ class TestPerformanceBottlenecksCoverage:
 class TestStaleAutomationsCoverage:
     """Tests for stale_automations coverage gaps: invalid params and non-empty loop bodies."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_invalid_params_and_nonempty_records(self, settings, auth_provider):
         """Invalid stale_days/limit fall back to defaults; non-empty records hit loop bodies."""
@@ -1648,7 +1649,7 @@ class TestStaleAutomationsCoverage:
 class TestErrorAnalysisCoverage:
     """Tests for error_analysis coverage gaps: invalid params and source filter."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_invalid_hours_and_limit(self, settings, auth_provider):
         """Invalid hours/limit fall back to defaults."""
@@ -1669,7 +1670,7 @@ class TestErrorAnalysisCoverage:
         # Invalid limit falls back to 100 (lines 29-30)
         assert result["params"]["limit"] == 100
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_source_filter(self, settings, auth_provider):
         """Source filter triggers the .like() branch (line 36)."""
@@ -1692,7 +1693,7 @@ class TestErrorAnalysisCoverage:
 class TestDeprecatedApisCoverage:
     """Tests for deprecated_apis coverage gaps: invalid limit and code_search exception."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_invalid_limit(self, settings, auth_provider):
         """Invalid limit falls back to default 20."""
@@ -1711,7 +1712,7 @@ class TestDeprecatedApisCoverage:
         # Invalid limit falls back to 20 (lines 38-39)
         assert result["params"]["limit"] == 20
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_code_search_exception_skips_pattern(self, settings, auth_provider):
         """When code_search raises for one pattern, it's skipped (lines 56-58)."""
@@ -1743,7 +1744,7 @@ class TestDeprecatedApisCoverage:
 class TestSlowTransactionsCoverage:
     """Tests for slow_transactions coverage gaps."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_invalid_hours_and_limit(self, settings, auth_provider):
         """Invalid hours/limit fall back to defaults (lines 36-37, 40-41)."""
@@ -1771,7 +1772,7 @@ class TestSlowTransactionsCoverage:
         assert result["params"]["hours"] == 24
         assert result["params"]["limit"] == 20
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_categories_filter(self, settings, auth_provider):
         """Category filter skips non-matching tables (lines 45, 51)."""
@@ -1792,7 +1793,7 @@ class TestSlowTransactionsCoverage:
         # Only one table should have been queried (the rest skipped)
         assert result["investigation"] == "slow_transactions"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_query_records_exception_skips_table(self, settings, auth_provider):
         """When query_records raises for a table, it's skipped (lines 84-86)."""
@@ -1827,7 +1828,7 @@ class TestSlowTransactionsCoverage:
 class TestTableHealthCoverage:
     """Tests for table_health coverage gaps."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_missing_table_param(self, settings, auth_provider):
         """Missing table param returns error (line 23)."""
@@ -1842,7 +1843,7 @@ class TestTableHealthCoverage:
         assert result["error"] == "Missing required parameter: table"
         assert result["finding_count"] == 0
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_invalid_hours_param(self, settings, auth_provider):
         """Invalid hours falls back to 24 (lines 38-39)."""
@@ -1871,7 +1872,7 @@ class TestTableHealthCoverage:
 
         assert result["hours"] == 24
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_health_indicators_thresholds(self, settings, auth_provider):
         """Triggers all health indicator thresholds (lines 101, 103, 105)."""
@@ -1961,7 +1962,7 @@ class TestTableHealthCoverage:
 class TestPerformanceBottlenecksCheckTableAccess:
     """Tests that performance_bottlenecks run() calls check_table_access for each queried table."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_run_raises_on_denied_sys_script(self, settings, auth_provider):
         """run() raises PolicyError when sys_script is denied."""
         from unittest.mock import patch
@@ -1988,7 +1989,7 @@ class TestPerformanceBottlenecksCheckTableAccess:
 class TestSlowTransactionsCheckTableAccess:
     """Tests that slow_transactions run() calls check_table_access for each queried table."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_run_raises_on_denied_table(self, settings, auth_provider):
         """run() raises PolicyError when a performance pattern table is denied."""
         from unittest.mock import patch
@@ -2015,7 +2016,7 @@ class TestSlowTransactionsCheckTableAccess:
 class TestStaleAutomationsCheckTableAccess:
     """Tests that stale_automations run() calls check_table_access for each queried table."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_run_raises_on_denied_flow_context(self, settings, auth_provider):
         """run() raises PolicyError when flow_context is denied."""
         from unittest.mock import patch
@@ -2042,7 +2043,7 @@ class TestStaleAutomationsCheckTableAccess:
 class TestTableHealthExplainCheckTableAccess:
     """Tests that table_health explain() calls check_table_access."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_explain_raises_on_denied_table(self, settings, auth_provider):
         """explain() raises PolicyError when the element_id table is denied."""
         from unittest.mock import patch
@@ -2071,7 +2072,7 @@ class TestTableHealthExplainCheckTableAccess:
 class TestClampingMinimumOne:
     """Tests that hours/stale_days are clamped to a minimum of 1."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_error_analysis_clamps_hours_zero_to_one(self, settings, auth_provider):
         """error_analysis run() with hours=0 clamps to 1."""
@@ -2094,7 +2095,7 @@ class TestClampingMinimumOne:
         request_url = unquote(str(route.calls[0].request.url))
         assert "javascript:gs.hoursAgoStart(1)" in request_url
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_slow_transactions_clamps_hours_zero_to_one(self, settings, auth_provider):
         """slow_transactions run() with hours=0 clamps to 1."""
@@ -2127,7 +2128,7 @@ class TestClampingMinimumOne:
         cancellation_url = unquote(str(routes["syslog_cancellation"].calls[0].request.url))
         assert "javascript:gs.hoursAgoStart(1)" in cancellation_url
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_stale_automations_clamps_stale_days_zero_to_one(self, settings, auth_provider):
         """stale_automations run() with stale_days=0 clamps to 1."""
@@ -2159,7 +2160,7 @@ class TestClampingMinimumOne:
         flow_url = unquote(str(flow_route.calls[0].request.url))
         assert "javascript:gs.daysAgoEnd(1)" in flow_url
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_performance_bottlenecks_clamps_negative_hours_to_one(self, settings, auth_provider):
         """performance_bottlenecks run() with hours=-5 clamps to 1."""

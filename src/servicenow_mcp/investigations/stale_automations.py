@@ -11,6 +11,7 @@ from servicenow_mcp.investigation_helpers import (
 from servicenow_mcp.policy import check_table_access, mask_sensitive_fields
 from servicenow_mcp.utils import ServiceNowQuery
 
+
 _ALLOWED_TABLES = {
     "flow_context",
     "sys_script",

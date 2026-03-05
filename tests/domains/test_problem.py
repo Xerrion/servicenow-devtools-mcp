@@ -10,6 +10,7 @@ from toon_format import decode as toon_decode
 from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.config import Settings
 
+
 BASE_URL = "https://test.service-now.com"
 
 
@@ -31,7 +32,7 @@ def _register_and_get_tools(settings: Settings, auth_provider: BasicAuthProvider
 class TestProblemList:
     """Tests for problem_list tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_list_no_filters(self, settings, auth_provider):
         """Should query all problems when no filters provided."""
@@ -63,7 +64,7 @@ class TestProblemList:
         assert len(data["data"]) == 2
         assert data["data"][0]["number"] == "PRB0010001"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_list_with_state_filter(self, settings, auth_provider):
         """Should map state names to numeric values using PROBLEM_STATE_MAP."""
@@ -76,7 +77,7 @@ class TestProblemList:
         # "new" maps to "1" via ChoiceRegistry defaults
         assert "state%3D1" in str(request.url)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_list_with_multiple_filters(self, settings, auth_provider):
         """Should combine multiple filters correctly."""
@@ -97,7 +98,7 @@ class TestProblemList:
         assert "assigned_to%3Duser123" in url_str
         assert "assignment_group%3Dgroup456" in url_str
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_list_with_priority_filter(self, settings, auth_provider):
         """Should filter by priority only."""
@@ -112,7 +113,7 @@ class TestProblemList:
         # No state filter should be present
         assert "state%3D" not in url_str
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_list_all_state(self, settings, auth_provider):
         """Should NOT add state filter when state='all'."""
@@ -129,7 +130,7 @@ class TestProblemList:
 class TestProblemGet:
     """Tests for problem_get tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_get_valid_number(self, settings, auth_provider):
         """Should fetch problem by PRB number."""
@@ -156,7 +157,7 @@ class TestProblemGet:
         assert data["data"]["number"] == "PRB0010001"
         assert data["data"]["sys_id"] == "abc123"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_get_invalid_prefix(self, settings, auth_provider):
         """Should reject non-PRB numbers."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -166,7 +167,7 @@ class TestProblemGet:
         assert data["status"] == "error"
         assert "PRB" in data["error"]["message"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_get_not_found(self, settings, auth_provider):
         """Should handle problem not found."""
@@ -179,7 +180,7 @@ class TestProblemGet:
         assert data["status"] == "error"
         assert "not found" in data["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_get_case_insensitive(self, settings, auth_provider):
         """Should uppercase the problem number before querying."""
@@ -211,7 +212,7 @@ class TestProblemGet:
 class TestProblemCreate:
     """Tests for problem_create tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_create_valid(self, settings, auth_provider):
         """Should create problem with required fields."""
@@ -240,7 +241,7 @@ class TestProblemCreate:
         assert data["status"] == "success"
         assert data["data"]["number"] == "PRB0010002"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_create_with_optional_fields(self, settings, auth_provider):
         """Should include optional fields when provided."""
@@ -278,7 +279,7 @@ class TestProblemCreate:
         assert data["data"]["description"] == "Detailed info"
         assert data["data"]["assigned_to"] == "user123"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_create_missing_short_description(self, settings, auth_provider):
         """Should reject empty short_description."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -288,7 +289,7 @@ class TestProblemCreate:
         assert data["status"] == "error"
         assert "short_description" in data["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_create_whitespace_short_description(self, settings, auth_provider):
         """Should reject whitespace-only short_description."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -298,7 +299,7 @@ class TestProblemCreate:
         assert data["status"] == "error"
         assert "short_description" in data["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_create_invalid_urgency_too_high(self, settings, auth_provider):
         """Should reject urgency=5 (max is 4)."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -308,7 +309,7 @@ class TestProblemCreate:
         assert data["status"] == "error"
         assert "urgency" in data["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_create_invalid_urgency_too_low(self, settings, auth_provider):
         """Should reject urgency=0 (min is 1)."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -318,7 +319,7 @@ class TestProblemCreate:
         assert data["status"] == "error"
         assert "urgency" in data["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_create_invalid_impact_too_high(self, settings, auth_provider):
         """Should reject impact=5 (max is 4)."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -328,7 +329,7 @@ class TestProblemCreate:
         assert data["status"] == "error"
         assert "impact" in data["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_create_invalid_impact_too_low(self, settings, auth_provider):
         """Should reject impact=0 (min is 1)."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -338,7 +339,7 @@ class TestProblemCreate:
         assert data["status"] == "error"
         assert "impact" in data["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_create_blocked_in_prod(self):
         """Should block creation in production."""
         prod_env = {
@@ -363,7 +364,7 @@ class TestProblemCreate:
 class TestProblemUpdate:
     """Tests for problem_update tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_update_valid(self, settings, auth_provider):
         """Should update problem by PRB number."""
@@ -404,7 +405,7 @@ class TestProblemUpdate:
         assert data["status"] == "success"
         assert data["data"]["short_description"] == "Updated"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_update_invalid_number(self, settings, auth_provider):
         """Should reject non-PRB numbers."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -414,7 +415,7 @@ class TestProblemUpdate:
         assert data["status"] == "error"
         assert "PRB" in data["error"]["message"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_update_not_found(self, settings, auth_provider):
         """Should handle problem not found."""
@@ -427,7 +428,7 @@ class TestProblemUpdate:
         assert data["status"] == "error"
         assert "not found" in data["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_update_no_changes(self, settings, auth_provider):
         """Should error when no fields to update are provided."""
@@ -445,7 +446,7 @@ class TestProblemUpdate:
         assert data["status"] == "error"
         assert "no fields" in data["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_update_with_state(self, settings, auth_provider):
         """Should map state name to numeric value using PROBLEM_STATE_MAP."""
@@ -479,7 +480,7 @@ class TestProblemUpdate:
         # "known_error" maps to "3" via ChoiceRegistry defaults
         assert data["data"]["state"] == "3"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_update_with_all_fields(self, settings, auth_provider):
         """Should update all supported fields."""
@@ -532,7 +533,7 @@ class TestProblemUpdate:
         assert data["data"]["urgency"] == "2"
         assert data["data"]["state"] == "5"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_update_blocked_in_prod(self):
         """Should block updates in production."""
         prod_env = {
@@ -560,7 +561,7 @@ class TestProblemUpdate:
 class TestProblemRootCause:
     """Tests for problem_root_cause tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_root_cause_valid(self, settings, auth_provider):
         """Should document root cause with cause_notes."""
@@ -593,7 +594,7 @@ class TestProblemRootCause:
         assert data["status"] == "success"
         assert data["data"]["cause_notes"] == "Root cause identified"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_root_cause_with_fix_notes(self, settings, auth_provider):
         """Should include fix_notes when provided."""
@@ -629,7 +630,7 @@ class TestProblemRootCause:
         assert data["data"]["cause_notes"] == "Memory leak in module X"
         assert data["data"]["fix_notes"] == "Patch applied to module X"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_root_cause_invalid_number(self, settings, auth_provider):
         """Should reject non-PRB numbers."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -642,7 +643,7 @@ class TestProblemRootCause:
         assert data["status"] == "error"
         assert "PRB" in data["error"]["message"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_root_cause_not_found(self, settings, auth_provider):
         """Should handle problem not found."""
@@ -658,7 +659,7 @@ class TestProblemRootCause:
         assert data["status"] == "error"
         assert "not found" in data["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_root_cause_empty_cause_notes(self, settings, auth_provider):
         """Should reject empty cause_notes."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -671,7 +672,7 @@ class TestProblemRootCause:
         assert data["status"] == "error"
         assert "cause_notes" in data["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_root_cause_whitespace_cause_notes(self, settings, auth_provider):
         """Should reject whitespace-only cause_notes."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -684,7 +685,7 @@ class TestProblemRootCause:
         assert data["status"] == "error"
         assert "cause_notes" in data["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_root_cause_blocked_in_prod(self):
         """Should block root cause updates in production."""
         prod_env = {

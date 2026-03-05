@@ -11,6 +11,7 @@ from servicenow_mcp.investigation_helpers import (
 from servicenow_mcp.policy import check_table_access, mask_sensitive_fields
 from servicenow_mcp.utils import ServiceNowQuery
 
+
 # ServiceNow performance pattern tables and their finding categories
 PERFORMANCE_TABLES = [
     ("sys_query_pattern", "slow_query"),

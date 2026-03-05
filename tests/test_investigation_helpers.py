@@ -11,6 +11,7 @@ from servicenow_mcp.investigation_helpers import (
     parse_int_param,
 )
 
+
 # ── parse_int_param ──────────────────────────────────────────────────────
 
 
@@ -139,7 +140,7 @@ class TestBuildInvestigationResult:
 class TestFetchAndExplain:
     """Tests for fetch_and_explain()."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @patch("servicenow_mcp.investigation_helpers.check_table_access")
     @patch("servicenow_mcp.investigation_helpers.mask_sensitive_fields")
     @patch("servicenow_mcp.investigation_helpers.validate_identifier")
@@ -174,7 +175,7 @@ class TestFetchAndExplain:
         assert result["explanation"] == "Flow 'Test Flow' is stuck."
         assert result["record"] is test_record
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @patch("servicenow_mcp.investigation_helpers.check_table_access")
     @patch("servicenow_mcp.investigation_helpers.mask_sensitive_fields")
     @patch("servicenow_mcp.investigation_helpers.validate_identifier")
@@ -198,7 +199,7 @@ class TestFetchAndExplain:
 
         mock_validate.assert_called_once_with("abc123")
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @patch("servicenow_mcp.investigation_helpers.check_table_access")
     @patch("servicenow_mcp.investigation_helpers.mask_sensitive_fields")
     @patch("servicenow_mcp.investigation_helpers.validate_identifier")
@@ -222,7 +223,7 @@ class TestFetchAndExplain:
 
         mock_check.assert_called_once_with("incident")
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @patch("servicenow_mcp.investigation_helpers.check_table_access")
     @patch("servicenow_mcp.investigation_helpers.mask_sensitive_fields")
     @patch("servicenow_mcp.investigation_helpers.validate_identifier")
@@ -250,7 +251,7 @@ class TestFetchAndExplain:
         mock_mask.assert_called_once_with(raw_record)
         assert result["record"] is masked_record
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @patch("servicenow_mcp.investigation_helpers.check_table_access")
     @patch("servicenow_mcp.investigation_helpers.mask_sensitive_fields")
     @patch("servicenow_mcp.investigation_helpers.validate_identifier")
@@ -284,7 +285,7 @@ class TestFetchAndExplain:
         assert len(received_records) == 1
         assert received_records[0] is masked_record
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @patch("servicenow_mcp.investigation_helpers.check_table_access")
     @patch("servicenow_mcp.investigation_helpers.mask_sensitive_fields")
     @patch("servicenow_mcp.investigation_helpers.validate_identifier")
@@ -312,7 +313,7 @@ class TestFetchAndExplain:
 
         assert result["explanation"] == "Part one. Part two. Part three."
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_raises_value_error_for_invalid_element_id(self) -> None:
         """Raises ValueError when element_id is missing a colon."""
         client = AsyncMock()
@@ -325,7 +326,7 @@ class TestFetchAndExplain:
                 build_explanation=lambda t, s, r: ["ok"],
             )
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_raises_value_error_for_disallowed_table(self) -> None:
         """Raises ValueError when the table is not in the allowed set."""
         client = AsyncMock()

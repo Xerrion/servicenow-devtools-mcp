@@ -7,6 +7,7 @@ from typing import Any
 from servicenow_mcp.config import Settings
 from servicenow_mcp.errors import PolicyError, QuerySafetyError
 
+
 logger = logging.getLogger(__name__)
 
 # Tables that must never be accessed via the MCP server

@@ -16,6 +16,7 @@ from servicenow_mcp.policy import (
 )
 from servicenow_mcp.utils import ServiceNowQuery, validate_identifier
 
+
 HEAVY_AUTOMATION_THRESHOLD = 10
 
 

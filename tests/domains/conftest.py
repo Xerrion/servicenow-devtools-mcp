@@ -8,7 +8,7 @@ from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.config import Settings
 
 
-@pytest.fixture
+@pytest.fixture()
 def settings() -> Settings:
     """Test settings fixture (no env file loading)."""
     env = {
@@ -22,7 +22,7 @@ def settings() -> Settings:
         return Settings(_env_file=None)
 
 
-@pytest.fixture
+@pytest.fixture()
 def auth_provider(settings: Settings) -> BasicAuthProvider:
     """Test auth provider fixture."""
     return BasicAuthProvider(settings)

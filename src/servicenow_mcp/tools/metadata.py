@@ -22,6 +22,7 @@ from servicenow_mcp.utils import (
     validate_identifier,
 )
 
+
 # Mapping from human-friendly artifact type names to ServiceNow tables
 ARTIFACT_TABLES: dict[str, str] = {
     "business_rule": "sys_script",

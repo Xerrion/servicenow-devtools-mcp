@@ -8,6 +8,7 @@ import pytest
 from servicenow_mcp.packages import PACKAGE_REGISTRY
 from servicenow_mcp.server import create_mcp_server
 
+
 pytestmark = pytest.mark.integration
 
 # Expected tool counts per package (verified in Wave FINAL F3).

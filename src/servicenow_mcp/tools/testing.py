@@ -22,6 +22,7 @@ from servicenow_mcp.utils import (
     resolve_query_token,
 )
 
+
 logger = logging.getLogger(__name__)
 
 # ATF polling constants

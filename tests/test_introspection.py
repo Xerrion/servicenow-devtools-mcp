@@ -9,10 +9,11 @@ from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.policy import DENIED_TABLES
 from servicenow_mcp.state import QueryTokenStore
 
+
 BASE_URL = "https://test.service-now.com"
 
 
-@pytest.fixture
+@pytest.fixture()
 def auth_provider(settings):
     """Create a BasicAuthProvider from test settings."""
     return BasicAuthProvider(settings)
@@ -34,7 +35,7 @@ def _register_and_get_tools(settings, auth_provider):
 class TestTableDescribe:
     """Tests for the table_describe tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_returns_field_metadata(self, settings, auth_provider):
         """Returns structured field metadata for a known table."""
@@ -76,7 +77,7 @@ class TestTableDescribe:
         assert result["data"]["fields"][0]["element"] == "number"
         assert result["data"]["fields"][1]["element"] == "state"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_denied_table_returns_error(self, settings, auth_provider):
         """Blocked tables return an error response (no HTTP call made)."""
         denied = next(iter(DENIED_TABLES))
@@ -87,7 +88,7 @@ class TestTableDescribe:
         assert result["status"] == "error"
         assert "denied" in result["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_includes_correlation_id(self, settings, auth_provider):
         """Response always contains a correlation_id."""
@@ -106,7 +107,7 @@ class TestTableDescribe:
 class TestTableGet:
     """Tests for the table_get tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_returns_single_record(self, settings, auth_provider):
         """Fetches and returns a single record by sys_id."""
@@ -131,7 +132,7 @@ class TestTableGet:
         assert result["data"]["sys_id"] == "abc123"
         assert result["data"]["number"] == "INC0001"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_masks_sensitive_fields(self, settings, auth_provider):
         """Sensitive fields like password are masked in the response."""
@@ -158,7 +159,7 @@ class TestTableGet:
         assert result["data"]["password"] == "***MASKED***"
         assert result["data"]["api_key"] == "***MASKED***"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_not_found_returns_error(self, settings, auth_provider):
         """404 from ServiceNow produces an error response."""
@@ -172,7 +173,7 @@ class TestTableGet:
 
         assert result["status"] == "error"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_denied_table_returns_error(self, settings, auth_provider):
         """Denied table returns error without making HTTP call."""
         denied = next(iter(DENIED_TABLES))
@@ -187,7 +188,7 @@ class TestTableGet:
 class TestTableQuery:
     """Tests for the table_query tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_returns_matching_records(self, settings, auth_provider):
         """Returns records matching the query with pagination."""
@@ -213,7 +214,7 @@ class TestTableQuery:
         assert len(result["data"]) == 2
         assert result["pagination"]["total"] == 2
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_limit_capped_with_warning(self, settings, auth_provider):
         """When requested limit exceeds max_row_limit, it is capped and a warning is added."""
@@ -235,7 +236,7 @@ class TestTableQuery:
         assert result["pagination"]["limit"] == 100
         assert any("capped" in w.lower() for w in result.get("warnings", []))
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_large_table_without_date_filter_returns_error(self, settings, auth_provider):
         """Large tables require a date filter; omitting it returns an error."""
         # Add syslog to large tables for this test
@@ -248,7 +249,7 @@ class TestTableQuery:
         assert result["status"] == "error"
         assert "date" in result["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_denied_table_returns_error(self, settings, auth_provider):
         """Denied table returns error."""
         denied = next(iter(DENIED_TABLES))
@@ -260,7 +261,7 @@ class TestTableQuery:
         assert result["status"] == "error"
         assert "denied" in result["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_display_values_passed_to_client(self, settings, auth_provider):
         """When display_values=True, sysparm_display_value=true is sent to the API."""
@@ -297,7 +298,7 @@ class TestTableQuery:
 class TestTableAggregate:
     """Tests for the table_aggregate tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_returns_aggregate_stats(self, settings, auth_provider):
         """Returns aggregate statistics for the query."""
@@ -316,7 +317,7 @@ class TestTableAggregate:
         assert result["status"] == "success"
         assert result["data"]["stats"]["count"] == "42"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_denied_table_returns_error(self, settings, auth_provider):
         """Denied table returns error."""
         denied = next(iter(DENIED_TABLES))
@@ -336,7 +337,7 @@ class TestErrorPropagation:
     """Verify that ServiceNowMCPError subclasses raised by the client are caught
     by the tool layer and returned inside a format_response error envelope."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_auth_error_returns_error_envelope(self, settings, auth_provider):
         """AuthError (401) from client is caught and returned in error envelope."""
@@ -355,7 +356,7 @@ class TestErrorPropagation:
         assert "not authenticated" in result["error"]["message"].lower()
         assert "correlation_id" in result
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_forbidden_error_returns_error_envelope(self, settings, auth_provider):
         """ForbiddenError (403) from client is caught and returned in error envelope."""
@@ -374,7 +375,7 @@ class TestErrorPropagation:
         assert "insufficient" in result["error"]["message"].lower() or "forbidden" in result["error"]["message"].lower()
         assert "correlation_id" in result
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_not_found_error_returns_error_envelope(self, settings, auth_provider):
         """NotFoundError (404) from client is caught and returned in error envelope."""
@@ -393,7 +394,7 @@ class TestErrorPropagation:
         assert "not found" in result["error"]["message"].lower()
         assert "correlation_id" in result
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_server_error_returns_error_envelope(self, settings, auth_provider):
         """ServerError (500) from client is caught and returned in error envelope."""
@@ -415,7 +416,7 @@ class TestErrorPropagation:
         )
         assert "correlation_id" in result
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_query_tool_auth_error_returns_error_envelope(self, settings, auth_provider):
         """AuthError during table_query is caught and returned in error envelope."""
@@ -438,7 +439,7 @@ class TestErrorPropagation:
         )
         assert "correlation_id" in result
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_aggregate_tool_server_error_returns_error_envelope(self, settings, auth_provider):
         """ServerError during table_aggregate is caught and returned in error envelope."""
@@ -462,7 +463,7 @@ class TestErrorPropagation:
 class TestQueryTokenValidation:
     """Tests that query token validation works correctly."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_invalid_token_returns_error(self, settings, auth_provider):
         """Passing a non-existent token returns a descriptive error."""
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
@@ -472,7 +473,7 @@ class TestQueryTokenValidation:
         assert result["status"] == "error"
         assert "build_query" in result["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_empty_token_queries_without_filter(self, settings, auth_provider):
         """Empty query_token runs query with no filter."""

@@ -10,6 +10,7 @@ from toon_format import decode as toon_decode
 from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.config import Settings
 
+
 BASE_URL = "https://test.service-now.com"
 
 
@@ -31,7 +32,7 @@ def _register_and_get_tools(settings: Settings, auth_provider: BasicAuthProvider
 class TestIncidentList:
     """Tests for incident_list tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_list_no_filters(self, settings, auth_provider):
         """Should query all incidents when no filters provided."""
@@ -63,7 +64,7 @@ class TestIncidentList:
         assert len(data["data"]) == 2
         assert data["data"][0]["number"] == "INC0010001"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_list_with_state_filter(self, settings, auth_provider):
         """Should map state names to numeric values."""
@@ -75,7 +76,7 @@ class TestIncidentList:
         request = respx.calls.last.request
         assert "state%3D1" in str(request.url)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_list_with_multiple_filters(self, settings, auth_provider):
         """Should combine multiple filters correctly."""
@@ -93,7 +94,7 @@ class TestIncidentList:
 class TestIncidentGet:
     """Tests for incident_get tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_get_valid_number(self, settings, auth_provider):
         """Should fetch incident by INC number."""
@@ -120,7 +121,7 @@ class TestIncidentGet:
         assert data["data"]["number"] == "INC0010001"
         assert data["data"]["sys_id"] == "abc123"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_get_invalid_prefix(self, settings, auth_provider):
         """Should reject non-INC numbers."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -130,7 +131,7 @@ class TestIncidentGet:
         assert data["status"] == "error"
         assert "INC" in data["error"]["message"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_get_not_found(self, settings, auth_provider):
         """Should handle incident not found."""
@@ -147,7 +148,7 @@ class TestIncidentGet:
 class TestIncidentCreate:
     """Tests for incident_create tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_create_valid(self, settings, auth_provider):
         """Should create incident with required short_description."""
@@ -176,7 +177,7 @@ class TestIncidentCreate:
         assert data["status"] == "success"
         assert data["data"]["number"] == "INC0010123"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_create_missing_short_description(self, settings, auth_provider):
         """Should reject empty short_description."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -186,7 +187,7 @@ class TestIncidentCreate:
         assert data["status"] == "error"
         assert "short_description" in data["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_create_invalid_urgency(self, settings, auth_provider):
         """Should reject urgency outside 1-4 range."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -203,7 +204,7 @@ class TestIncidentCreate:
         assert data["status"] == "error"
         assert "urgency" in data["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_create_invalid_impact(self, settings, auth_provider):
         """Should reject impact outside 1-4 range."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -218,7 +219,7 @@ class TestIncidentCreate:
         assert data["status"] == "error"
         assert "impact" in data["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_create_blocked_in_prod(self):
         """Should block creation in production."""
         prod_env = {
@@ -239,7 +240,7 @@ class TestIncidentCreate:
             assert data["status"] == "error"
             assert "production" in data["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_create_with_all_optional_fields(self, settings, auth_provider):
         """Should include all optional fields in the create payload."""
@@ -284,7 +285,7 @@ class TestIncidentCreate:
 class TestIncidentUpdate:
     """Tests for incident_update tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_update_valid(self, settings, auth_provider):
         """Should update incident by INC number."""
@@ -325,7 +326,7 @@ class TestIncidentUpdate:
         assert data["status"] == "success"
         assert data["data"]["short_description"] == "Updated"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_update_invalid_number(self, settings, auth_provider):
         """Should reject non-INC numbers."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -335,7 +336,7 @@ class TestIncidentUpdate:
         assert data["status"] == "error"
         assert "INC" in data["error"]["message"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_update_blocked_in_prod(self):
         """Should block updates in production."""
         prod_env = {
@@ -359,7 +360,7 @@ class TestIncidentUpdate:
             assert data["status"] == "error"
             assert "production" in data["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_update_not_found(self, settings, auth_provider):
         """Should handle incident not found during update."""
@@ -372,7 +373,7 @@ class TestIncidentUpdate:
         assert data["status"] == "error"
         assert "not found" in data["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_update_no_changes(self, settings, auth_provider):
         """Should reject update when no fields are provided."""
@@ -390,7 +391,7 @@ class TestIncidentUpdate:
         assert data["status"] == "error"
         assert "no fields" in data["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_update_with_all_optional_fields(self, settings, auth_provider):
         """Should include all optional fields in the update payload."""
@@ -447,7 +448,7 @@ class TestIncidentUpdate:
 class TestIncidentResolve:
     """Tests for incident_resolve tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_resolve_valid(self, settings, auth_provider):
         """Should resolve incident with close_code and close_notes."""
@@ -491,7 +492,7 @@ class TestIncidentResolve:
         assert data["status"] == "success"
         assert data["data"]["state"] == "6"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_resolve_missing_close_code(self, settings, auth_provider):
         """Should require close_code."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -505,7 +506,7 @@ class TestIncidentResolve:
         assert data["status"] == "error"
         assert "close_code" in data["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_resolve_missing_close_notes(self, settings, auth_provider):
         """Should require close_notes."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -519,7 +520,7 @@ class TestIncidentResolve:
         assert data["status"] == "error"
         assert "close_notes" in data["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_resolve_blocked_in_prod(self):
         """Should block resolving in production."""
         prod_env = {
@@ -544,7 +545,7 @@ class TestIncidentResolve:
             assert data["status"] == "error"
             assert "production" in data["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_resolve_invalid_number(self, settings, auth_provider):
         """Should reject non-INC numbers for resolve."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -558,7 +559,7 @@ class TestIncidentResolve:
         assert data["status"] == "error"
         assert "INC" in data["error"]["message"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_resolve_not_found(self, settings, auth_provider):
         """Should handle incident not found during resolve."""
@@ -579,7 +580,7 @@ class TestIncidentResolve:
 class TestIncidentAddComment:
     """Tests for incident_add_comment tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_add_comment_valid(self, settings, auth_provider):
         """Should add comment to incident."""
@@ -611,7 +612,7 @@ class TestIncidentAddComment:
 
         assert data["status"] == "success"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_add_work_note_valid(self, settings, auth_provider):
         """Should add work_note to incident."""
@@ -643,7 +644,7 @@ class TestIncidentAddComment:
 
         assert data["status"] == "success"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_add_comment_both_empty(self, settings, auth_provider):
         """Should require at least one of comment or work_note."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -657,7 +658,7 @@ class TestIncidentAddComment:
         assert data["status"] == "error"
         assert "comment" in data["error"]["message"].lower() or "work_note" in data["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_add_comment_blocked_in_prod(self):
         """Should block adding comments in production."""
         prod_env = {
@@ -681,7 +682,7 @@ class TestIncidentAddComment:
             assert data["status"] == "error"
             assert "production" in data["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_add_comment_invalid_number(self, settings, auth_provider):
         """Should reject non-INC numbers for add_comment."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -694,7 +695,7 @@ class TestIncidentAddComment:
         assert data["status"] == "error"
         assert "INC" in data["error"]["message"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_add_comment_not_found(self, settings, auth_provider):
         """Should handle incident not found when adding comment."""

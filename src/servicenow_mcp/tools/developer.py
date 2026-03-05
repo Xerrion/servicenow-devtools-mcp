@@ -20,6 +20,7 @@ from servicenow_mcp.policy import (
 from servicenow_mcp.state import PreviewTokenStore
 from servicenow_mcp.utils import format_response, validate_identifier
 
+
 logger = logging.getLogger(__name__)
 
 

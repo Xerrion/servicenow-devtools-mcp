@@ -9,7 +9,7 @@ from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.state import QueryTokenStore
 
 
-@pytest.fixture
+@pytest.fixture()
 def auth_provider(settings):
     """Create a BasicAuthProvider from test settings."""
     return BasicAuthProvider(settings)

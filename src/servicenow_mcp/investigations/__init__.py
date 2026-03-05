@@ -17,6 +17,7 @@ from servicenow_mcp.investigations import (
     table_health,
 )
 
+
 INVESTIGATION_REGISTRY: dict = {
     "stale_automations": stale_automations,
     "deprecated_apis": deprecated_apis,

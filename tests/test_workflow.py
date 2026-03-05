@@ -9,10 +9,11 @@ from toon_format import decode as toon_decode
 
 from servicenow_mcp.auth import BasicAuthProvider
 
+
 BASE_URL = "https://test.service-now.com"
 
 
-@pytest.fixture
+@pytest.fixture()
 def auth_provider(settings):
     """Create a BasicAuthProvider from test settings."""
     return BasicAuthProvider(settings)
@@ -58,7 +59,7 @@ class TestWorkflowToolRegistration:
 class TestWorkflowContexts:
     """Tests for the workflow_contexts tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_returns_both_legacy_and_flow_contexts(self, settings, auth_provider):
         """Returns legacy workflow contexts and flow designer contexts."""
@@ -115,7 +116,7 @@ class TestWorkflowContexts:
         assert result["data"]["legacy_workflows"][0]["name"] == "Incident Workflow"
         assert result["data"]["flow_designer"][0]["name"] == "Auto-assign Flow"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_empty_results_for_both_engines(self, settings, auth_provider):
         """Returns empty lists when no contexts found."""
@@ -134,7 +135,7 @@ class TestWorkflowContexts:
         assert result["data"]["legacy_workflows"] == []
         assert result["data"]["flow_designer"] == []
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_filters_by_state(self, settings, auth_provider):
         """Passes state filter through to the legacy query."""
@@ -174,7 +175,7 @@ class TestWorkflowContexts:
         qs = parse_qs(urlparse(str(request.url)).query)
         assert "state=finished" in qs["sysparm_query"][0]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_filters_by_table(self, settings, auth_provider):
         """Passes table filter through to the legacy query."""
@@ -195,7 +196,7 @@ class TestWorkflowContexts:
         qs = parse_qs(urlparse(str(request.url)).query)
         assert "table=incident" in qs["sysparm_query"][0]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_handles_server_error(self, settings, auth_provider):
         """Returns error envelope when legacy context query fails."""
@@ -223,7 +224,7 @@ class TestWorkflowContexts:
 class TestWorkflowMap:
     """Tests for the workflow_map tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_returns_full_map(self, settings, auth_provider):
         """Returns version, activities, and transitions."""
@@ -328,7 +329,7 @@ class TestWorkflowMap:
         assert len(result["data"]["activities"][1]["variables"]) == 1
         assert result["data"]["activities"][1]["variables"][0]["value"] == "some_script_body"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_empty_activities_and_transitions(self, settings, auth_provider):
         """Returns version with empty activities and transitions lists."""
@@ -361,7 +362,7 @@ class TestWorkflowMap:
         assert result["data"]["activities"] == []
         assert result["data"]["transitions"] == []
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_activities_sorted_by_x_position(self, settings, auth_provider):
         """Activities are returned ordered by x position from the query."""
@@ -416,7 +417,7 @@ class TestWorkflowMap:
         assert names == ["First", "Second", "Third"]
         assert all(a["variables"] == [] for a in result["data"]["activities"])
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_error_on_missing_version(self, settings, auth_provider):
         """Returns error when the workflow version is not found."""
@@ -438,7 +439,7 @@ class TestWorkflowMap:
         assert isinstance(result["error"], dict)
         assert "Not found" in result["error"]["message"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_map_groups_variables_by_activity(self, settings, auth_provider):
         """Variables are grouped correctly per activity in the map."""
@@ -514,7 +515,7 @@ class TestWorkflowMap:
         assert len(a1["variables"]) == 2
         assert len(a2["variables"]) == 1
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_map_empty_activities_skips_variable_fetch(self, settings, auth_provider):
         """No sys_variable_value call when there are no activities."""
@@ -553,7 +554,7 @@ class TestWorkflowMap:
 class TestWorkflowStatus:
     """Tests for the workflow_status tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_returns_context_with_executing_and_history(self, settings, auth_provider):
         """Returns context record alongside executing and history lists."""
@@ -627,7 +628,7 @@ class TestWorkflowStatus:
         assert result["data"]["executing"][0]["activity.name"] == "Approval"
         assert result["data"]["history"][0]["result"] == "success"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_empty_executing_all_completed(self, settings, auth_provider):
         """Returns empty executing list when all activities have finished."""
@@ -678,7 +679,7 @@ class TestWorkflowStatus:
         assert result["data"]["executing"] == []
         assert len(result["data"]["history"]) == 1
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_multiple_executing_activities(self, settings, auth_provider):
         """Returns multiple currently-executing activities."""
@@ -739,7 +740,7 @@ class TestWorkflowStatus:
         assert result["status"] == "success"
         assert len(result["data"]["executing"]) == 3
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_history_with_faults(self, settings, auth_provider):
         """Returns history entries with populated fault_description."""
@@ -801,7 +802,7 @@ class TestWorkflowStatus:
         assert history[0]["fault_description"] == "NullPointerException at line 42"
         assert history[1]["fault_description"] == "Invalid email address"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_error_on_missing_context(self, settings, auth_provider):
         """Returns error envelope when wf_context is not found."""
@@ -825,7 +826,7 @@ class TestWorkflowStatus:
 class TestWorkflowActivityDetail:
     """Tests for the workflow_activity_detail tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_returns_activity_with_linked_definition(self, settings, auth_provider):
         """Returns activity display values alongside the element definition."""
@@ -897,7 +898,7 @@ class TestWorkflowActivityDetail:
         assert len(result["data"]["variables"]) == 1
         assert result["data"]["variables"][0]["value"] == "current.state = 2;"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_activity_with_no_definition(self, settings, auth_provider):
         """Returns definition as None when activity has no linked definition."""
@@ -929,7 +930,7 @@ class TestWorkflowActivityDetail:
         assert result["data"]["definition"] is None
         assert result["data"]["variables"] == []
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_error_on_missing_activity(self, settings, auth_provider):
         """Returns error when the activity record is not found."""
@@ -945,7 +946,7 @@ class TestWorkflowActivityDetail:
         assert isinstance(result["error"], dict)
         assert "Not found" in result["error"]["message"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_activity_includes_multiple_variables(self, settings, auth_provider):
         """Returns multiple configured variables for an activity."""
@@ -1017,7 +1018,7 @@ class TestWorkflowActivityDetail:
 class TestWorkflowVersionList:
     """Tests for the workflow_version_list tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_returns_versions_for_table(self, settings, auth_provider):
         """Returns workflow versions defined for a specific table."""
@@ -1062,7 +1063,7 @@ class TestWorkflowVersionList:
         assert len(result["data"]["versions"]) == 2
         assert result["data"]["versions"][0]["table"] == "incident"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_empty_result(self, settings, auth_provider):
         """Returns empty versions list when none found."""
@@ -1077,7 +1078,7 @@ class TestWorkflowVersionList:
         assert result["status"] == "success"
         assert result["data"]["versions"] == []
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_active_only_false_includes_inactive(self, settings, auth_provider):
         """Omits the active filter when active_only is False."""
@@ -1110,7 +1111,7 @@ class TestWorkflowVersionList:
         qs = parse_qs(urlparse(str(request.url)).query)
         assert "active=true" not in qs["sysparm_query"][0]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_returns_versions_with_display_values(self, settings, auth_provider):
         """Display values are requested for version records."""
@@ -1145,7 +1146,7 @@ class TestWorkflowVersionList:
         request = version_route.calls[0].request
         assert "sysparm_display_value=true" in str(request.url)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_handles_server_error(self, settings, auth_provider):
         """Returns error envelope on server error."""
