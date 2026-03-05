@@ -10,6 +10,7 @@ from toon_format import decode as toon_decode
 from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.config import Settings
 
+
 BASE_URL = "https://test.service-now.com"
 
 
@@ -31,7 +32,7 @@ def _register_and_get_tools(settings: Settings, auth_provider: BasicAuthProvider
 class TestKnowledgeSearch:
     """Tests for knowledge_search tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_search_default_published(self, settings, auth_provider):
         """Should search published articles by default."""
@@ -40,8 +41,16 @@ class TestKnowledgeSearch:
                 200,
                 json={
                     "result": [
-                        {"sys_id": "kb1", "number": "KB0010001", "short_description": "How to reset password"},
-                        {"sys_id": "kb2", "number": "KB0010002", "short_description": "Password policy guide"},
+                        {
+                            "sys_id": "kb1",
+                            "number": "KB0010001",
+                            "short_description": "How to reset password",
+                        },
+                        {
+                            "sys_id": "kb2",
+                            "number": "KB0010002",
+                            "short_description": "Password policy guide",
+                        },
                     ]
                 },
             )
@@ -58,7 +67,7 @@ class TestKnowledgeSearch:
         assert "textLIKEpassword" in str(request.url)
         assert "workflow_state%3Dpublished" in str(request.url)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_search_custom_workflow_state(self, settings, auth_provider):
         """Should filter by custom workflow_state."""
@@ -70,7 +79,7 @@ class TestKnowledgeSearch:
         request = respx.calls.last.request
         assert "workflow_state%3Ddraft" in str(request.url)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_search_custom_limit(self, settings, auth_provider):
         """Should respect custom limit parameter."""
@@ -86,14 +95,22 @@ class TestKnowledgeSearch:
 class TestKnowledgeGet:
     """Tests for knowledge_get tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_get_by_kb_number(self, settings, auth_provider):
         """Should fetch knowledge article by KB number."""
         respx.get(f"{BASE_URL}/api/now/table/kb_knowledge").mock(
             return_value=Response(
                 200,
-                json={"result": [{"sys_id": "kb123", "number": "KB0010001", "short_description": "Test article"}]},
+                json={
+                    "result": [
+                        {
+                            "sys_id": "kb123",
+                            "number": "KB0010001",
+                            "short_description": "Test article",
+                        }
+                    ]
+                },
             )
         )
 
@@ -106,7 +123,7 @@ class TestKnowledgeGet:
         request = respx.calls.last.request
         assert "number%3DKB0010001" in str(request.url)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_get_by_sys_id(self, settings, auth_provider):
         """Should fetch knowledge article by sys_id if 32-char hex."""
@@ -115,7 +132,14 @@ class TestKnowledgeGet:
                 Response(200, json={"result": []}),  # First query by number fails
                 Response(
                     200,
-                    json={"result": [{"sys_id": "abc123def456abc123def456abc12345", "number": "KB0010001"}]},
+                    json={
+                        "result": [
+                            {
+                                "sys_id": "abc123def456abc123def456abc12345",
+                                "number": "KB0010001",
+                            }
+                        ]
+                    },
                 ),  # Second query by sys_id succeeds
             ]
         )
@@ -127,7 +151,7 @@ class TestKnowledgeGet:
         assert data["status"] == "success"
         assert data["data"]["number"] == "KB0010001"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_get_not_found(self, settings, auth_provider):
         """Should return error when knowledge article not found."""
@@ -149,7 +173,7 @@ class TestKnowledgeGet:
 class TestKnowledgeCreate:
     """Tests for knowledge_create tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_create_minimal(self, settings, auth_provider):
         """Should create knowledge article with minimal required fields."""
@@ -176,7 +200,7 @@ class TestKnowledgeCreate:
         assert data["data"]["number"] == "KB0010003"
         assert data["data"]["workflow_state"] == "draft"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_create_missing_short_description(self, settings, auth_provider):
         """Should return error if short_description is empty."""
@@ -187,7 +211,7 @@ class TestKnowledgeCreate:
         assert data["status"] == "error"
         assert "short_description" in data["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_create_missing_text(self, settings, auth_provider):
         """Should return error if text is empty."""
@@ -198,7 +222,7 @@ class TestKnowledgeCreate:
         assert data["status"] == "error"
         assert "text" in data["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_create_with_kb_knowledge_base_and_category(self, settings, auth_provider):
         """Should include kb_knowledge_base and kb_category in create data when provided."""
@@ -239,7 +263,7 @@ class TestKnowledgeCreate:
         assert request_body["kb_knowledge_base"] == "base123"
         assert request_body["kb_category"] == "cat456"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_create_production_blocked(self):
         """Should block write in production environment."""
         prod_env = {
@@ -264,17 +288,26 @@ class TestKnowledgeCreate:
 class TestKnowledgeUpdate:
     """Tests for knowledge_update tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_update_by_number(self, settings, auth_provider):
         """Should update knowledge article by KB number."""
         respx.get(f"{BASE_URL}/api/now/table/kb_knowledge").mock(
-            return_value=Response(200, json={"result": [{"sys_id": "kb123", "number": "KB0010001"}]})
+            return_value=Response(
+                200,
+                json={"result": [{"sys_id": "kb123", "number": "KB0010001"}]},
+            )
         )
         respx.patch(f"{BASE_URL}/api/now/table/kb_knowledge/kb123").mock(
             return_value=Response(
                 200,
-                json={"result": {"sys_id": "kb123", "number": "KB0010001", "short_description": "Updated title"}},
+                json={
+                    "result": {
+                        "sys_id": "kb123",
+                        "number": "KB0010001",
+                        "short_description": "Updated title",
+                    }
+                },
             )
         )
 
@@ -285,14 +318,24 @@ class TestKnowledgeUpdate:
         assert data["status"] == "success"
         assert data["data"]["short_description"] == "Updated title"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_update_by_sys_id(self, settings, auth_provider):
         """Should update knowledge article by sys_id."""
         respx.get(f"{BASE_URL}/api/now/table/kb_knowledge").mock(
             side_effect=[
                 Response(200, json={"result": []}),  # Query by number fails
-                Response(200, json={"result": [{"sys_id": "abc123def456abc123def456abc12345", "number": "KB0010001"}]}),
+                Response(
+                    200,
+                    json={
+                        "result": [
+                            {
+                                "sys_id": "abc123def456abc123def456abc12345",
+                                "number": "KB0010001",
+                            }
+                        ]
+                    },
+                ),
             ]
         )
         respx.patch(f"{BASE_URL}/api/now/table/kb_knowledge/abc123def456abc123def456abc12345").mock(
@@ -310,14 +353,15 @@ class TestKnowledgeUpdate:
 
         tools = _register_and_get_tools(settings, auth_provider)
         result = await tools["knowledge_update"](
-            number_or_sys_id="abc123def456abc123def456abc12345", text="Updated content"
+            number_or_sys_id="abc123def456abc123def456abc12345",
+            text="Updated content",
         )
         data = toon_decode(result)
 
         assert data["status"] == "success"
         assert data["data"]["text"] == "Updated content"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_update_not_found(self, settings, auth_provider):
         """Should return error if article not found."""
@@ -335,12 +379,15 @@ class TestKnowledgeUpdate:
         assert data["status"] == "error"
         assert "not found" in data["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_update_no_changes_provided(self, settings, auth_provider):
         """Should return error when no update fields are provided."""
         respx.get(f"{BASE_URL}/api/now/table/kb_knowledge").mock(
-            return_value=Response(200, json={"result": [{"sys_id": "kb123", "number": "KB0010001"}]})
+            return_value=Response(
+                200,
+                json={"result": [{"sys_id": "kb123", "number": "KB0010001"}]},
+            )
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
@@ -350,7 +397,7 @@ class TestKnowledgeUpdate:
         assert data["status"] == "error"
         assert "no fields" in data["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_update_production_blocked(self):
         """Should block write in production environment."""
         prod_env = {
@@ -371,12 +418,15 @@ class TestKnowledgeUpdate:
             assert data["status"] == "error"
             assert "production" in data["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_update_with_workflow_state_kb_base_and_category(self, settings, auth_provider):
         """Should include workflow_state, kb_knowledge_base, and kb_category in update."""
         respx.get(f"{BASE_URL}/api/now/table/kb_knowledge").mock(
-            return_value=Response(200, json={"result": [{"sys_id": "kb123", "number": "KB0010001"}]})
+            return_value=Response(
+                200,
+                json={"result": [{"sys_id": "kb123", "number": "KB0010001"}]},
+            )
         )
         respx.patch(f"{BASE_URL}/api/now/table/kb_knowledge/kb123").mock(
             return_value=Response(
@@ -419,17 +469,26 @@ class TestKnowledgeUpdate:
 class TestKnowledgeFeedback:
     """Tests for knowledge_feedback tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_feedback_with_rating(self, settings, auth_provider):
         """Should submit rating feedback to kb_feedback table."""
         respx.get(f"{BASE_URL}/api/now/table/kb_knowledge").mock(
-            return_value=Response(200, json={"result": [{"sys_id": "kb123", "number": "KB0010001"}]})
+            return_value=Response(
+                200,
+                json={"result": [{"sys_id": "kb123", "number": "KB0010001"}]},
+            )
         )
         respx.post(f"{BASE_URL}/api/now/table/kb_feedback").mock(
             return_value=Response(
                 201,
-                json={"result": {"sys_id": "fb001", "article": "kb123", "rating": "5"}},
+                json={
+                    "result": {
+                        "sys_id": "fb001",
+                        "article": "kb123",
+                        "rating": "5",
+                    }
+                },
             )
         )
 
@@ -441,17 +500,26 @@ class TestKnowledgeFeedback:
         assert data["data"]["article"] == "kb123"
         assert data["data"]["rating"] == "5"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_feedback_with_comment(self, settings, auth_provider):
         """Should submit comment feedback to kb_feedback table."""
         respx.get(f"{BASE_URL}/api/now/table/kb_knowledge").mock(
-            return_value=Response(200, json={"result": [{"sys_id": "kb123", "number": "KB0010001"}]})
+            return_value=Response(
+                200,
+                json={"result": [{"sys_id": "kb123", "number": "KB0010001"}]},
+            )
         )
         respx.post(f"{BASE_URL}/api/now/table/kb_feedback").mock(
             return_value=Response(
                 201,
-                json={"result": {"sys_id": "fb002", "article": "kb123", "comments": "Very helpful"}},
+                json={
+                    "result": {
+                        "sys_id": "fb002",
+                        "article": "kb123",
+                        "comments": "Very helpful",
+                    }
+                },
             )
         )
 
@@ -463,12 +531,15 @@ class TestKnowledgeFeedback:
         assert data["data"]["article"] == "kb123"
         assert data["data"]["comments"] == "Very helpful"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_feedback_both_rating_and_comment(self, settings, auth_provider):
         """Should submit both rating and comment to kb_feedback."""
         respx.get(f"{BASE_URL}/api/now/table/kb_knowledge").mock(
-            return_value=Response(200, json={"result": [{"sys_id": "kb123", "number": "KB0010001"}]})
+            return_value=Response(
+                200,
+                json={"result": [{"sys_id": "kb123", "number": "KB0010001"}]},
+            )
         )
         respx.post(f"{BASE_URL}/api/now/table/kb_feedback").mock(
             return_value=Response(
@@ -492,7 +563,7 @@ class TestKnowledgeFeedback:
         assert data["data"]["rating"] == "4"
         assert data["data"]["comments"] == "Good article"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_feedback_missing_both(self, settings, auth_provider):
         """Should return error if neither rating nor comment provided."""
@@ -503,7 +574,7 @@ class TestKnowledgeFeedback:
         assert data["status"] == "error"
         assert "rating or comment" in data["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_feedback_invalid_rating_low(self, settings, auth_provider):
         """Should return error if rating below 1."""
@@ -514,7 +585,7 @@ class TestKnowledgeFeedback:
         assert data["status"] == "error"
         assert "between 1 and 5" in data["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_feedback_invalid_rating_high(self, settings, auth_provider):
         """Should return error if rating above 5."""
@@ -525,7 +596,7 @@ class TestKnowledgeFeedback:
         assert data["status"] == "error"
         assert "between 1 and 5" in data["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_feedback_production_blocked(self):
         """Should block write in production environment."""
         prod_env = {
@@ -546,7 +617,7 @@ class TestKnowledgeFeedback:
             assert data["status"] == "error"
             assert "production" in data["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_feedback_lookup_by_sys_id(self, settings, auth_provider):
         """Should fall back to sys_id lookup when number lookup returns nothing."""
@@ -555,7 +626,14 @@ class TestKnowledgeFeedback:
                 Response(200, json={"result": []}),  # Query by number fails
                 Response(
                     200,
-                    json={"result": [{"sys_id": "abc123def456abc123def456abc12345", "number": "KB0010001"}]},
+                    json={
+                        "result": [
+                            {
+                                "sys_id": "abc123def456abc123def456abc12345",
+                                "number": "KB0010001",
+                            }
+                        ]
+                    },
                 ),  # Query by sys_id succeeds
             ]
         )
@@ -579,7 +657,7 @@ class TestKnowledgeFeedback:
         assert data["status"] == "success"
         assert data["data"]["article"] == "abc123def456abc123def456abc12345"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_feedback_article_not_found(self, settings, auth_provider):
         """Should return error when article not found for feedback."""

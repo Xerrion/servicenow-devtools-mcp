@@ -10,6 +10,7 @@ from toon_format import decode as toon_decode
 from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.config import Settings
 
+
 BASE_URL = "https://test.service-now.com"
 
 
@@ -31,7 +32,7 @@ def _register_and_get_tools(settings: Settings, auth_provider: BasicAuthProvider
 class TestRequestList:
     """Tests for request_list tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_list_no_filters(self, settings, auth_provider):
         """Should query all requests when no filters provided."""
@@ -40,8 +41,16 @@ class TestRequestList:
                 200,
                 json={
                     "result": [
-                        {"sys_id": "id1", "number": "REQ0010001", "short_description": "Request 1"},
-                        {"sys_id": "id2", "number": "REQ0010002", "short_description": "Request 2"},
+                        {
+                            "sys_id": "id1",
+                            "number": "REQ0010001",
+                            "short_description": "Request 1",
+                        },
+                        {
+                            "sys_id": "id2",
+                            "number": "REQ0010002",
+                            "short_description": "Request 2",
+                        },
                     ]
                 },
             )
@@ -55,7 +64,7 @@ class TestRequestList:
         assert len(data["data"]) == 2
         assert data["data"][0]["number"] == "REQ0010001"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_list_with_state_filter(self, settings, auth_provider):
         """Should apply state filter to query."""
@@ -67,7 +76,7 @@ class TestRequestList:
         request = respx.calls.last.request
         assert "state%3D1" in str(request.url)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_list_with_requested_for(self, settings, auth_provider):
         """Should apply requested_for filter to query."""
@@ -79,7 +88,7 @@ class TestRequestList:
         request = respx.calls.last.request
         assert "requested_for%3Duser123" in str(request.url)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_list_with_multiple_filters(self, settings, auth_provider):
         """Should combine multiple filters correctly."""
@@ -98,7 +107,7 @@ class TestRequestList:
 class TestRequestGet:
     """Tests for request_get tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_get_valid_number(self, settings, auth_provider):
         """Should fetch request by REQ number."""
@@ -107,7 +116,11 @@ class TestRequestGet:
                 200,
                 json={
                     "result": [
-                        {"sys_id": "abc123", "number": "REQ0010001", "short_description": "Test request"},
+                        {
+                            "sys_id": "abc123",
+                            "number": "REQ0010001",
+                            "short_description": "Test request",
+                        },
                     ]
                 },
             )
@@ -121,7 +134,7 @@ class TestRequestGet:
         assert data["data"]["number"] == "REQ0010001"
         assert data["data"]["sys_id"] == "abc123"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_get_invalid_prefix(self, settings, auth_provider):
         """Should reject non-REQ numbers."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -131,7 +144,7 @@ class TestRequestGet:
         assert data["status"] == "error"
         assert "REQ" in data["error"]["message"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_get_not_found(self, settings, auth_provider):
         """Should handle request not found."""
@@ -144,7 +157,7 @@ class TestRequestGet:
         assert data["status"] == "error"
         assert "not found" in data["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_get_case_insensitive(self, settings, auth_provider):
         """Should uppercase the number before querying."""
@@ -153,7 +166,11 @@ class TestRequestGet:
                 200,
                 json={
                     "result": [
-                        {"sys_id": "abc123", "number": "REQ0010001", "short_description": "Test request"},
+                        {
+                            "sys_id": "abc123",
+                            "number": "REQ0010001",
+                            "short_description": "Test request",
+                        },
                     ]
                 },
             )
@@ -173,7 +190,7 @@ class TestRequestGet:
 class TestRequestItems:
     """Tests for request_items tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_items_valid(self, settings, auth_provider):
         """Should fetch request items by REQ number using dot-walk query."""
@@ -182,8 +199,16 @@ class TestRequestItems:
                 200,
                 json={
                     "result": [
-                        {"sys_id": "item1", "number": "RITM0010001", "short_description": "Item 1"},
-                        {"sys_id": "item2", "number": "RITM0010002", "short_description": "Item 2"},
+                        {
+                            "sys_id": "item1",
+                            "number": "RITM0010001",
+                            "short_description": "Item 1",
+                        },
+                        {
+                            "sys_id": "item2",
+                            "number": "RITM0010002",
+                            "short_description": "Item 2",
+                        },
                     ]
                 },
             )
@@ -200,7 +225,7 @@ class TestRequestItems:
         request = respx.calls.last.request
         assert "request.number%3DREQ0010001" in str(request.url)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_items_invalid_prefix(self, settings, auth_provider):
         """Should reject non-REQ numbers."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -210,7 +235,7 @@ class TestRequestItems:
         assert data["status"] == "error"
         assert "REQ" in data["error"]["message"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_items_empty_result(self, settings, auth_provider):
         """Should succeed with empty list when no items found."""
@@ -227,7 +252,7 @@ class TestRequestItems:
 class TestRequestItemGet:
     """Tests for request_item_get tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_get_valid_ritm(self, settings, auth_provider):
         """Should fetch request item by RITM number."""
@@ -236,7 +261,11 @@ class TestRequestItemGet:
                 200,
                 json={
                     "result": [
-                        {"sys_id": "item123", "number": "RITM0010001", "short_description": "Test item"},
+                        {
+                            "sys_id": "item123",
+                            "number": "RITM0010001",
+                            "short_description": "Test item",
+                        },
                     ]
                 },
             )
@@ -250,7 +279,7 @@ class TestRequestItemGet:
         assert data["data"]["number"] == "RITM0010001"
         assert data["data"]["sys_id"] == "item123"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_get_invalid_prefix(self, settings, auth_provider):
         """Should reject non-RITM numbers."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -260,7 +289,7 @@ class TestRequestItemGet:
         assert data["status"] == "error"
         assert "RITM" in data["error"]["message"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_get_not_found(self, settings, auth_provider):
         """Should handle request item not found."""
@@ -277,7 +306,7 @@ class TestRequestItemGet:
 class TestRequestItemUpdate:
     """Tests for request_item_update tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     @patch("servicenow_mcp.policy.write_gate", return_value=None)
     async def test_update_valid(self, mock_write_gate, settings, auth_provider):
@@ -308,7 +337,7 @@ class TestRequestItemUpdate:
         assert data["status"] == "success"
         assert data["data"]["state"] == "3"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     @patch("servicenow_mcp.policy.write_gate", return_value=None)
     async def test_update_with_assignment(self, mock_write_gate, settings, auth_provider):
@@ -345,7 +374,7 @@ class TestRequestItemUpdate:
         assert data["data"]["assignment_group"] == "group456"
         assert data["data"]["assigned_to"] == "user789"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @patch("servicenow_mcp.policy.write_gate", return_value=None)
     async def test_update_invalid_number(self, mock_write_gate, settings, auth_provider):
         """Should reject non-RITM numbers."""
@@ -356,7 +385,7 @@ class TestRequestItemUpdate:
         assert data["status"] == "error"
         assert "RITM" in data["error"]["message"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     @patch("servicenow_mcp.policy.write_gate", return_value=None)
     async def test_update_not_found(self, mock_write_gate, settings, auth_provider):
@@ -370,7 +399,7 @@ class TestRequestItemUpdate:
         assert data["status"] == "error"
         assert "not found" in data["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     @patch("servicenow_mcp.policy.write_gate", return_value=None)
     async def test_update_no_changes(self, mock_write_gate, settings, auth_provider):
@@ -389,7 +418,7 @@ class TestRequestItemUpdate:
         assert data["status"] == "error"
         assert "no fields" in data["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_update_blocked_in_prod(self):
         """Should block updates in production."""
         prod_env = {

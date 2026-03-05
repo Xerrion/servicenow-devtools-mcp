@@ -10,6 +10,7 @@ from toon_format import decode as toon_decode
 from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.config import Settings
 
+
 BASE_URL = "https://test.service-now.com"
 SC_BASE = f"{BASE_URL}/api/sn_sc/servicecatalog"
 
@@ -35,7 +36,7 @@ def _register_and_get_tools(settings: Settings, auth_provider: BasicAuthProvider
 class TestScCatalogsList:
     """Tests for sc_catalogs_list tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_list_defaults(self, settings, auth_provider):
         """Should list catalogs with default parameters."""
@@ -59,7 +60,7 @@ class TestScCatalogsList:
         assert len(data["data"]) == 2
         assert data["data"][0]["title"] == "Service Catalog"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_list_with_text_filter(self, settings, auth_provider):
         """Should pass text search parameter."""
@@ -71,7 +72,7 @@ class TestScCatalogsList:
         request = respx.calls.last.request
         assert "sysparm_text=hardware" in str(request.url)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_list_with_limit(self, settings, auth_provider):
         """Should pass limit parameter."""
@@ -90,7 +91,7 @@ class TestScCatalogsList:
 class TestScCatalogGet:
     """Tests for sc_catalog_get tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_get_catalog(self, settings, auth_provider):
         """Should fetch a specific catalog by sys_id."""
@@ -116,7 +117,7 @@ class TestScCatalogGet:
 class TestScCategoriesList:
     """Tests for sc_categories_list tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_list_categories(self, settings, auth_provider):
         """Should list categories for a catalog."""
@@ -140,7 +141,7 @@ class TestScCategoriesList:
         assert len(data["data"]) == 2
         assert data["data"][0]["title"] == "Hardware"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_list_categories_with_pagination(self, settings, auth_provider):
         """Should pass limit and offset parameters."""
@@ -154,7 +155,7 @@ class TestScCategoriesList:
         assert "sysparm_limit=10" in url
         assert "sysparm_offset=5" in url
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_list_categories_top_level_only(self, settings, auth_provider):
         """Should pass top_level_only parameter."""
@@ -173,7 +174,7 @@ class TestScCategoriesList:
 class TestScCategoryGet:
     """Tests for sc_category_get tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_get_category(self, settings, auth_provider):
         """Should fetch a specific category by sys_id."""
@@ -199,7 +200,7 @@ class TestScCategoryGet:
 class TestScItemsList:
     """Tests for sc_items_list tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_list_items_defaults(self, settings, auth_provider):
         """Should list catalog items with default parameters."""
@@ -223,7 +224,7 @@ class TestScItemsList:
         assert len(data["data"]) == 2
         assert data["data"][0]["name"] == "Laptop"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_list_items_with_filters(self, settings, auth_provider):
         """Should pass text, catalog, and category filters."""
@@ -253,14 +254,20 @@ class TestScItemsList:
 class TestScItemGet:
     """Tests for sc_item_get tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_get_item(self, settings, auth_provider):
         """Should fetch a specific catalog item by sys_id."""
         respx.get(f"{SC_BASE}/items/item123").mock(
             return_value=Response(
                 200,
-                json={"result": {"sys_id": "item123", "name": "Laptop", "price": "$1200"}},
+                json={
+                    "result": {
+                        "sys_id": "item123",
+                        "name": "Laptop",
+                        "price": "$1200",
+                    }
+                },
             )
         )
 
@@ -279,7 +286,7 @@ class TestScItemGet:
 class TestScItemVariables:
     """Tests for sc_item_variables tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_get_variables(self, settings, auth_provider):
         """Should fetch variables for a catalog item."""
@@ -288,8 +295,16 @@ class TestScItemVariables:
                 200,
                 json={
                     "result": [
-                        {"name": "urgency", "type": "choice", "mandatory": True},
-                        {"name": "description", "type": "text", "mandatory": False},
+                        {
+                            "name": "urgency",
+                            "type": "choice",
+                            "mandatory": True,
+                        },
+                        {
+                            "name": "description",
+                            "type": "text",
+                            "mandatory": False,
+                        },
                     ]
                 },
             )
@@ -310,7 +325,7 @@ class TestScItemVariables:
 class TestScOrderNow:
     """Tests for sc_order_now tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     @patch("servicenow_mcp.policy.write_gate", return_value=None)
     async def test_order_now_no_variables(self, mock_write_gate, settings, auth_provider):
@@ -329,7 +344,7 @@ class TestScOrderNow:
         assert data["status"] == "success"
         assert data["data"]["number"] == "REQ0010001"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     @patch("servicenow_mcp.policy.write_gate", return_value=None)
     async def test_order_now_with_variables(self, mock_write_gate, settings, auth_provider):
@@ -351,7 +366,7 @@ class TestScOrderNow:
         assert data["status"] == "success"
         assert data["data"]["number"] == "REQ0010001"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_order_now_blocked_in_prod(self):
         """Should block ordering in production."""
         prod_env = {
@@ -379,7 +394,7 @@ class TestScOrderNow:
 class TestScAddToCart:
     """Tests for sc_add_to_cart tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     @patch("servicenow_mcp.policy.write_gate", return_value=None)
     async def test_add_to_cart_no_variables(self, mock_write_gate, settings, auth_provider):
@@ -398,7 +413,7 @@ class TestScAddToCart:
         assert data["status"] == "success"
         assert data["data"]["cart_item_id"] == "ci123"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     @patch("servicenow_mcp.policy.write_gate", return_value=None)
     async def test_add_to_cart_with_variables(self, mock_write_gate, settings, auth_provider):
@@ -420,7 +435,7 @@ class TestScAddToCart:
         assert data["status"] == "success"
         assert data["data"]["cart_item_id"] == "ci123"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_add_to_cart_blocked_in_prod(self):
         """Should block add-to-cart in production."""
         prod_env = {
@@ -448,7 +463,7 @@ class TestScAddToCart:
 class TestScCartGet:
     """Tests for sc_cart_get tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_get_cart(self, settings, auth_provider):
         """Should retrieve the current user's cart."""
@@ -480,7 +495,7 @@ class TestScCartGet:
 class TestScCartSubmit:
     """Tests for sc_cart_submit tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     @patch("servicenow_mcp.policy.write_gate", return_value=None)
     async def test_submit_cart(self, mock_write_gate, settings, auth_provider):
@@ -488,7 +503,12 @@ class TestScCartSubmit:
         respx.post(f"{SC_BASE}/cart/submit_order").mock(
             return_value=Response(
                 200,
-                json={"result": {"request_number": "REQ0010001", "request_id": "req123"}},
+                json={
+                    "result": {
+                        "request_number": "REQ0010001",
+                        "request_id": "req123",
+                    }
+                },
             )
         )
 
@@ -499,7 +519,7 @@ class TestScCartSubmit:
         assert data["status"] == "success"
         assert data["data"]["request_number"] == "REQ0010001"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_submit_cart_blocked_in_prod(self):
         """Should block cart submission in production."""
         prod_env = {
@@ -527,7 +547,7 @@ class TestScCartSubmit:
 class TestScCartCheckout:
     """Tests for sc_cart_checkout tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     @patch("servicenow_mcp.policy.write_gate", return_value=None)
     async def test_checkout_cart(self, mock_write_gate, settings, auth_provider):
@@ -535,7 +555,12 @@ class TestScCartCheckout:
         respx.post(f"{SC_BASE}/cart/checkout").mock(
             return_value=Response(
                 200,
-                json={"result": {"request_number": "REQ0010002", "request_id": "req456"}},
+                json={
+                    "result": {
+                        "request_number": "REQ0010002",
+                        "request_id": "req456",
+                    }
+                },
             )
         )
 
@@ -546,7 +571,7 @@ class TestScCartCheckout:
         assert data["status"] == "success"
         assert data["data"]["request_number"] == "REQ0010002"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_checkout_blocked_in_prod(self):
         """Should block checkout in production."""
         prod_env = {

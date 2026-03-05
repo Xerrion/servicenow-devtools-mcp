@@ -6,6 +6,7 @@ from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.config import Settings
 
+
 pytestmark = pytest.mark.integration
 
 
@@ -50,7 +51,13 @@ class TestDebug:
             ecc_result = await client.query_records(
                 "ecc_queue",
                 "state=error",
-                fields=["sys_id", "name", "queue", "error_string", "sys_created_on"],
+                fields=[
+                    "sys_id",
+                    "name",
+                    "queue",
+                    "error_string",
+                    "sys_created_on",
+                ],
                 limit=20,
             )
 

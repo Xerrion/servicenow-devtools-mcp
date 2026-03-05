@@ -8,9 +8,14 @@ from mcp.server.fastmcp import FastMCP
 from servicenow_mcp.auth import create_auth
 from servicenow_mcp.choices import ChoiceRegistry
 from servicenow_mcp.config import Settings
-from servicenow_mcp.packages import _TOOL_GROUP_MODULES, get_package, list_packages
+from servicenow_mcp.packages import (
+    _TOOL_GROUP_MODULES,
+    get_package,
+    list_packages,
+)
 from servicenow_mcp.state import QueryTokenStore
 from servicenow_mcp.utils import serialize
+
 
 logger = logging.getLogger(__name__)
 
@@ -52,9 +57,9 @@ def create_mcp_server() -> FastMCP:
                         module.register_tools(mcp, settings, auth_provider, choices=choices)
                     else:
                         module.register_tools(mcp, settings, auth_provider)
-                    logger.info(f"Loaded tool group: {group_name}")
+                    logger.info("Loaded tool group: %s", group_name)
             except ImportError as e:
-                logger.warning(f"Could not load tool group '{group_name}': {e}")
+                logger.warning("Could not load tool group '%s': %s", group_name, e)
 
     return mcp
 

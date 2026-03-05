@@ -11,6 +11,7 @@ from servicenow_mcp.investigation_helpers import (
 from servicenow_mcp.policy import check_table_access, mask_sensitive_fields
 from servicenow_mcp.utils import ServiceNowQuery
 
+
 # ServiceNow performance pattern tables and their finding categories
 PERFORMANCE_TABLES = [
     ("sys_query_pattern", "slow_query"),
@@ -88,7 +89,11 @@ async def run(client: ServiceNowClient, params: dict[str, Any]) -> dict[str, Any
     return build_investigation_result(
         "slow_transactions",
         findings,
-        params={"hours": hours, "limit": limit, "categories": categories_filter},
+        params={
+            "hours": hours,
+            "limit": limit,
+            "categories": categories_filter,
+        },
         tables_queried=[t[0] for t in PERFORMANCE_TABLES],
     )
 

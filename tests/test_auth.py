@@ -21,7 +21,7 @@ class TestBasicAuthProvider:
         with patch.dict("os.environ", env, clear=True):
             return Settings(_env_file=None)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_get_headers_returns_authorization(self):
         """get_headers includes an Authorization header."""
         from servicenow_mcp.auth import BasicAuthProvider
@@ -32,7 +32,7 @@ class TestBasicAuthProvider:
 
         assert "Authorization" in headers
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_get_headers_basic_prefix(self):
         """Authorization header starts with 'Basic '."""
         from servicenow_mcp.auth import BasicAuthProvider
@@ -43,7 +43,7 @@ class TestBasicAuthProvider:
 
         assert headers["Authorization"].startswith("Basic ")
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_get_headers_correct_encoding(self):
         """Authorization header contains correctly base64-encoded credentials."""
         from servicenow_mcp.auth import BasicAuthProvider
@@ -55,7 +55,7 @@ class TestBasicAuthProvider:
         expected = base64.b64encode(b"admin:s3cret").decode("ascii")
         assert headers["Authorization"] == f"Basic {expected}"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_get_headers_with_different_credentials(self):
         """Encoding works for different username/password combinations."""
         from servicenow_mcp.auth import BasicAuthProvider
@@ -70,7 +70,7 @@ class TestBasicAuthProvider:
         expected = base64.b64encode(b"user@company.com:p@ss:w0rd!").decode("ascii")
         assert headers["Authorization"] == f"Basic {expected}"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_get_headers_includes_content_type(self):
         """Headers include JSON content type."""
         from servicenow_mcp.auth import BasicAuthProvider

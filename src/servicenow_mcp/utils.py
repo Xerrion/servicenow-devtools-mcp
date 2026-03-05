@@ -11,6 +11,7 @@ from toon_format import encode as toon_encode
 
 from servicenow_mcp.errors import ForbiddenError
 
+
 if TYPE_CHECKING:
     from servicenow_mcp.state import QueryTokenStore
 

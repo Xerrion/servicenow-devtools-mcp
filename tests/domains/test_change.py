@@ -10,6 +10,7 @@ from toon_format import decode as toon_decode
 from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.config import Settings
 
+
 BASE_URL = "https://test.service-now.com"
 
 
@@ -31,7 +32,7 @@ def _register_and_get_tools(settings: Settings, auth_provider: BasicAuthProvider
 class TestChangeList:
     """Tests for change_list tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_list_no_filters(self, settings, auth_provider):
         """Should query all change requests when no filters provided."""
@@ -40,8 +41,16 @@ class TestChangeList:
                 200,
                 json={
                     "result": [
-                        {"sys_id": "id1", "number": "CHG0010001", "short_description": "Test change 1"},
-                        {"sys_id": "id2", "number": "CHG0010002", "short_description": "Test change 2"},
+                        {
+                            "sys_id": "id1",
+                            "number": "CHG0010001",
+                            "short_description": "Test change 1",
+                        },
+                        {
+                            "sys_id": "id2",
+                            "number": "CHG0010002",
+                            "short_description": "Test change 2",
+                        },
                     ]
                 },
             )
@@ -55,7 +64,7 @@ class TestChangeList:
         assert len(data["data"]) == 2
         assert data["data"][0]["number"] == "CHG0010001"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_list_with_state_filter(self, settings, auth_provider):
         """Should map state names to numeric values."""
@@ -67,7 +76,7 @@ class TestChangeList:
         request = respx.calls.last.request
         assert "state%3D-5" in str(request.url)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_list_with_multiple_filters(self, settings, auth_provider):
         """Should combine multiple filters correctly."""
@@ -85,14 +94,22 @@ class TestChangeList:
 class TestChangeGet:
     """Tests for change_get tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_get_valid_number(self, settings, auth_provider):
         """Should fetch change request by CHG number."""
         respx.get(f"{BASE_URL}/api/now/table/change_request").mock(
             return_value=Response(
                 200,
-                json={"result": [{"sys_id": "abc123", "number": "CHG0010001", "short_description": "Test change"}]},
+                json={
+                    "result": [
+                        {
+                            "sys_id": "abc123",
+                            "number": "CHG0010001",
+                            "short_description": "Test change",
+                        }
+                    ]
+                },
             )
         )
 
@@ -104,7 +121,7 @@ class TestChangeGet:
         assert data["data"]["number"] == "CHG0010001"
         assert data["data"]["sys_id"] == "abc123"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_get_invalid_prefix(self, settings, auth_provider):
         """Should reject non-CHG numbers."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -114,7 +131,7 @@ class TestChangeGet:
         assert data["status"] == "error"
         assert "CHG" in data["error"]["message"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_get_not_found(self, settings, auth_provider):
         """Should handle change request not found."""
@@ -131,7 +148,7 @@ class TestChangeGet:
 class TestChangeCreate:
     """Tests for change_create tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_create_valid(self, settings, auth_provider):
         """Should create change request with required short_description."""
@@ -159,7 +176,7 @@ class TestChangeCreate:
         assert data["status"] == "success"
         assert data["data"]["number"] == "CHG0010123"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_create_with_all_optional_params(self, settings, auth_provider):
         """Should include all optional fields in the created record."""
@@ -206,7 +223,7 @@ class TestChangeCreate:
         assert request_body["start_date"] == "2026-04-01 08:00:00"
         assert request_body["end_date"] == "2026-04-01 12:00:00"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_create_blocked_in_prod(self):
         """Should block creation in production."""
         prod_env = {
@@ -229,7 +246,7 @@ class TestChangeCreate:
             assert data["status"] == "error"
             assert "production" in data["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_create_missing_short_description(self, settings, auth_provider):
         """Should reject empty short_description."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -239,7 +256,7 @@ class TestChangeCreate:
         assert data["status"] == "error"
         assert "short_description" in data["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_create_invalid_type(self, settings, auth_provider):
         """Should reject invalid type value."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -253,14 +270,22 @@ class TestChangeCreate:
 class TestChangeUpdate:
     """Tests for change_update tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_update_valid(self, settings, auth_provider):
         """Should update change request by CHG number."""
         respx.get(f"{BASE_URL}/api/now/table/change_request").mock(
             return_value=Response(
                 200,
-                json={"result": [{"sys_id": "abc123", "number": "CHG0010001", "short_description": "Old"}]},
+                json={
+                    "result": [
+                        {
+                            "sys_id": "abc123",
+                            "number": "CHG0010001",
+                            "short_description": "Old",
+                        }
+                    ]
+                },
             )
         )
         respx.patch(f"{BASE_URL}/api/now/table/change_request/abc123").mock(
@@ -286,7 +311,7 @@ class TestChangeUpdate:
         assert data["status"] == "success"
         assert data["data"]["short_description"] == "Updated"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_update_invalid_number(self, settings, auth_provider):
         """Should reject non-CHG numbers."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -296,7 +321,7 @@ class TestChangeUpdate:
         assert data["status"] == "error"
         assert "CHG" in data["error"]["message"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_update_blocked_in_prod(self):
         """Should block updates in production."""
         prod_env = {
@@ -320,7 +345,7 @@ class TestChangeUpdate:
             assert data["status"] == "error"
             assert "production" in data["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_update_not_found(self, settings, auth_provider):
         """Should handle change request not found during update."""
@@ -336,7 +361,7 @@ class TestChangeUpdate:
         assert data["status"] == "error"
         assert "not found" in data["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_update_with_all_optional_params(self, settings, auth_provider):
         """Should pass all optional fields including state mapping."""
@@ -382,7 +407,7 @@ class TestChangeUpdate:
         assert request_body["assignment_group"] == "grp001"
         assert request_body["state"] == "-1"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_update_no_changes_provided(self, settings, auth_provider):
         """Should error when no update fields are provided."""
@@ -404,7 +429,7 @@ class TestChangeUpdate:
 class TestChangeTasks:
     """Tests for change_tasks tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_tasks_valid(self, settings, auth_provider):
         """Should fetch change tasks by change request number."""
@@ -413,8 +438,16 @@ class TestChangeTasks:
                 200,
                 json={
                     "result": [
-                        {"sys_id": "task1", "number": "CTASK0010001", "short_description": "Task 1"},
-                        {"sys_id": "task2", "number": "CTASK0010002", "short_description": "Task 2"},
+                        {
+                            "sys_id": "task1",
+                            "number": "CTASK0010001",
+                            "short_description": "Task 1",
+                        },
+                        {
+                            "sys_id": "task2",
+                            "number": "CTASK0010002",
+                            "short_description": "Task 2",
+                        },
                     ]
                 },
             )
@@ -428,7 +461,7 @@ class TestChangeTasks:
         assert len(data["data"]) == 2
         assert data["data"][0]["number"] == "CTASK0010001"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_tasks_invalid_prefix(self, settings, auth_provider):
         """Should reject non-CHG numbers."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -438,7 +471,7 @@ class TestChangeTasks:
         assert data["status"] == "error"
         assert "CHG" in data["error"]["message"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_tasks_empty_result(self, settings, auth_provider):
         """Should handle no tasks found."""
@@ -460,7 +493,7 @@ class TestChangeTasks:
 class TestChangeAddComment:
     """Tests for change_add_comment tool."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_add_comment_valid(self, settings, auth_provider):
         """Should add comment to change request."""
@@ -492,7 +525,7 @@ class TestChangeAddComment:
 
         assert data["status"] == "success"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_add_work_note_valid(self, settings, auth_provider):
         """Should add work_note to change request."""
@@ -524,7 +557,7 @@ class TestChangeAddComment:
 
         assert data["status"] == "success"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_add_comment_both_empty(self, settings, auth_provider):
         """Should require at least one of comment or work_note."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -538,7 +571,7 @@ class TestChangeAddComment:
         assert data["status"] == "error"
         assert "comment" in data["error"]["message"].lower() or "work_note" in data["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_add_comment_blocked_in_prod(self):
         """Should block adding comments in production."""
         prod_env = {
@@ -562,7 +595,7 @@ class TestChangeAddComment:
             assert data["status"] == "error"
             assert "production" in data["error"]["message"].lower()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_add_comment_invalid_prefix(self, settings, auth_provider):
         """Should reject non-CHG numbers."""
         tools = _register_and_get_tools(settings, auth_provider)
@@ -575,7 +608,7 @@ class TestChangeAddComment:
         assert data["status"] == "error"
         assert "CHG" in data["error"]["message"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     @respx.mock
     async def test_add_comment_not_found(self, settings, auth_provider):
         """Should handle change request not found when adding comment."""
