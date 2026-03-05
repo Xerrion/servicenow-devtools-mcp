@@ -154,9 +154,11 @@ def _apply_between(
     query: ServiceNowQuery, field: str, operator: str, condition: dict[str, Any], correlation_id: str
 ) -> str | None:
     """Apply the between operator (requires start and end)."""
-    start = condition.get("start") or condition.get("value")
-    end = condition.get("end", "")
-    if start is None or start == "" or end is None or end == "":
+    start = condition.get("start")
+    if start is None:
+        start = condition.get("value")
+    end = condition.get("end")
+    if start is None or end is None:
         return format_response(
             data=None,
             correlation_id=correlation_id,
@@ -172,9 +174,11 @@ def _apply_datepart(
 ) -> str | None:
     """Apply the datepart operator (requires part, dp_operator, dp_value)."""
     part = condition.get("part", "")
-    dp_operator = condition.get("dp_operator") or condition.get("value", "")
-    dp_value = condition.get("dp_value", "")
-    if part is None or part == "" or dp_operator is None or dp_operator == "" or dp_value is None or dp_value == "":
+    dp_operator = condition.get("dp_operator")
+    if dp_operator is None:
+        dp_operator = condition.get("value")
+    dp_value = condition.get("dp_value")
+    if not part or not dp_operator or dp_value is None:
         return format_response(
             data=None,
             correlation_id=correlation_id,
