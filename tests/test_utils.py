@@ -947,6 +947,8 @@ class TestServiceNowQueryDateTimeOperators:
 class TestSafeToolCall:
     """Tests for the safe_tool_call error-handling wrapper."""
 
+    # Tests are async because safe_tool_call awaits the inner fn coroutine.
+
     async def test_success_passthrough(self):
         """Successful fn return passes through unchanged."""
 

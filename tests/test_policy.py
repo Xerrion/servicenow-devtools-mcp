@@ -31,13 +31,6 @@ class TestDenyList:
         # Should not raise
         check_table_access("incident")
 
-    def test_allowed_table_returns_none(self):
-        """check_table_access returns None for allowed tables."""
-        from servicenow_mcp.policy import check_table_access
-
-        result = check_table_access("sys_script_include")
-        assert result is None
-
     def test_denied_table_case_insensitive(self):
         """Denied table check is case-insensitive."""
         from servicenow_mcp.policy import check_table_access

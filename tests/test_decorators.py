@@ -41,7 +41,7 @@ class TestToolHandler:
         await my_tool()
         uuid.UUID(captured["cid"])  # Raises if not valid UUID
 
-    async def test_hides_correlation_id_from_signature(self) -> None:
+    def test_hides_correlation_id_from_signature(self) -> None:
         """The correlation_id parameter is hidden from inspect.signature()."""
 
         @tool_handler
@@ -54,7 +54,7 @@ class TestToolHandler:
         assert "table" in param_names
         assert "limit" in param_names
 
-    async def test_preserves_function_name(self) -> None:
+    def test_preserves_function_name(self) -> None:
         """functools.wraps preserves __name__ and __doc__."""
 
         @tool_handler
@@ -65,7 +65,7 @@ class TestToolHandler:
         assert my_tool.__name__ == "my_tool"
         assert my_tool.__doc__ == "My tool docstring."
 
-    async def test_no_wrapped_attribute(self) -> None:
+    def test_no_wrapped_attribute(self) -> None:
         """__wrapped__ is deleted to prevent inspect.signature from following it."""
 
         @tool_handler

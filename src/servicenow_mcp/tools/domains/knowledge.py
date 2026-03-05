@@ -17,6 +17,9 @@ from servicenow_mcp.policy import (
 from servicenow_mcp.utils import ServiceNowQuery, format_response
 
 
+_SYS_ID_PATTERN = re.compile(r"^[a-f0-9]{32}$")
+
+
 def register_tools(
     mcp: FastMCP,
     settings: Settings,
@@ -31,6 +34,7 @@ def register_tools(
         auth_provider: Authentication provider for ServiceNow API
         choices: Optional choice registry for resolving field values
     """
+    _ = choices  # Accepted for interface conformance with domain tool convention
 
     @mcp.tool()
     @tool_handler
@@ -88,7 +92,7 @@ def register_tools(
         check_table_access("kb_knowledge")
 
         # Detect if input is sys_id (32-char lowercase hex string)
-        is_sys_id = bool(re.match(r"^[a-f0-9]{32}$", number_or_sys_id.lower()))
+        is_sys_id = bool(_SYS_ID_PATTERN.match(number_or_sys_id.lower()))
 
         async with ServiceNowClient(settings, auth_provider) as client:
             # Try lookup by number first
@@ -209,7 +213,7 @@ def register_tools(
             return gate_error
 
         # Detect if input is sys_id (32-char lowercase hex string)
-        is_sys_id = bool(re.match(r"^[a-f0-9]{32}$", number_or_sys_id.lower()))
+        is_sys_id = bool(_SYS_ID_PATTERN.match(number_or_sys_id.lower()))
 
         async with ServiceNowClient(settings, auth_provider) as client:
             # Try lookup by number first
@@ -310,7 +314,7 @@ def register_tools(
             return gate_error
 
         # Detect if input is sys_id (32-char lowercase hex string)
-        is_sys_id = bool(re.match(r"^[a-f0-9]{32}$", number_or_sys_id.lower()))
+        is_sys_id = bool(_SYS_ID_PATTERN.match(number_or_sys_id.lower()))
 
         async with ServiceNowClient(settings, auth_provider) as client:
             # Try lookup by number first

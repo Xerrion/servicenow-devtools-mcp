@@ -18,6 +18,9 @@ from servicenow_mcp.policy import INTERNAL_QUERY_LIMIT
 from servicenow_mcp.utils import ServiceNowQuery, validate_identifier
 
 
+_ATF_PLUGIN_ERROR = "ATF Cloud Runner plugin (sn_atf_tg) may not be installed"
+
+
 class ServiceNowClient:
     """Async HTTP client for the ServiceNow REST API."""
 
@@ -739,7 +742,7 @@ class ServiceNowClient:
             self._raise_for_status(response)
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
-                raise NotFoundError("ATF Cloud Runner plugin (sn_atf_tg) may not be installed") from None
+                raise NotFoundError(_ATF_PLUGIN_ERROR) from None
             raise
 
         response_data = response.json()
@@ -769,7 +772,7 @@ class ServiceNowClient:
             self._raise_for_status(response)
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
-                raise NotFoundError("ATF Cloud Runner plugin (sn_atf_tg) may not be installed") from None
+                raise NotFoundError(_ATF_PLUGIN_ERROR) from None
             raise
 
         response_data = response.json()
@@ -799,7 +802,7 @@ class ServiceNowClient:
             self._raise_for_status(response)
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
-                raise NotFoundError("ATF Cloud Runner plugin (sn_atf_tg) may not be installed") from None
+                raise NotFoundError(_ATF_PLUGIN_ERROR) from None
             raise
 
         response_data = response.json()

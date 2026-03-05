@@ -691,6 +691,7 @@ def resolve_query_token(query_token: str, query_store: "QueryTokenStore", correl
 
     Returns the encoded query string. Raises ValueError if the token is invalid or expired.
     """
+    _ = correlation_id  # Kept for API consistency across tool helpers
     if not query_token:
         return ""
     payload = query_store.get(query_token)
