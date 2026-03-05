@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import time
+from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
@@ -29,6 +30,32 @@ logger = logging.getLogger(__name__)
 ATF_POLL_INTERVAL = 5
 ATF_MAX_POLL_DURATION = 300
 
+_PASS_STATUSES: frozenset[str] = frozenset({"success", "passed"})
+
+
+def _is_pass(record: dict[str, Any]) -> bool:
+    """Return True if the record status indicates a passing result."""
+    return record.get("status", "").lower() in _PASS_STATUSES
+
+
+def _validate_exclusive_ids(test_id: str, suite_id: str, correlation_id: str) -> str | None:
+    """Return error if not exactly one of test_id/suite_id is provided, else None."""
+    if not test_id and not suite_id:
+        return format_response(
+            data=None,
+            correlation_id=correlation_id,
+            status="error",
+            error="Must provide exactly one of test_id or suite_id.",
+        )
+    if test_id and suite_id:
+        return format_response(
+            data=None,
+            correlation_id=correlation_id,
+            status="error",
+            error="Must provide exactly one of test_id or suite_id, not both.",
+        )
+    return None
+
 
 def _atf_execution_gate(settings: Settings, correlation_id: str) -> str | None:
     """Gate ATF execution tools - running tests creates result records."""
@@ -41,6 +68,122 @@ def _atf_execution_gate(settings: Settings, correlation_id: str) -> str | None:
             error=reason,
         )
     return None
+
+
+async def _atf_run_and_poll(
+    client: ServiceNowClient,
+    run_id: str,
+    is_suite: bool,
+    poll: bool,
+    poll_interval: int,
+    max_poll_duration: int,
+    correlation_id: str,
+) -> str:
+    """Run an ATF test or suite and optionally poll for completion.
+
+    Args:
+        client: Active ServiceNow client.
+        run_id: The sys_id of the test or suite to run.
+        is_suite: True for suite execution, False for test.
+        poll: If True, poll until completion.
+        poll_interval: Seconds between polls (pre-clamped).
+        max_poll_duration: Max seconds to poll (pre-clamped).
+        correlation_id: Request correlation ID.
+    """
+    id_key = "suite_id" if is_suite else "test_id"
+
+    result = await client.atf_run(run_id, is_suite=is_suite)
+    snboq_id = result.get("snboqId") or result.get("snboq_id") or result.get("executionId", "")
+
+    if not snboq_id:
+        return format_response(
+            data=None,
+            correlation_id=correlation_id,
+            status="error",
+            error="ATF execution started but no execution ID returned.",
+        )
+
+    if not poll:
+        return format_response(
+            data={
+                "execution_id": snboq_id,
+                "status": "started",
+                id_key: run_id,
+                "polling": False,
+            },
+            correlation_id=correlation_id,
+        )
+
+    start_time = time.monotonic()
+    terminal_states = {"completed", "failure", "error", "cancelled"}
+    state = "unknown"
+    progress = 0
+
+    while (time.monotonic() - start_time) < max_poll_duration:
+        progress_result = await client.atf_progress(snboq_id)
+        state = progress_result.get("state", "").lower()
+        progress = progress_result.get("progress", 0)
+
+        if state in terminal_states:
+            return format_response(
+                data={
+                    "execution_id": snboq_id,
+                    "status": state,
+                    "progress": progress,
+                    id_key: run_id,
+                },
+                correlation_id=correlation_id,
+            )
+
+        await asyncio.sleep(poll_interval)
+
+    return format_response(
+        data={
+            "execution_id": snboq_id,
+            "status": "polling_timeout",
+            "progress": progress,
+            id_key: run_id,
+            "last_known_state": state,
+        },
+        correlation_id=correlation_id,
+        warnings=[f"Polling timeout after {max_poll_duration}s. Use atf_progress with execution_id to check status."],
+    )
+
+
+def _compute_flakiness(records: list[dict[str, Any]]) -> tuple[int, bool]:
+    """Compute transition count and flaky flag from ordered result records.
+
+    Returns:
+        A tuple of (transition_count, is_flaky).
+    """
+    transitions = 0
+    for i in range(1, len(records)):
+        if _is_pass(records[i - 1]) != _is_pass(records[i]):
+            transitions += 1
+
+    flaky = transitions >= 3 or (transitions >= 2 and len(records) < 10)
+    return transitions, flaky
+
+
+def _compute_trend(records: list[dict[str, Any]]) -> str:
+    """Compute pass-rate trend from ordered result records.
+
+    Returns one of: 'improving', 'degrading', 'stable', 'insufficient_data'.
+    """
+    total = len(records)
+    if total < 4:
+        return "insufficient_data"
+
+    mid = total // 2
+    first_pass_rate = sum(1 for r in records[:mid] if _is_pass(r)) / mid
+    second_pass_rate = sum(1 for r in records[mid:] if _is_pass(r)) / (total - mid)
+
+    diff = second_pass_rate - first_pass_rate
+    if diff > 0.05:
+        return "improving"
+    if diff < -0.05:
+        return "degrading"
+    return "stable"
 
 
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
@@ -211,21 +354,9 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             suite_id: The sys_id of a test suite (sys_atf_test_suite). Mutually exclusive with test_id.
             limit: Maximum results to return (default 10).
         """
-        if not test_id and not suite_id:
-            return format_response(
-                data=None,
-                correlation_id=correlation_id,
-                status="error",
-                error="Must provide exactly one of test_id or suite_id.",
-            )
-
-        if test_id and suite_id:
-            return format_response(
-                data=None,
-                correlation_id=correlation_id,
-                status="error",
-                error="Must provide exactly one of test_id or suite_id, not both.",
-            )
+        err = _validate_exclusive_ids(test_id, suite_id, correlation_id)
+        if err:
+            return err
 
         if test_id:
             check_table_access("sys_atf_test_result")
@@ -304,63 +435,14 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         clamped_max_duration = max(10, min(max_poll_duration, ATF_MAX_POLL_DURATION))
 
         async with ServiceNowClient(settings, auth_provider) as client:
-            result = await client.atf_run(test_id, is_suite=False)
-            snboq_id = result.get("snboqId") or result.get("snboq_id") or result.get("executionId", "")
-
-            if not snboq_id:
-                return format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error="ATF execution started but no execution ID returned.",
-                )
-
-            if not poll:
-                return format_response(
-                    data={
-                        "execution_id": snboq_id,
-                        "status": "started",
-                        "test_id": test_id,
-                        "polling": False,
-                    },
-                    correlation_id=correlation_id,
-                )
-
-            start_time = time.monotonic()
-            terminal_states = {"completed", "failure", "error", "cancelled"}
-            state = "unknown"
-            progress = 0
-
-            while (time.monotonic() - start_time) < clamped_max_duration:
-                progress_result = await client.atf_progress(snboq_id)
-                state = progress_result.get("state", "").lower()
-                progress = progress_result.get("progress", 0)
-
-                if state in terminal_states:
-                    return format_response(
-                        data={
-                            "execution_id": snboq_id,
-                            "status": state,
-                            "progress": progress,
-                            "test_id": test_id,
-                        },
-                        correlation_id=correlation_id,
-                    )
-
-                await asyncio.sleep(clamped_interval)
-
-            return format_response(
-                data={
-                    "execution_id": snboq_id,
-                    "status": "polling_timeout",
-                    "progress": progress,
-                    "test_id": test_id,
-                    "last_known_state": state,
-                },
+            return await _atf_run_and_poll(
+                client,
+                test_id,
+                is_suite=False,
+                poll=poll,
+                poll_interval=clamped_interval,
+                max_poll_duration=clamped_max_duration,
                 correlation_id=correlation_id,
-                warnings=[
-                    f"Polling timeout after {clamped_max_duration}s. Use atf_progress with execution_id to check status."
-                ],
             )
 
     @mcp.tool()
@@ -391,63 +473,14 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         clamped_max_duration = max(10, min(max_poll_duration, ATF_MAX_POLL_DURATION))
 
         async with ServiceNowClient(settings, auth_provider) as client:
-            result = await client.atf_run(suite_id, is_suite=True)
-            snboq_id = result.get("snboqId") or result.get("snboq_id") or result.get("executionId", "")
-
-            if not snboq_id:
-                return format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error="ATF execution started but no execution ID returned.",
-                )
-
-            if not poll:
-                return format_response(
-                    data={
-                        "execution_id": snboq_id,
-                        "status": "started",
-                        "suite_id": suite_id,
-                        "polling": False,
-                    },
-                    correlation_id=correlation_id,
-                )
-
-            start_time = time.monotonic()
-            terminal_states = {"completed", "failure", "error", "cancelled"}
-            state = "unknown"
-            progress = 0
-
-            while (time.monotonic() - start_time) < clamped_max_duration:
-                progress_result = await client.atf_progress(snboq_id)
-                state = progress_result.get("state", "").lower()
-                progress = progress_result.get("progress", 0)
-
-                if state in terminal_states:
-                    return format_response(
-                        data={
-                            "execution_id": snboq_id,
-                            "status": state,
-                            "progress": progress,
-                            "suite_id": suite_id,
-                        },
-                        correlation_id=correlation_id,
-                    )
-
-                await asyncio.sleep(clamped_interval)
-
-            return format_response(
-                data={
-                    "execution_id": snboq_id,
-                    "status": "polling_timeout",
-                    "progress": progress,
-                    "suite_id": suite_id,
-                    "last_known_state": state,
-                },
+            return await _atf_run_and_poll(
+                client,
+                suite_id,
+                is_suite=True,
+                poll=poll,
+                poll_interval=clamped_interval,
+                max_poll_duration=clamped_max_duration,
                 correlation_id=correlation_id,
-                warnings=[
-                    f"Polling timeout after {clamped_max_duration}s. Use atf_progress with execution_id to check status."
-                ],
             )
 
     @mcp.tool()
@@ -470,21 +503,9 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             days: How many days of history to analyze (default 30).
             limit: Maximum results to fetch (default 50).
         """
-        if not test_id and not suite_id:
-            return format_response(
-                data=None,
-                correlation_id=correlation_id,
-                status="error",
-                error="Must provide exactly one of test_id or suite_id.",
-            )
-
-        if test_id and suite_id:
-            return format_response(
-                data=None,
-                correlation_id=correlation_id,
-                status="error",
-                error="Must provide exactly one of test_id or suite_id, not both.",
-            )
+        err = _validate_exclusive_ids(test_id, suite_id, correlation_id)
+        if err:
+            return err
 
         if test_id:
             check_table_access("sys_atf_test_result")
@@ -523,42 +544,12 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 warnings=["No execution results found in the specified time window."],
             )
 
-        pass_count = sum(1 for r in records if r.get("status", "").lower() in {"success", "passed"})
+        pass_count = sum(1 for r in records if _is_pass(r))
         fail_count = total_runs - pass_count
         pass_rate = pass_count / total_runs if total_runs > 0 else 0.0
 
-        transitions = 0
-        for i in range(1, len(records)):
-            prev_status = records[i - 1].get("status", "").lower()
-            curr_status = records[i].get("status", "").lower()
-            prev_pass = prev_status in {"success", "passed"}
-            curr_pass = curr_status in {"success", "passed"}
-            if prev_pass != curr_pass:
-                transitions += 1
-
-        flaky = transitions >= 3 or (transitions >= 2 and total_runs < 10)
-
-        if total_runs >= 4:
-            mid = total_runs // 2
-            first_half = records[:mid]
-            second_half = records[mid:]
-
-            first_pass_rate = sum(1 for r in first_half if r.get("status", "").lower() in {"success", "passed"}) / len(
-                first_half
-            )
-            second_pass_rate = sum(
-                1 for r in second_half if r.get("status", "").lower() in {"success", "passed"}
-            ) / len(second_half)
-
-            diff = second_pass_rate - first_pass_rate
-            if diff > 0.05:
-                trend = "improving"
-            elif diff < -0.05:
-                trend = "degrading"
-            else:
-                trend = "stable"
-        else:
-            trend = "insufficient_data"
+        transitions, flaky = _compute_flakiness(records)
+        trend = _compute_trend(records)
 
         last_run = records[-1] if records else None
 
