@@ -280,9 +280,7 @@ class TestServiceNowClientGetMetadata:
 
         assert route.called
         url = str(route.calls[0].request.url)
-        # URL-encoded = becomes %3D in query params
-        assert "name" in url
-        assert "incident" in url
+        assert "name%3Dincident" in url
 
 
 class TestServiceNowClientAggregate:
