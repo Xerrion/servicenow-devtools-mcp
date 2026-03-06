@@ -19,9 +19,9 @@ class Settings(BaseSettings):
     def __init__(
         self,
         *,
-        servicenow_instance_url: str | None = ...,
-        servicenow_username: str | None = ...,
-        servicenow_password: SecretStr | None = ...,
+        servicenow_instance_url: str = ...,
+        servicenow_username: str = ...,
+        servicenow_password: SecretStr = ...,
         mcp_tool_package: str = ...,
         servicenow_env: str = ...,
         max_row_limit: int = ...,
