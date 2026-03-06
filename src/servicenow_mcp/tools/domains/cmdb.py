@@ -10,7 +10,7 @@ from servicenow_mcp.choices import ChoiceRegistry
 from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.config import Settings
 from servicenow_mcp.decorators import tool_handler
-from servicenow_mcp.policy import check_table_access, enforce_query_safety, mask_sensitive_fields
+from servicenow_mcp.policy import check_table_access, mask_sensitive_fields
 from servicenow_mcp.utils import ServiceNowQuery, format_response
 
 
@@ -200,8 +200,7 @@ def register_tools(
             limit: Maximum number of classes to return (default 50)
         """
         check_table_access("cmdb_ci")
-        safety = enforce_query_safety("cmdb_ci", "", limit, settings)
-        effective_limit = safety["limit"]
+        effective_limit = min(limit, settings.max_row_limit)
 
         async with ServiceNowClient(settings, auth_provider) as client:
             aggregate_result: Any = await client.aggregate(
