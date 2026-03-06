@@ -9,10 +9,24 @@ from servicenow_mcp.config import Settings
 from servicenow_mcp.decorators import tool_handler
 from servicenow_mcp.policy import (
     check_table_access,
+    enforce_query_safety,
     mask_sensitive_fields,
     write_gate,
 )
+from servicenow_mcp.tools.domains._helpers import (
+    fetch_record_by_number,
+    lookup_record_by_number,
+    parse_field_list,
+    resolve_state,
+    validate_no_empty_changes,
+    validate_number_prefix,
+    validate_required_string,
+)
 from servicenow_mcp.utils import ServiceNowQuery, format_response
+
+
+_CHANGE_ENTITY_LABEL = "change request"
+_CHANGE_ENTITY_TITLE = "Change request"
 
 
 def register_tools(
@@ -56,14 +70,17 @@ def register_tools(
 
         q = ServiceNowQuery()
         if state:
-            resolved = await choices.resolve("change_request", "state", state.lower()) if choices else state
+            resolved = await resolve_state("change_request", state, choices)
             q = q.equals_if("state", resolved, True)
         q = q.equals_if("type", type, bool(type))
         q = q.equals_if("risk", risk, bool(risk))
         q = q.equals_if("assignment_group", assignment_group, bool(assignment_group))
 
         query = q.build()
-        field_list = [f.strip() for f in fields.split(",") if f.strip()] if fields else None
+        field_list = parse_field_list(fields)
+
+        safety = enforce_query_safety("change_request", query, limit, settings)
+        effective_limit = safety["limit"]
 
         async with ServiceNowClient(settings, auth_provider) as client:
             result = await client.query_records(
@@ -71,7 +88,7 @@ def register_tools(
                 query=query,
                 fields=field_list,
                 display_values=True,
-                limit=limit,
+                limit=effective_limit,
             )
             masked = [mask_sensitive_fields(r) for r in result["records"]]
             return format_response(data=masked, correlation_id=correlation_id)
@@ -86,30 +103,12 @@ def register_tools(
         """
         check_table_access("change_request")
 
-        if not number.upper().startswith("CHG"):
-            return format_response(
-                data=None,
-                correlation_id=correlation_id,
-                status="error",
-                error=f"Invalid change request number: {number}. Must start with CHG prefix.",
-            )
+        err = validate_number_prefix(number, "CHG", _CHANGE_ENTITY_LABEL, correlation_id)
+        if err:
+            return err
 
         async with ServiceNowClient(settings, auth_provider) as client:
-            result = await client.query_records(
-                table="change_request",
-                query=ServiceNowQuery().equals("number", number.upper()).build(),
-                display_values=True,
-                limit=1,
-            )
-            if not result["records"]:
-                return format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error=f"Change request {number} not found.",
-                )
-            masked = mask_sensitive_fields(result["records"][0])
-            return format_response(data=masked, correlation_id=correlation_id)
+            return await fetch_record_by_number(client, "change_request", number, _CHANGE_ENTITY_TITLE, correlation_id)
 
     @mcp.tool()
     @tool_handler
@@ -141,13 +140,9 @@ def register_tools(
         if blocked:
             return blocked
 
-        if not short_description or not short_description.strip():
-            return format_response(
-                data=None,
-                correlation_id=correlation_id,
-                status="error",
-                error="short_description is required and cannot be empty.",
-            )
+        err = validate_required_string(short_description, "short_description", correlation_id)
+        if err:
+            return err
 
         valid_types = ["standard", "normal", "emergency"]
         if type and type not in valid_types:
@@ -209,29 +204,16 @@ def register_tools(
         if blocked:
             return blocked
 
-        if not number.upper().startswith("CHG"):
-            return format_response(
-                data=None,
-                correlation_id=correlation_id,
-                status="error",
-                error=f"Invalid change request number: {number}. Must start with CHG prefix.",
-            )
+        err = validate_number_prefix(number, "CHG", _CHANGE_ENTITY_LABEL, correlation_id)
+        if err:
+            return err
 
         async with ServiceNowClient(settings, auth_provider) as client:
-            result = await client.query_records(
-                table="change_request",
-                query=ServiceNowQuery().equals("number", number.upper()).build(),
-                limit=1,
+            sys_id, err = await lookup_record_by_number(
+                client, "change_request", number, _CHANGE_ENTITY_TITLE, correlation_id
             )
-            if not result["records"]:
-                return format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error=f"Change request {number} not found.",
-                )
-
-            sys_id = result["records"][0]["sys_id"]
+            if err:
+                return err
 
             changes = {}
             if short_description:
@@ -245,15 +227,11 @@ def register_tools(
             if assignment_group:
                 changes["assignment_group"] = assignment_group
             if state:
-                changes["state"] = await choices.resolve("change_request", "state", state.lower()) if choices else state
+                changes["state"] = await resolve_state("change_request", state, choices)
 
-            if not changes:
-                return format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error="No fields to update provided.",
-                )
+            err = validate_no_empty_changes(changes, correlation_id)
+            if err:
+                return err
 
             updated = await client.update_record("change_request", sys_id, changes)
             masked = mask_sensitive_fields(updated)
@@ -277,23 +255,23 @@ def register_tools(
         """
         check_table_access("change_task")
 
-        if not number.upper().startswith("CHG"):
-            return format_response(
-                data=None,
-                correlation_id=correlation_id,
-                status="error",
-                error=f"Invalid change request number: {number}. Must start with CHG prefix.",
-            )
+        err = validate_number_prefix(number, "CHG", _CHANGE_ENTITY_LABEL, correlation_id)
+        if err:
+            return err
 
-        field_list = [f.strip() for f in fields.split(",") if f.strip()] if fields else None
+        field_list = parse_field_list(fields)
+
+        query = ServiceNowQuery().equals("change_request.number", number.upper()).build()
+        safety = enforce_query_safety("change_task", query, limit, settings)
+        effective_limit = safety["limit"]
 
         async with ServiceNowClient(settings, auth_provider) as client:
             result = await client.query_records(
                 table="change_task",
-                query=ServiceNowQuery().equals("change_request.number", number.upper()).build(),
+                query=query,
                 fields=field_list,
                 display_values=True,
-                limit=limit,
+                limit=effective_limit,
             )
             masked = [mask_sensitive_fields(r) for r in result["records"]]
             return format_response(data=masked, correlation_id=correlation_id)
@@ -320,13 +298,9 @@ def register_tools(
         if blocked:
             return blocked
 
-        if not number.upper().startswith("CHG"):
-            return format_response(
-                data=None,
-                correlation_id=correlation_id,
-                status="error",
-                error=f"Invalid change request number: {number}. Must start with CHG prefix.",
-            )
+        err = validate_number_prefix(number, "CHG", _CHANGE_ENTITY_LABEL, correlation_id)
+        if err:
+            return err
 
         if not comment and not work_note:
             return format_response(
@@ -337,20 +311,11 @@ def register_tools(
             )
 
         async with ServiceNowClient(settings, auth_provider) as client:
-            result = await client.query_records(
-                table="change_request",
-                query=ServiceNowQuery().equals("number", number.upper()).build(),
-                limit=1,
+            sys_id, err = await lookup_record_by_number(
+                client, "change_request", number, _CHANGE_ENTITY_TITLE, correlation_id
             )
-            if not result["records"]:
-                return format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error=f"Change request {number} not found.",
-                )
-
-            sys_id = result["records"][0]["sys_id"]
+            if err:
+                return err
 
             changes = {}
             if comment:

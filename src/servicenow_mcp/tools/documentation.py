@@ -1,6 +1,7 @@
 """Documentation tools for generating logic maps, summaries, test scenarios, and review notes."""
 
 import asyncio
+import itertools
 import re
 from typing import Any
 
@@ -21,6 +22,60 @@ from servicenow_mcp.utils import (
     format_response,
     validate_identifier,
 )
+
+
+# ── Shared helpers ────────────────────────────────────────────────────────
+
+
+def _resolve_artifact_table(artifact_type: str, correlation_id: str) -> tuple[str, str | None]:
+    """Resolve artifact_type to its table name, returning (table, None) or ("", error_response)."""
+    table = ARTIFACT_TABLES.get(artifact_type)
+    if not table:
+        valid_types = ", ".join(sorted(ARTIFACT_TABLES.keys()))
+        return "", format_response(
+            data=None,
+            correlation_id=correlation_id,
+            status="error",
+            error=f"Unknown artifact type '{artifact_type}'. Valid: {valid_types}",
+        )
+    return table, None
+
+
+async def _fetch_artifact_script(client: ServiceNowClient, table: str, sys_id: str) -> tuple[dict[str, Any], str]:
+    """Fetch an artifact record and return (masked_record, script_body)."""
+    record = mask_sensitive_fields(await client.get_record(table, sys_id))
+    script = record.get("script", "") or ""
+    return record, script
+
+
+def _classify_br_phases(br_records: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    """Classify business rules by lifecycle phase."""
+    phases: dict[str, list[dict[str, Any]]] = {}
+    for br in br_records:
+        when = br.get("when", "before")
+        operations = []
+        if br.get("action_insert") == "true":
+            operations.append("insert")
+        if br.get("action_update") == "true":
+            operations.append("update")
+        if br.get("action_delete") == "true":
+            operations.append("delete")
+        if not operations:
+            operations = ["all"]
+
+        for op in operations:
+            phase_key = f"{when}_{op}"
+            if phase_key not in phases:
+                phases[phase_key] = []
+            phases[phase_key].append(
+                {
+                    "type": "business_rule",
+                    "sys_id": br.get("sys_id", ""),
+                    "name": br.get("name", ""),
+                    "order": br.get("order", ""),
+                }
+            )
+    return phases
 
 
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
@@ -84,31 +139,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             )
 
         # Build phase map from business rules
-        phases: dict[str, list[dict[str, Any]]] = {}
-        for br in br_result["records"]:
-            when = br.get("when", "before")
-            operations = []
-            if br.get("action_insert") == "true":
-                operations.append("insert")
-            if br.get("action_update") == "true":
-                operations.append("update")
-            if br.get("action_delete") == "true":
-                operations.append("delete")
-            if not operations:
-                operations = ["all"]
-
-            for op in operations:
-                phase_key = f"{when}_{op}"
-                if phase_key not in phases:
-                    phases[phase_key] = []
-                phases[phase_key].append(
-                    {
-                        "type": "business_rule",
-                        "sys_id": br.get("sys_id", ""),
-                        "name": br.get("name", ""),
-                        "order": br.get("order", ""),
-                    }
-                )
+        phases = _classify_br_phases(br_result["records"])
 
         # Add client scripts under 'client' phase
         cs_records = cs_result["records"]
@@ -173,23 +204,16 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             artifact_type: The artifact type (e.g. business_rule, script_include).
             sys_id: The sys_id of the artifact.
         """
-        table = ARTIFACT_TABLES.get(artifact_type)
-        if not table:
-            valid_types = ", ".join(sorted(ARTIFACT_TABLES.keys()))
-            return format_response(
-                data=None,
-                correlation_id=correlation_id,
-                status="error",
-                error=f"Unknown artifact type '{artifact_type}'. Valid: {valid_types}",
-            )
+        table, err = _resolve_artifact_table(artifact_type, correlation_id)
+        if err:
+            return err
 
         check_table_access(table)
 
         async with ServiceNowClient(settings, auth_provider) as client:
-            record = mask_sensitive_fields(await client.get_record(table, sys_id))
+            record, script = await _fetch_artifact_script(client, table, sys_id)
 
             # Parse script for GlideRecord('table_name') references
-            script = record.get("script", "")
             referenced_tables = _extract_gliderecord_tables(script)
 
             # Search for what references this artifact
@@ -225,24 +249,16 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             artifact_type: The artifact type (e.g. business_rule, script_include).
             sys_id: The sys_id of the artifact.
         """
-        table = ARTIFACT_TABLES.get(artifact_type)
-        if not table:
-            valid_types = ", ".join(sorted(ARTIFACT_TABLES.keys()))
-            return format_response(
-                data=None,
-                correlation_id=correlation_id,
-                status="error",
-                error=f"Unknown artifact type '{artifact_type}'. Valid: {valid_types}",
-            )
+        table, err = _resolve_artifact_table(artifact_type, correlation_id)
+        if err:
+            return err
 
         check_table_access(table)
 
         async with ServiceNowClient(settings, auth_provider) as client:
-            record = await client.get_record(table, sys_id)
+            record, script = await _fetch_artifact_script(client, table, sys_id)
 
-        record = mask_sensitive_fields(record)
-        script = record.get("script", "")
-        scenarios = _generate_test_scenarios(script, record)
+        scenarios = _generate_test_scenarios(script)
 
         return format_response(
             data={
@@ -269,23 +285,15 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             artifact_type: The artifact type (e.g. business_rule, script_include).
             sys_id: The sys_id of the artifact.
         """
-        table = ARTIFACT_TABLES.get(artifact_type)
-        if not table:
-            valid_types = ", ".join(sorted(ARTIFACT_TABLES.keys()))
-            return format_response(
-                data=None,
-                correlation_id=correlation_id,
-                status="error",
-                error=f"Unknown artifact type '{artifact_type}'. Valid: {valid_types}",
-            )
+        table, err = _resolve_artifact_table(artifact_type, correlation_id)
+        if err:
+            return err
 
         check_table_access(table)
 
         async with ServiceNowClient(settings, auth_provider) as client:
-            record = await client.get_record(table, sys_id)
+            record, script = await _fetch_artifact_script(client, table, sys_id)
 
-        record = mask_sensitive_fields(record)
-        script = record.get("script", "")
         findings = _scan_for_anti_patterns(script)
 
         return format_response(
@@ -319,7 +327,63 @@ def _extract_gliderecord_tables(script: str) -> list[str]:
     return result
 
 
-def _generate_test_scenarios(script: str, record: dict[str, Any]) -> list[dict[str, str]]:
+_WHILE_BLOCK_RE: re.Pattern[str] = re.compile(r"\bwhile\s*\(")
+_FOR_BLOCK_RE: re.Pattern[str] = re.compile(r"\bfor\s*\(")
+_GR_IN_BLOCK_RE: re.Pattern[str] = re.compile(r"new\s+GlideRecord(?:Secure)?\s*\(")
+
+_SCENARIO_PATTERNS: list[tuple[re.Pattern[str], dict[str, str]]] = [
+    (
+        re.compile(r"current\.operation\(\)\s*==\s*['\"]insert['\"]"),
+        {
+            "scenario": "Test insert operation path",
+            "description": "Create a new record and verify the insert-specific logic executes correctly.",
+            "priority": "high",
+        },
+    ),
+    (
+        re.compile(r"current\.operation\(\)\s*==\s*['\"]update['\"]"),
+        {
+            "scenario": "Test update operation path",
+            "description": "Update an existing record and verify the update-specific logic executes correctly.",
+            "priority": "high",
+        },
+    ),
+    (
+        re.compile(r"current\.operation\(\)\s*==\s*['\"]delete['\"]"),
+        {
+            "scenario": "Test delete operation path",
+            "description": "Delete a record and verify the delete-specific logic executes correctly.",
+            "priority": "high",
+        },
+    ),
+    (
+        re.compile(r"current\.isNewRecord\(\)"),
+        {
+            "scenario": "Test new record vs existing record",
+            "description": "Test behavior for both new and existing records since isNewRecord() is used.",
+            "priority": "high",
+        },
+    ),
+    (
+        re.compile(r"\bif\s*\("),
+        {
+            "scenario": "Test condition branches",
+            "description": "Verify each conditional branch (if/else) is tested with appropriate input values.",
+            "priority": "medium",
+        },
+    ),
+    (
+        re.compile(r"setAbortAction\(true\)"),
+        {
+            "scenario": "Test abort action trigger",
+            "description": "Verify conditions under which the operation is aborted and that the abort message is appropriate.",
+            "priority": "high",
+        },
+    ),
+]
+
+
+def _generate_test_scenarios(script: str) -> list[dict[str, str]]:
     """Analyze script and generate test scenario suggestions."""
     scenarios: list[dict[str, str]] = []
 
@@ -333,53 +397,12 @@ def _generate_test_scenarios(script: str, record: dict[str, Any]) -> list[dict[s
         )
         return scenarios
 
-    # Detect operation() checks → insert/update/delete scenarios
-    if re.search(r"current\.operation\(\)\s*==\s*['\"]insert['\"]", script):
-        scenarios.append(
-            {
-                "scenario": "Test insert operation path",
-                "description": "Create a new record and verify the insert-specific logic executes correctly.",
-                "priority": "high",
-            }
-        )
-    if re.search(r"current\.operation\(\)\s*==\s*['\"]update['\"]", script):
-        scenarios.append(
-            {
-                "scenario": "Test update operation path",
-                "description": "Update an existing record and verify the update-specific logic executes correctly.",
-                "priority": "high",
-            }
-        )
-    if re.search(r"current\.operation\(\)\s*==\s*['\"]delete['\"]", script):
-        scenarios.append(
-            {
-                "scenario": "Test delete operation path",
-                "description": "Delete a record and verify the delete-specific logic executes correctly.",
-                "priority": "high",
-            }
-        )
+    # Check data-driven patterns
+    for pattern, scenario in _SCENARIO_PATTERNS:
+        if pattern.search(script):
+            scenarios.append(scenario)
 
-    # Detect isNewRecord() checks
-    if re.search(r"current\.isNewRecord\(\)", script):
-        scenarios.append(
-            {
-                "scenario": "Test new record vs existing record",
-                "description": "Test behavior for both new and existing records since isNewRecord() is used.",
-                "priority": "high",
-            }
-        )
-
-    # Detect if/else condition branches
-    if re.search(r"\bif\s*\(", script):
-        scenarios.append(
-            {
-                "scenario": "Test condition branches",
-                "description": "Verify each conditional branch (if/else) is tested with appropriate input values.",
-                "priority": "medium",
-            }
-        )
-
-    # Detect role checks
+    # Detect role checks (dynamic - can't be data-driven)
     role_matches = re.findall(r"gs\.hasRole\(['\"]([^'\"]+)['\"]\)", script)
     scenarios.extend(
         {
@@ -389,16 +412,6 @@ def _generate_test_scenarios(script: str, record: dict[str, Any]) -> list[dict[s
         }
         for role in role_matches
     )
-
-    # Detect setAbortAction
-    if re.search(r"setAbortAction\(true\)", script):
-        scenarios.append(
-            {
-                "scenario": "Test abort action trigger",
-                "description": "Verify conditions under which the operation is aborted and that the abort message is appropriate.",
-                "priority": "high",
-            }
-        )
 
     # Detect GlideRecord queries (data dependency)
     tables = _extract_gliderecord_tables(script)
@@ -424,6 +437,19 @@ def _generate_test_scenarios(script: str, record: dict[str, Any]) -> list[dict[s
     return scenarios
 
 
+def _find_block_end(script: str, open_brace_idx: int) -> int:
+    """Return the index of the matching closing brace, or end of script."""
+    depth = 0
+    for idx in range(open_brace_idx, len(script)):
+        if script[idx] == "{":
+            depth += 1
+        elif script[idx] == "}":
+            depth -= 1
+            if depth == 0:
+                return idx
+    return len(script) - 1
+
+
 def _scan_for_anti_patterns(script: str) -> list[dict[str, str]]:
     """Scan script for common ServiceNow anti-patterns."""
     findings: list[dict[str, str]] = []
@@ -432,13 +458,57 @@ def _scan_for_anti_patterns(script: str) -> list[dict[str, str]]:
         return findings
 
     # 1. GlideRecord inside a loop (while/for containing new GlideRecord)
-    if re.search(r"while\s*\([^()]*(?:\([^)]*\)[^()]*)*\)\s*\{[^}]*new\s+GlideRecord\s*\(", script, re.DOTALL):
+    has_gr_in_loop = False
+    loop_matches = sorted(
+        itertools.chain(_WHILE_BLOCK_RE.finditer(script), _FOR_BLOCK_RE.finditer(script)),
+        key=lambda m: m.start(),
+    )
+    for m in loop_matches:
+        # Find the matching closing paren for the condition
+        open_paren = script.find("(", m.start())
+        if open_paren == -1:
+            continue
+        depth = 1
+        pos = open_paren + 1
+        while pos < len(script) and depth > 0:
+            if script[pos] == "(":
+                depth += 1
+            elif script[pos] == ")":
+                depth -= 1
+            pos += 1
+        # pos is now right after the closing ")"
+
+        # Skip whitespace to find block start
+        body_start = pos
+        while body_start < len(script) and script[body_start] in " \t\r\n":
+            body_start += 1
+
+        if body_start >= len(script):
+            continue
+
+        if script[body_start] == "{":
+            # Braced block - use existing _find_block_end
+            block_end = _find_block_end(script, body_start)
+            block = script[body_start : block_end + 1]
+        else:
+            # Single statement (no braces) - find the next semicolon or newline
+            stmt_end = len(script)
+            for terminator in (";", "\n"):
+                idx = script.find(terminator, body_start)
+                if idx != -1:
+                    stmt_end = min(stmt_end, idx + 1)
+            block = script[body_start:stmt_end]
+
+        if _GR_IN_BLOCK_RE.search(block):
+            has_gr_in_loop = True
+            break
+    if has_gr_in_loop:
         findings.append(
             {
                 "category": "gliderecord_in_loop",
                 "severity": "warning",
                 "message": "GlideRecord instantiated inside a loop. This is a major performance "
-                "concern — move the query outside the loop or use GlideAggregate.",
+                "concern - move the query outside the loop or use GlideAggregate.",
             }
         )
 
