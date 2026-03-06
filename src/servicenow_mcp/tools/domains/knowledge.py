@@ -23,8 +23,8 @@ _SYS_ID_PATTERN: re.Pattern[str] = re.compile(r"^[a-f0-9]{32}$")
 
 
 def _collect_non_empty(**fields: str) -> dict[str, str]:
-    """Collect non-empty string values into a dict."""
-    return {k: v for k, v in fields.items() if v}
+    """Return only the entries whose values are non-empty after stripping whitespace."""
+    return {k: stripped for k, v in fields.items() if (stripped := v.strip())}
 
 
 def register_tools(

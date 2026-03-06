@@ -103,7 +103,16 @@ def _apply_time(
     )
     if err:
         return err
-    getattr(query, operator)(field, int(value))
+    try:
+        int_value = int(value)
+    except (ValueError, TypeError):
+        return format_response(
+            data=None,
+            correlation_id=correlation_id,
+            status="error",
+            error=f"Time operator '{operator}' requires an integer 'value', got: {value!r}",
+        )
+    getattr(query, operator)(field, int_value)
     return None
 
 
@@ -158,7 +167,7 @@ def _apply_between(
     if start is None:
         start = condition.get("value")
     end = condition.get("end")
-    if start is None or end is None:
+    if start is None or start == "" or end is None or end == "":
         return format_response(
             data=None,
             correlation_id=correlation_id,
@@ -178,7 +187,7 @@ def _apply_datepart(
     if dp_operator is None:
         dp_operator = condition.get("value")
     dp_value = condition.get("dp_value")
-    if not part or not dp_operator or dp_value is None:
+    if part is None or part == "" or dp_operator is None or dp_operator == "" or dp_value is None or dp_value == "":
         return format_response(
             data=None,
             correlation_id=correlation_id,
@@ -267,12 +276,28 @@ def _apply_condition(
             error=f"Each condition requires 'operator'. Got: {condition}",
         )
 
+    if not isinstance(operator, str):
+        return format_response(
+            data=None,
+            correlation_id=correlation_id,
+            status="error",
+            error=f"Condition 'operator' must be a string, got {type(operator).__name__}",
+        )
+
     if operator != "new_query" and not field:
         return format_response(
             data=None,
             correlation_id=correlation_id,
             status="error",
             error=f"Operator '{operator}' requires a 'field'. Got: {condition}",
+        )
+
+    if operator != "new_query" and not isinstance(field, str):
+        return format_response(
+            data=None,
+            correlation_id=correlation_id,
+            status="error",
+            error=f"Condition 'field' must be a string, got {type(field).__name__}",
         )
 
     handler = _get_handler(operator)
