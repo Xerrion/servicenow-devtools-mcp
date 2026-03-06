@@ -1,6 +1,7 @@
 """Documentation tools for generating logic maps, summaries, test scenarios, and review notes."""
 
 import asyncio
+import itertools
 import re
 from typing import Any
 
@@ -327,6 +328,7 @@ def _extract_gliderecord_tables(script: str) -> list[str]:
 
 
 _WHILE_BLOCK_RE: re.Pattern[str] = re.compile(r"\bwhile\s*\(")
+_FOR_BLOCK_RE: re.Pattern[str] = re.compile(r"\bfor\s*\(")
 _GR_IN_BLOCK_RE: re.Pattern[str] = re.compile(r"new\s+GlideRecord(?:Secure)?\s*\(")
 
 _SCENARIO_PATTERNS: list[tuple[re.Pattern[str], dict[str, str]]] = [
@@ -457,12 +459,47 @@ def _scan_for_anti_patterns(script: str) -> list[dict[str, str]]:
 
     # 1. GlideRecord inside a loop (while/for containing new GlideRecord)
     has_gr_in_loop = False
-    for m in _WHILE_BLOCK_RE.finditer(script):
-        open_brace_idx = script.find("{", m.start())
-        if open_brace_idx == -1:
+    loop_matches = sorted(
+        itertools.chain(_WHILE_BLOCK_RE.finditer(script), _FOR_BLOCK_RE.finditer(script)),
+        key=lambda m: m.start(),
+    )
+    for m in loop_matches:
+        # Find the matching closing paren for the condition
+        open_paren = script.find("(", m.start())
+        if open_paren == -1:
             continue
-        close_brace_idx = _find_block_end(script, open_brace_idx)
-        if _GR_IN_BLOCK_RE.search(script[open_brace_idx : close_brace_idx + 1]):
+        depth = 1
+        pos = open_paren + 1
+        while pos < len(script) and depth > 0:
+            if script[pos] == "(":
+                depth += 1
+            elif script[pos] == ")":
+                depth -= 1
+            pos += 1
+        # pos is now right after the closing ")"
+
+        # Skip whitespace to find block start
+        body_start = pos
+        while body_start < len(script) and script[body_start] in " \t\r\n":
+            body_start += 1
+
+        if body_start >= len(script):
+            continue
+
+        if script[body_start] == "{":
+            # Braced block - use existing _find_block_end
+            block_end = _find_block_end(script, body_start)
+            block = script[body_start : block_end + 1]
+        else:
+            # Single statement (no braces) - find the next semicolon or newline
+            stmt_end = len(script)
+            for terminator in (";", "\n"):
+                idx = script.find(terminator, body_start)
+                if idx != -1:
+                    stmt_end = min(stmt_end, idx + 1)
+            block = script[body_start:stmt_end]
+
+        if _GR_IN_BLOCK_RE.search(block):
             has_gr_in_loop = True
             break
     if has_gr_in_loop:
@@ -471,7 +508,7 @@ def _scan_for_anti_patterns(script: str) -> list[dict[str, str]]:
                 "category": "gliderecord_in_loop",
                 "severity": "warning",
                 "message": "GlideRecord instantiated inside a loop. This is a major performance "
-                "concern — move the query outside the loop or use GlideAggregate.",
+                "concern - move the query outside the loop or use GlideAggregate.",
             }
         )
 
