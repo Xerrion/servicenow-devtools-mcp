@@ -329,6 +329,55 @@ def _apply_condition(
     return handler(query, field, operator, condition, correlation_id)
 
 
+def _build_query_impl(
+    conditions_list: list[Any],
+    query_store: QueryTokenStore,
+    correlation_id: str,
+) -> str:
+    """Process a parsed conditions list and return a formatted TOON response.
+
+    Iterates over each condition dict, applies it to a ``ServiceNowQuery``,
+    stores the built query string in *query_store*, and returns the serialized
+    response.
+    """
+    query = ServiceNowQuery()
+    for idx, condition in enumerate(conditions_list):
+        if not isinstance(condition, dict):
+            return format_response(
+                data=None,
+                correlation_id=correlation_id,
+                status="error",
+                error=f"conditions[{idx}] must be a JSON object, got {type(condition).__name__}",
+            )
+        err = _apply_condition(query, condition, correlation_id)
+        if err:
+            return err
+
+    built = query.build()
+    query_token = query_store.create({"query": built})
+    return format_response(
+        data={"query": built, "query_token": query_token},
+        correlation_id=correlation_id,
+    )
+
+
+def _build_field_list(columns: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Build the field metadata list from sys_dictionary entries and documentation."""
+    fields: list[dict[str, Any]] = []
+    for entry in columns:
+        field_info: dict[str, Any] = {
+            "element": entry.get("element", ""),
+            "internal_type": entry.get("internal_type", ""),
+            "max_length": entry.get("max_length", ""),
+            "mandatory": entry.get("mandatory", "false"),
+            "reference": entry.get("reference", ""),
+            "column_label": entry.get("column_label", ""),
+            "default_value": entry.get("default_value", ""),
+        }
+        fields.append(field_info)
+    return fields
+
+
 # ---------------------------------------------------------------------------
 # Tool registration
 # ---------------------------------------------------------------------------
@@ -369,18 +418,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             )
             docs = {d["element"]: d for d in docs_result.get("records", []) if d.get("element")}
 
-        fields = []
-        for entry in metadata:
-            field_info = {
-                "element": entry.get("element", ""),
-                "internal_type": entry.get("internal_type", ""),
-                "max_length": entry.get("max_length", ""),
-                "mandatory": entry.get("mandatory", "false"),
-                "reference": entry.get("reference", ""),
-                "column_label": entry.get("column_label", ""),
-                "default_value": entry.get("default_value", ""),
-            }
-            fields.append(field_info)
+        fields = _build_field_list(metadata)
 
         return format_response(
             data={
@@ -556,25 +594,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     error="conditions must be a JSON array",
                 )
 
-            query = ServiceNowQuery()
-            for idx, condition in enumerate(parsed):
-                if not isinstance(condition, dict):
-                    return format_response(
-                        data=None,
-                        correlation_id=correlation_id,
-                        status="error",
-                        error=f"conditions[{idx}] must be a JSON object, got {type(condition).__name__}",
-                    )
-                err = _apply_condition(query, condition, correlation_id)
-                if err:
-                    return err
-
-            built = query.build()
-            query_token = query_store.create({"query": built})
-            return format_response(
-                data={"query": built, "query_token": query_token},
-                correlation_id=correlation_id,
-            )
+            return _build_query_impl(parsed, query_store, correlation_id)
 
         except json.JSONDecodeError as e:
             return format_response(

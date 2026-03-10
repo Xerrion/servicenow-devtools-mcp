@@ -76,8 +76,8 @@ class TestRecordGet:
                     "result": {
                         "sys_id": "user1",
                         "user_name": "admin",
-                        "password": "supersecret",
-                        "api_key": "key123",
+                        "password": "supersecret",  # NOSONAR
+                        "api_key": "key123",  # NOSONAR
                     }
                 },
             )

@@ -24,113 +24,132 @@ from servicenow_mcp.utils import format_response, validate_identifier
 logger = logging.getLogger(__name__)
 
 
+# ------------------------------------------------------------------
+# Module-scope helpers (extracted from register_tools closure)
+# ------------------------------------------------------------------
+
+
+async def _check_mandatory_fields(
+    client: ServiceNowClient,
+    table: str,
+    data: dict[str, Any],
+) -> list[str]:
+    """Return list of mandatory field names missing from *data*.
+
+    Best-effort: if metadata fetch fails, logs a warning and returns
+    an empty list so the create can proceed (ServiceNow will still
+    validate server-side).
+    """
+    try:
+        metadata = await client.get_metadata(table)
+    except Exception:
+        logger.warning(
+            "Failed to fetch metadata for mandatory field check on table '%s'",
+            table,
+        )
+        return []
+    mandatory_fields = [
+        entry["element"] for entry in metadata if entry.get("mandatory") == "true" and entry.get("element")
+    ]
+    return [f for f in mandatory_fields if f not in data]
+
+
+async def _check_mandatory_or_error(
+    client: ServiceNowClient,
+    table: str,
+    data: dict[str, Any],
+    correlation_id: str,
+) -> str | None:
+    """Check for missing mandatory fields and return error response if any, else None."""
+    missing = await _check_mandatory_fields(client, table, data)
+    if missing:
+        return format_response(
+            data={"table": table, "missing_fields": missing},
+            correlation_id=correlation_id,
+            status="error",
+            error=f"Missing mandatory fields for table '{table}': {', '.join(missing)}",
+        )
+    return None
+
+
+async def _execute_apply_action(
+    client: ServiceNowClient,
+    payload: dict[str, Any],
+    table: str,
+    correlation_id: str,
+) -> str:
+    """Execute a previewed create/update/delete action."""
+    action = payload["action"]
+
+    if action == "create":
+        err = await _check_mandatory_or_error(client, table, payload["data"], correlation_id)
+        if err:
+            return err
+        result = await client.create_record(table, payload["data"])
+        return format_response(
+            data={
+                "action": "create",
+                "table": table,
+                "sys_id": result["sys_id"],
+                "record": mask_sensitive_fields(result),
+            },
+            correlation_id=correlation_id,
+        )
+
+    if action == "update":
+        sys_id = payload["sys_id"]
+        result = await client.update_record(table, sys_id, payload["changes"])
+        return format_response(
+            data={
+                "action": "update",
+                "table": table,
+                "sys_id": sys_id,
+                "record": mask_sensitive_fields(result),
+            },
+            correlation_id=correlation_id,
+        )
+
+    if action == "delete":
+        sys_id = payload["sys_id"]
+        await client.delete_record(table, sys_id)
+        return format_response(
+            data={
+                "action": "delete",
+                "table": table,
+                "sys_id": sys_id,
+                "deleted": True,
+            },
+            correlation_id=correlation_id,
+        )
+
+    return format_response(
+        data=None,
+        correlation_id=correlation_id,
+        status="error",
+        error=f"Unknown preview action: '{action}'",
+    )
+
+
+def _build_update_diff(
+    changes_dict: dict[str, Any],
+    current: dict[str, Any],
+) -> dict[str, dict[str, str]]:
+    """Build a field-level diff for a preview update."""
+    diff: dict[str, dict[str, str]] = {}
+    for field, new_value in changes_dict.items():
+        old_value = current.get(field, "")
+        if is_sensitive_field(field):
+            diff[field] = {"old": MASK_VALUE, "new": MASK_VALUE}
+        else:
+            diff[field] = {"old": old_value, "new": new_value}
+    return diff
+
+
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
     """Register record write operation tools on the MCP server."""
 
     # In-memory preview token store, shared across preview/apply tools via closure
     preview_store = PreviewTokenStore()
-
-    # ------------------------------------------------------------------
-    # Private helpers (closure over settings / auth_provider)
-    # ------------------------------------------------------------------
-
-    async def _check_mandatory_fields(
-        client: ServiceNowClient,
-        table: str,
-        data: dict[str, Any],
-    ) -> list[str]:
-        """Return list of mandatory field names missing from data.
-
-        Best-effort: if metadata fetch fails, logs a warning and returns
-        an empty list so the create can proceed (ServiceNow will still
-        validate server-side).
-        """
-        try:
-            metadata = await client.get_metadata(table)
-        except Exception:
-            logger.warning(
-                "Failed to fetch metadata for mandatory field check on table '%s'",
-                table,
-            )
-            return []
-        mandatory_fields = [
-            entry["element"] for entry in metadata if entry.get("mandatory") == "true" and entry.get("element")
-        ]
-        return [f for f in mandatory_fields if f not in data]
-
-    async def _check_mandatory_or_error(
-        client: ServiceNowClient,
-        table: str,
-        data: dict[str, Any],
-        correlation_id: str,
-    ) -> str | None:
-        """Check for missing mandatory fields and return error response if any, else None."""
-        missing = await _check_mandatory_fields(client, table, data)
-        if missing:
-            return format_response(
-                data={"table": table, "missing_fields": missing},
-                correlation_id=correlation_id,
-                status="error",
-                error=f"Missing mandatory fields for table '{table}': {', '.join(missing)}",
-            )
-        return None
-
-    async def _execute_apply_action(
-        client: ServiceNowClient,
-        payload: dict[str, Any],
-        table: str,
-        correlation_id: str,
-    ) -> str:
-        """Execute a previewed create/update/delete action."""
-        action = payload["action"]
-
-        if action == "create":
-            err = await _check_mandatory_or_error(client, table, payload["data"], correlation_id)
-            if err:
-                return err
-            result = await client.create_record(table, payload["data"])
-            return format_response(
-                data={
-                    "action": "create",
-                    "table": table,
-                    "sys_id": result["sys_id"],
-                    "record": mask_sensitive_fields(result),
-                },
-                correlation_id=correlation_id,
-            )
-
-        if action == "update":
-            sys_id = payload["sys_id"]
-            result = await client.update_record(table, sys_id, payload["changes"])
-            return format_response(
-                data={
-                    "action": "update",
-                    "table": table,
-                    "sys_id": sys_id,
-                    "record": mask_sensitive_fields(result),
-                },
-                correlation_id=correlation_id,
-            )
-
-        if action == "delete":
-            sys_id = payload["sys_id"]
-            await client.delete_record(table, sys_id)
-            return format_response(
-                data={
-                    "action": "delete",
-                    "table": table,
-                    "sys_id": sys_id,
-                    "deleted": True,
-                },
-                correlation_id=correlation_id,
-            )
-
-        return format_response(
-            data=None,
-            correlation_id=correlation_id,
-            status="error",
-            error=f"Unknown preview action: '{action}'",
-        )
 
     # ------------------------------------------------------------------
     # Write tools (CRUD)
@@ -266,14 +285,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         async with ServiceNowClient(settings, auth_provider) as client:
             current = await client.get_record(table, sys_id)
 
-        # Build field-level diff (only for fields being changed)
-        diff: dict[str, dict[str, str]] = {}
-        for field, new_value in changes_dict.items():
-            old_value = current.get(field, "")
-            if is_sensitive_field(field):
-                diff[field] = {"old": MASK_VALUE, "new": MASK_VALUE}
-            else:
-                diff[field] = {"old": old_value, "new": new_value}
+        diff = _build_update_diff(changes_dict, current)
 
         # Store preview for later apply
         token = preview_store.create(

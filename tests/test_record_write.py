@@ -53,7 +53,7 @@ class TestRecordCreate:
                         "sys_id": "new001",
                         "short_description": "Test incident",
                         "state": "1",
-                        "password": "s3cret",
+                        "password": "s3cret",  # NOSONAR
                     }
                 },
             )
@@ -70,7 +70,7 @@ class TestRecordCreate:
         assert result["data"]["table"] == "incident"
         assert result["data"]["sys_id"] == "new001"
         assert result["data"]["record"]["short_description"] == "Test incident"
-        assert result["data"]["record"]["password"] == "***MASKED***"
+        assert result["data"]["record"]["password"] == "***MASKED***"  # NOSONAR
 
     @pytest.mark.asyncio()
     async def test_blocked_in_prod(self, prod_settings: Settings, prod_auth_provider: BasicAuthProvider) -> None:
@@ -161,7 +161,7 @@ class TestRecordPreviewCreate:
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["record_preview_create"](
             table="incident",
-            data=json.dumps({"short_description": "Test", "password": "s3cret"}),
+            data=json.dumps({"short_description": "Test", "password": "s3cret"}),  # NOSONAR
         )
         result = decode_response(raw)
 
@@ -169,7 +169,7 @@ class TestRecordPreviewCreate:
         assert "token" in result["data"]
         assert result["data"]["table"] == "incident"
         assert result["data"]["action"] == "create"
-        assert result["data"]["data"]["password"] == "***MASKED***"
+        assert result["data"]["data"]["password"] == "***MASKED***"  # NOSONAR
 
     @pytest.mark.asyncio()
     async def test_blocked_in_prod(self, prod_settings: Settings, prod_auth_provider: BasicAuthProvider) -> None:
@@ -211,7 +211,7 @@ class TestRecordUpdate:
                     "result": {
                         "sys_id": "inc001",
                         "state": "2",
-                        "password": "s3cret",
+                        "password": "s3cret",  # NOSONAR
                     }
                 },
             )
@@ -228,7 +228,7 @@ class TestRecordUpdate:
         assert result["status"] == "success"
         assert result["data"]["sys_id"] == "inc001"
         assert result["data"]["record"]["state"] == "2"
-        assert result["data"]["record"]["password"] == "***MASKED***"
+        assert result["data"]["record"]["password"] == "***MASKED***"  # NOSONAR
 
     @pytest.mark.asyncio()
     async def test_blocked_in_prod(self, prod_settings: Settings, prod_auth_provider: BasicAuthProvider) -> None:
@@ -341,7 +341,7 @@ class TestRecordPreviewUpdate:
                 json={
                     "result": {
                         "sys_id": "inc001",
-                        "password": "old_password",
+                        "password": "old_password",  # NOSONAR
                     }
                 },
             )
@@ -351,13 +351,13 @@ class TestRecordPreviewUpdate:
         raw = await tools["record_preview_update"](
             table="incident",
             sys_id="inc001",
-            changes=json.dumps({"password": "new_password"}),
+            changes=json.dumps({"password": "new_password"}),  # NOSONAR
         )
         result = decode_response(raw)
 
         assert result["status"] == "success"
-        assert result["data"]["diff"]["password"]["old"] == "***MASKED***"
-        assert result["data"]["diff"]["password"]["new"] == "***MASKED***"
+        assert result["data"]["diff"]["password"]["old"] == "***MASKED***"  # NOSONAR
+        assert result["data"]["diff"]["password"]["new"] == "***MASKED***"  # NOSONAR
 
     @pytest.mark.asyncio()
     async def test_blocked_in_prod(self, prod_settings: Settings, prod_auth_provider: BasicAuthProvider) -> None:
@@ -459,7 +459,7 @@ class TestRecordPreviewDelete:
                         "sys_id": "inc001",
                         "short_description": "Test incident",
                         "state": "1",
-                        "password": "s3cret",
+                        "password": "s3cret",  # NOSONAR
                     }
                 },
             )
@@ -474,7 +474,7 @@ class TestRecordPreviewDelete:
         assert result["data"]["table"] == "incident"
         assert result["data"]["sys_id"] == "inc001"
         assert result["data"]["record_snapshot"]["short_description"] == "Test incident"
-        assert result["data"]["record_snapshot"]["password"] == "***MASKED***"
+        assert result["data"]["record_snapshot"]["password"] == "***MASKED***"  # NOSONAR
 
     @pytest.mark.asyncio()
     async def test_blocked_in_prod(self, prod_settings: Settings, prod_auth_provider: BasicAuthProvider) -> None:
@@ -662,7 +662,7 @@ class TestRecordApply:
                     "result": {
                         "sys_id": "new001",
                         "short_description": "Test",
-                        "password": "s3cret",
+                        "password": "s3cret",  # NOSONAR
                     }
                 },
             )
@@ -672,7 +672,7 @@ class TestRecordApply:
         result = decode_response(raw)
 
         assert result["status"] == "success"
-        assert result["data"]["record"]["password"] == "***MASKED***"
+        assert result["data"]["record"]["password"] == "***MASKED***"  # NOSONAR
 
     @pytest.mark.asyncio()
     @respx.mock

@@ -26,6 +26,95 @@ from servicenow_mcp.utils import (
 logger = logging.getLogger(__name__)
 
 
+# ------------------------------------------------------------------
+# Module-scope helpers (extracted from register_tools)
+# ------------------------------------------------------------------
+
+
+def _process_gather_results(
+    results: list[Any],
+    labels: list[str],
+) -> tuple[list[Any], list[str]]:
+    """Process asyncio.gather results that may contain exceptions.
+
+    Returns ``(unwrapped_results, warnings)`` where failed results are replaced
+    with ``None`` and a warning string is appended for each failure.
+    """
+    unwrapped: list[Any] = []
+    warnings: list[str] = []
+    for result, label in zip(results, labels, strict=True):
+        if isinstance(result, BaseException):
+            warnings.append(f"Could not fetch {label}: {result}")
+            unwrapped.append(None)
+        else:
+            unwrapped.append(result)
+    return unwrapped, warnings
+
+
+async def _fetch_and_attach_variables(
+    client: ServiceNowClient,
+    activity_records: list[dict[str, Any]],
+    settings: Settings,
+) -> tuple[dict[str, list[dict[str, Any]]], list[str]]:
+    """Bulk-fetch activity variables and group them by activity sys_id.
+
+    Returns ``(vars_by_activity, warnings)``.
+    """
+    warnings: list[str] = []
+    vars_by_activity: dict[str, list[dict[str, Any]]] = {}
+
+    activity_sys_ids = [resolve_ref_value(a["sys_id"]) for a in activity_records]
+    if not activity_sys_ids:
+        return vars_by_activity, warnings
+
+    try:
+        vars_query = (
+            ServiceNowQuery().equals("document", "wf_activity").in_list("document_key", activity_sys_ids).build()
+        )
+        vars_safety = enforce_query_safety("sys_variable_value", vars_query, 500, settings)
+        vars_result = await client.query_records(
+            "sys_variable_value",
+            vars_query,
+            fields=["sys_id", "variable", "value", "document_key"],
+            limit=vars_safety["limit"],
+            display_values=False,
+        )
+        for v in vars_result["records"]:
+            key = resolve_ref_value(v.get("document_key", ""))
+            vars_by_activity.setdefault(key, []).append(mask_sensitive_fields(v))
+    except Exception as exc:
+        warnings.append(f"Could not fetch activity variables: {exc}")
+
+    return vars_by_activity, warnings
+
+
+async def _fetch_activity_definition(
+    client: ServiceNowClient,
+    definition_sys_id: str,
+) -> tuple[dict[str, Any] | None, list[str]]:
+    """Fetch the wf_element_definition for an activity.
+
+    Returns ``(definition_record_or_none, warnings)``.
+    """
+    warnings: list[str] = []
+    if not definition_sys_id:
+        return None, warnings
+
+    try:
+        validate_identifier(definition_sys_id)
+        check_table_access("wf_element_definition")
+        record = await client.get_record(
+            "wf_element_definition",
+            definition_sys_id,
+            display_values=True,
+        )
+        return record, warnings
+    except Exception as exc:
+        logger.warning("Could not fetch element definition %s: %s", definition_sys_id, exc)
+        warnings.append(f"Could not fetch activity definition from wf_element_definition: {exc}")
+        return None, warnings
+
+
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
     """Register workflow introspection tools on the MCP server."""
 
@@ -189,60 +278,29 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 return_exceptions=True,
             )
 
-            raw_version, raw_activities, raw_transitions = results[0], results[1], results[2]
+            unwrapped, gather_warnings = _process_gather_results(
+                list(results),
+                ["workflow version record", "workflow activities", "workflow transitions"],
+            )
+            warnings.extend(gather_warnings)
 
-            # Version record is enrichment - degrade gracefully if unavailable
-            version_record: dict[str, Any]
-            if isinstance(raw_version, BaseException):
-                warnings.append(f"Could not fetch workflow version record: {raw_version}")
-                version_record = {}
-            else:
-                version_record = raw_version
+            version_record: dict[str, Any] = unwrapped[0] or {}
 
             # Activities are critical for a useful map
-            if isinstance(raw_activities, BaseException):
+            if unwrapped[1] is None:
                 return format_response(
                     data=None,
                     correlation_id=correlation_id,
                     status="error",
-                    error=f"Failed to fetch workflow activities: {raw_activities}",
+                    error=f"Failed to fetch workflow activities: {results[1]}",
                 )
-            activity_result: dict[str, Any] = raw_activities
+            activity_result: dict[str, Any] = unwrapped[1]
 
-            # Transitions can degrade gracefully - show activities without connections
-            transition_result: dict[str, Any]
-            if isinstance(raw_transitions, BaseException):
-                warnings.append(f"Could not fetch transitions: {raw_transitions}")
-                transition_result = {"records": [], "count": 0}
-            else:
-                transition_result = raw_transitions
+            transition_result: dict[str, Any] = unwrapped[2] or {"records": [], "count": 0}
 
-            # Bulk-fetch variables for all activities (display_values=False to keep raw sys_ids for grouping)
             activity_records = activity_result["records"]
-            activity_sys_ids = [resolve_ref_value(a["sys_id"]) for a in activity_records]
-
-            vars_by_activity: dict[str, list[dict[str, Any]]] = {}
-            if activity_sys_ids:
-                try:
-                    vars_query = (
-                        ServiceNowQuery()
-                        .equals("document", "wf_activity")
-                        .in_list("document_key", activity_sys_ids)
-                        .build()
-                    )
-                    vars_safety = enforce_query_safety("sys_variable_value", vars_query, 500, settings)
-                    vars_result = await client.query_records(
-                        "sys_variable_value",
-                        vars_query,
-                        fields=["sys_id", "variable", "value", "document_key"],
-                        limit=vars_safety["limit"],
-                        display_values=False,
-                    )
-                    for v in vars_result["records"]:
-                        key = resolve_ref_value(v.get("document_key", ""))
-                        vars_by_activity.setdefault(key, []).append(mask_sensitive_fields(v))
-                except Exception as exc:
-                    warnings.append(f"Could not fetch activity variables: {exc}")
+            vars_by_activity, var_warnings = await _fetch_and_attach_variables(client, activity_records, settings)
+            warnings.extend(var_warnings)
 
         # Attach variables to each activity
         activities = []
@@ -381,19 +439,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             )
 
             # Non-critical: element definition (may be inaccessible on some instances)
-            definition_record = None
-            if definition_sys_id:
-                try:
-                    validate_identifier(definition_sys_id)
-                    check_table_access("wf_element_definition")
-                    definition_record = await client.get_record(
-                        "wf_element_definition",
-                        definition_sys_id,
-                        display_values=True,
-                    )
-                except Exception as exc:
-                    logger.warning("Could not fetch element definition %s: %s", definition_sys_id, exc)
-                    warnings.append(f"Could not fetch activity definition from wf_element_definition: {exc}")
+            definition_record, def_warnings = await _fetch_activity_definition(client, definition_sys_id)
+            warnings.extend(def_warnings)
 
         return format_response(
             data={

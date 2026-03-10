@@ -1,5 +1,7 @@
 """Flow Designer introspection and migration analysis tools."""
 
+from __future__ import annotations
+
 import asyncio
 import logging
 import re
@@ -27,35 +29,56 @@ from servicenow_mcp.utils import (
 
 logger = logging.getLogger(__name__)
 
+# -- Duplicated string constants ---------------------------------------------------
+
+FD_SCRIPT_STEP = "Custom Action (Script Step)"
+FD_APPROVAL = "Ask for Approval Action"
+FD_CREATE_RECORD = "Create Record Action"
+FD_MANUAL_REFACTOR = "No Direct Equivalent (Manual Refactor)"
+FD_UNKNOWN = "Unknown (Review Manually)"
+FIELD_TO_NAME = "to.name"
+FIELD_ACTIVITY_DEF_NAME = "activity_definition.name"
+
+# -- Script detection patterns (split for lower regex complexity) ------------------
+
 # Known variable names that reliably contain script bodies in workflow activities.
 STRICT_SCRIPT_VARIABLE_NAMES: frozenset[str] = frozenset({"script", "run_script", "script_body"})
 CODE_AWARE_SCRIPT_VARIABLE_NAMES: frozenset[str] = frozenset({"condition"})
-SCRIPT_CODE_PATTERN: re.Pattern[str] = re.compile(
-    r"(?:\b(?:gs|current|workflow|answer|inputs|outputs)\s*\.|\b(?:function|var|let|const|if|else|for|while|try|catch|return)\b|answer\s*=)",
+_SCRIPT_OBJECT_PATTERN: re.Pattern[str] = re.compile(
+    r"\b(?:gs|current|workflow|answer|inputs|outputs)\s*\.|answer\s*=",
     re.IGNORECASE,
 )
+_SCRIPT_KEYWORD_PATTERN: re.Pattern[str] = re.compile(
+    r"\b(?:function|var|let|const|if|else|for|while|try|catch|return)\b",
+)
+
+
+def _contains_script_code(text: str) -> bool:
+    """Return True when *text* contains patterns indicating executable script."""
+    return bool(_SCRIPT_OBJECT_PATTERN.search(text) or _SCRIPT_KEYWORD_PATTERN.search(text))
+
 
 # Maps legacy workflow activity type names to their Flow Designer equivalents.
 ACTIVITY_TYPE_MAPPING: dict[str, str] = {
-    "run_script": "Custom Action (Script Step)",
-    "run script": "Custom Action (Script Step)",
-    "approval - user": "Ask for Approval Action",
-    "approval - group": "Ask for Approval Action",
-    "approval coordinator": "Ask for Approval Action",
+    "run_script": FD_SCRIPT_STEP,
+    "run script": FD_SCRIPT_STEP,
+    "approval - user": FD_APPROVAL,
+    "approval - group": FD_APPROVAL,
+    "approval coordinator": FD_APPROVAL,
     "wait for condition": "Wait for Condition Action",
     "timer": "Wait for Duration Action",
     "if": "Flow Logic (If/Else)",
     "branch": "Flow Logic (Parallel)",
     "notification": "Send Email Action",
-    "create task": "Create Record Action",
-    "catalog task": "Create Record Action",
+    "create task": FD_CREATE_RECORD,
+    "catalog task": FD_CREATE_RECORD,
     "set values": "Update Record Action",
     "join": "Flow Logic (Parallel - Join)",
     "return value": "Flow Output Variable",
     "end": "Flow End",
     "begin": "Flow Trigger",
-    "rollback to": "No Direct Equivalent (Manual Refactor)",
-    "turnback to": "No Direct Equivalent (Manual Refactor)",
+    "rollback to": FD_MANUAL_REFACTOR,
+    "turnback to": FD_MANUAL_REFACTOR,
 }
 
 
@@ -75,7 +98,7 @@ def _build_transition_indexes(
         outgoing.setdefault(source_id, []).append(
             {
                 "target_id": target_id,
-                "target_name": resolve_ref_value(transition.get("to.name", "")) or target_id,
+                "target_name": resolve_ref_value(transition.get(FIELD_TO_NAME, "")) or target_id,
                 "condition": resolve_ref_value(transition.get("condition", "")),
             }
         )
@@ -97,7 +120,7 @@ def _is_script_content(variable_name: str, value: str) -> bool:
     if normalized_name not in CODE_AWARE_SCRIPT_VARIABLE_NAMES:
         return False
 
-    return bool(SCRIPT_CODE_PATTERN.search(normalized_value))
+    return _contains_script_code(normalized_value)
 
 
 def _build_prerequisites(
@@ -153,7 +176,9 @@ def _build_build_steps(
         source_name = resolve_ref_value(transition.get("from.name", "")) or resolve_ref_value(
             transition.get("from", "")
         )
-        target_name = resolve_ref_value(transition.get("to.name", "")) or resolve_ref_value(transition.get("to", ""))
+        target_name = resolve_ref_value(transition.get(FIELD_TO_NAME, "")) or resolve_ref_value(
+            transition.get("to", "")
+        )
         condition = resolve_ref_value(transition.get("condition", ""))
         summary = f"{source_name} -> {target_name}"
         if condition:
@@ -220,6 +245,50 @@ def _build_build_steps(
     return build_steps
 
 
+_INSTRUCTION_MAP: dict[str, str] = {
+    "Flow End": (
+        "Let the flow end after the previous branch completes."
+        " Add outputs only if the legacy workflow returned values to another process."
+    ),
+    "Flow Logic (If/Else)": (
+        "Add an If branch and copy the legacy decision criteria so each outcome routes to the same downstream activity."
+    ),
+    "Flow Logic (Parallel)": (
+        "Add a parallel branch block and split execution"
+        " so each downstream path matches the original workflow branches."
+    ),
+    "Flow Logic (Parallel - Join)": (
+        "Add join logic or redesign the downstream sequence so all required branches complete before continuing."
+    ),
+    FD_APPROVAL: (
+        "Add an Ask for Approval action and mirror the same approver source,"
+        " approval outcome branches, and timeout handling."
+    ),
+    "Wait for Condition Action": (
+        "Add a Wait for Condition action and copy the same resume criteria from the legacy activity."
+    ),
+    "Wait for Duration Action": (
+        "Add a Wait for Duration action and reproduce the same timeout or schedule delay from the legacy activity."
+    ),
+    FD_CREATE_RECORD: (
+        "Add a Create Record action and map the same target table and field values that the legacy activity created."
+    ),
+    "Update Record Action": (
+        "Add an Update Record action and set the same field values that the legacy workflow updated at this step."
+    ),
+    "Send Email Action": (
+        "Add a Send Email action and copy the same recipients, template content, and send conditions."
+    ),
+    "Flow Output Variable": (
+        "Create or update a flow output so downstream consumers receive the same value as the legacy return activity."
+    ),
+    FD_SCRIPT_STEP: (
+        "Rebuild this scripted step as a custom action or reviewed script step,"
+        " then wire its outputs into the next flow step."
+    ),
+}
+
+
 def _build_activity_instruction(
     mapping: dict[str, Any],
     outgoing_transitions: list[dict[str, str]],
@@ -229,54 +298,21 @@ def _build_activity_instruction(
     equivalent = mapping["flow_designer_equivalent"]
     activity_name = mapping["activity_name"] or mapping["legacy_type"]
 
+    # Flow Trigger is special - it needs the workflow condition context.
     if equivalent == "Flow Trigger":
         return (
             f"Use this legacy begin activity as the flow trigger and apply the original trigger condition "
             f"{workflow_condition or 'from the legacy workflow definition'}."
         )
 
-    if equivalent == "Flow End":
-        return "Let the flow end after the previous branch completes. Add outputs only if the legacy workflow returned values to another process."
+    # Check the static instruction map for a direct match.
+    instruction = _INSTRUCTION_MAP.get(equivalent)
+    if instruction:
+        return instruction
 
-    if equivalent == "Flow Logic (If/Else)":
-        return "Add an If branch and copy the legacy decision criteria so each outcome routes to the same downstream activity."
-
-    if equivalent == "Flow Logic (Parallel)":
-        return "Add a parallel branch block and split execution so each downstream path matches the original workflow branches."
-
-    if equivalent == "Flow Logic (Parallel - Join)":
-        return "Add join logic or redesign the downstream sequence so all required branches complete before continuing."
-
-    if equivalent == "Ask for Approval Action":
-        return "Add an Ask for Approval action and mirror the same approver source, approval outcome branches, and timeout handling."
-
-    if equivalent == "Wait for Condition Action":
-        return "Add a Wait for Condition action and copy the same resume criteria from the legacy activity."
-
-    if equivalent == "Wait for Duration Action":
-        return (
-            "Add a Wait for Duration action and reproduce the same timeout or schedule delay from the legacy activity."
-        )
-
-    if equivalent == "Create Record Action":
-        return "Add a Create Record action and map the same target table and field values that the legacy activity created."
-
-    if equivalent == "Update Record Action":
-        return (
-            "Add an Update Record action and set the same field values that the legacy workflow updated at this step."
-        )
-
-    if equivalent == "Send Email Action":
-        return "Add a Send Email action and copy the same recipients, template content, and send conditions."
-
-    if equivalent == "Flow Output Variable":
-        return "Create or update a flow output so downstream consumers receive the same value as the legacy return activity."
-
-    if equivalent == "Custom Action (Script Step)":
-        return "Rebuild this scripted step as a custom action or reviewed script step, then wire its outputs into the next flow step."
-
+    # Unmapped or unknown activities need manual redesign guidance.
     transition_targets = ", ".join(transition["target_name"] for transition in outgoing_transitions)
-    if equivalent in {"Unknown (Review Manually)", "No Direct Equivalent (Manual Refactor)"}:
+    if equivalent in {FD_UNKNOWN, FD_MANUAL_REFACTOR}:
         return (
             f"This activity has no safe direct Flow Designer equivalent. Redesign the business outcome of '{activity_name}' manually"
             f" and reconnect it to: {transition_targets or 'the next required step'}."
@@ -434,6 +470,190 @@ def _build_manual_migration_instructions(
         ),
         "known_manual_work": _build_known_manual_work(migration_blockers, extracted_scripts),
     }
+
+
+def _detect_cycles(activities: list[dict[str, Any]], transitions: list[dict[str, Any]]) -> list[list[str]]:
+    """Detect cycles in a workflow graph using iterative DFS with 3-color marking."""
+    adjacency: dict[str, list[str]] = {}
+    for t in transitions:
+        src = resolve_ref_value(t.get("from", ""))
+        dst = resolve_ref_value(t.get("to", ""))
+        if src and dst:
+            adjacency.setdefault(src, []).append(dst)
+
+    WHITE, GRAY, BLACK = 0, 1, 2
+    color: dict[str, int] = {resolve_ref_value(a["sys_id"]): WHITE for a in activities}
+    cycles: list[list[str]] = []
+    path: list[str] = []
+
+    for activity in activities:
+        start = resolve_ref_value(activity["sys_id"])
+        if color.get(start) != WHITE:
+            continue
+        color[start] = GRAY
+        path.append(start)
+        stack: list[tuple[str, int]] = [(start, 0)]
+        while stack:
+            node, idx = stack[-1]
+            neighbors = adjacency.get(node, [])
+            if idx < len(neighbors):
+                stack[-1] = (node, idx + 1)
+                neighbor = neighbors[idx]
+                if neighbor not in color:
+                    continue
+                if color[neighbor] == GRAY:
+                    cycle_start = path.index(neighbor)
+                    cycles.append(path[cycle_start:])
+                elif color[neighbor] == WHITE:
+                    color[neighbor] = GRAY
+                    path.append(neighbor)
+                    stack.append((neighbor, 0))
+            else:
+                stack.pop()
+                path.pop()
+                color[node] = BLACK
+
+    return cycles
+
+
+async def _fetch_activity_variables(
+    client: ServiceNowClient,
+    activity_sys_ids: list[str],
+    settings: Settings,
+) -> dict[str, list[dict[str, Any]]]:
+    """Fetch sys_variable_value records grouped by activity sys_id."""
+    vars_by_activity: dict[str, list[dict[str, Any]]] = {}
+    if not activity_sys_ids:
+        return vars_by_activity
+
+    vars_query = ServiceNowQuery().equals("document", "wf_activity").in_list("document_key", activity_sys_ids).build()
+    vars_safety = enforce_query_safety("sys_variable_value", vars_query, INTERNAL_QUERY_LIMIT, settings)
+    vars_result = await client.query_records(
+        "sys_variable_value",
+        vars_query,
+        fields=["sys_id", "variable", "value", "document_key"],
+        limit=vars_safety["limit"],
+        display_values=False,
+    )
+    for v in vars_result["records"]:
+        key = resolve_ref_value(v.get("document_key", ""))
+        vars_by_activity.setdefault(key, []).append(mask_sensitive_fields(v))
+
+    return vars_by_activity
+
+
+def _map_activities(
+    activities: list[dict[str, Any]],
+    vars_by_activity: dict[str, list[dict[str, Any]]],
+) -> list[dict[str, Any]]:
+    """Map legacy activity types to Flow Designer equivalents and score scripts."""
+    activity_mapping: list[dict[str, Any]] = []
+
+    for a in activities:
+        definition_name = resolve_ref_value(a.get(FIELD_ACTIVITY_DEF_NAME, "")).lower().strip()
+        mapped = ACTIVITY_TYPE_MAPPING.get(definition_name, FD_UNKNOWN)
+
+        act_vars = vars_by_activity.get(resolve_ref_value(a["sys_id"]), [])
+        max_script_lines = 0
+        has_script = False
+        for var in act_vars:
+            val = resolve_ref_value(var.get("value", ""))
+            var_name = resolve_ref_value(var.get("variable", "")).lower().strip()
+            if _is_script_content(var_name, val):
+                line_count = len(val.strip().splitlines())
+                if line_count > max_script_lines:
+                    max_script_lines = line_count
+                has_script = True
+
+        activity_mapping.append(
+            {
+                "activity_name": resolve_ref_value(a.get("name", "")),
+                "activity_sys_id": resolve_ref_value(a["sys_id"]),
+                "legacy_type": resolve_ref_value(a.get(FIELD_ACTIVITY_DEF_NAME, "")),
+                "flow_designer_equivalent": mapped,
+                "has_script": has_script,
+                "script_line_count": max_script_lines,
+            }
+        )
+
+    return activity_mapping
+
+
+def _build_migration_blockers(
+    cycles: list[list[str]],
+    activity_mapping: list[dict[str, Any]],
+    activity_name_lookup: dict[str, str],
+) -> list[dict[str, Any]]:
+    """Build the list of migration blockers from cycles and unmapped activities."""
+    migration_blockers: list[dict[str, Any]] = []
+
+    for cycle in cycles:
+        cycle_names = [activity_name_lookup.get(sid, sid) for sid in cycle]
+        migration_blockers.append(
+            {
+                "type": "cycle",
+                "description": f"Cyclic path detected: {' -> '.join(cycle_names)}",
+                "activities_involved": cycle,
+            }
+        )
+
+    for mapping in activity_mapping:
+        if mapping["flow_designer_equivalent"] in {FD_MANUAL_REFACTOR, FD_UNKNOWN}:
+            migration_blockers.append(
+                {
+                    "type": "unmapped_activity",
+                    "description": (
+                        f"Activity '{mapping['activity_name']}' ({mapping['legacy_type']})"
+                        " has no direct Flow Designer equivalent"
+                    ),
+                    "activity_name": mapping["activity_name"],
+                }
+            )
+
+    return migration_blockers
+
+
+def _build_recommendations(
+    cycles: list[list[str]],
+    script_penalty: int,
+    unmapped_names: list[str],
+) -> list[str]:
+    """Build migration recommendation strings."""
+    recommendations: list[str] = []
+    if cycles:
+        recommendations.append("Refactor cyclic paths into Do Until loops or Subflows")
+    if script_penalty > 0:
+        recommendations.append("Extract Run Script activities into reusable Custom Actions")
+    if unmapped_names:
+        recommendations.append(
+            f"Activities {', '.join(unmapped_names)} have no direct Flow Designer equivalent - manual redesign required"
+        )
+    recommendations.append("Test migrated flow with same trigger conditions as original workflow")
+    return recommendations
+
+
+def _extract_script_bodies(
+    activities: list[dict[str, Any]],
+    vars_by_activity: dict[str, list[dict[str, Any]]],
+) -> list[dict[str, str]]:
+    """Extract embedded script bodies from activity variables for reference."""
+    extracted_scripts: list[dict[str, str]] = []
+    for a in activities:
+        for var in vars_by_activity.get(resolve_ref_value(a["sys_id"]), []):
+            val = resolve_ref_value(var.get("value", ""))
+            var_name = resolve_ref_value(var.get("variable", "")).lower().strip()
+            if _is_script_content(var_name, val):
+                extracted_scripts.append(
+                    mask_sensitive_fields(
+                        {
+                            "activity_name": resolve_ref_value(a.get("name", "")),
+                            "activity_sys_id": resolve_ref_value(a["sys_id"]),
+                            "variable_name": resolve_ref_value(var.get("variable", "")),
+                            "script_body": val,
+                        }
+                    )
+                )
+    return extracted_scripts
 
 
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
@@ -879,7 +1099,6 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         trans_safety = enforce_query_safety("wf_transition", trans_query, 500, settings)
 
         async with ServiceNowClient(settings, auth_provider) as client:
-            # Step 1: Parallel fetch version + activities + transitions
             version_record, activity_result, transition_result = await asyncio.gather(
                 client.get_record("wf_workflow_version", workflow_version_sys_id, display_values=True),
                 client.query_records(
@@ -889,7 +1108,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                         "sys_id",
                         "name",
                         "activity_definition",
-                        "activity_definition.name",
+                        FIELD_ACTIVITY_DEF_NAME,
                         "activity_definition.category",
                         "x",
                         "y",
@@ -907,7 +1126,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                         "from",
                         "from.name",
                         "to",
-                        "to.name",
+                        FIELD_TO_NAME,
                         "condition",
                     ],
                     limit=trans_safety["limit"],
@@ -918,172 +1137,27 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             activities = activity_result["records"]
             transitions = transition_result["records"]
 
-            # Step 2: Build adjacency graph from transitions
-            # NOTE: 'from' is a Python reserved word but works fine as a dict key
-            adjacency: dict[str, list[str]] = {}
-            for t in transitions:
-                src = resolve_ref_value(t.get("from", ""))
-                dst = resolve_ref_value(t.get("to", ""))
-                if src and dst:
-                    adjacency.setdefault(src, []).append(dst)
-
-            # Step 3: DFS cycle detection with 3-color marking
-            WHITE, GRAY, BLACK = 0, 1, 2
-            color: dict[str, int] = {resolve_ref_value(a["sys_id"]): WHITE for a in activities}
-            cycles: list[list[str]] = []
-            path: list[str] = []
-
-            for activity in activities:
-                start = resolve_ref_value(activity["sys_id"])
-                if color.get(start) != WHITE:
-                    continue
-                color[start] = GRAY
-                path.append(start)
-                stack: list[tuple[str, int]] = [(start, 0)]
-                while stack:
-                    node, idx = stack[-1]
-                    neighbors = adjacency.get(node, [])
-                    if idx < len(neighbors):
-                        stack[-1] = (node, idx + 1)
-                        neighbor = neighbors[idx]
-                        if neighbor not in color:
-                            continue
-                        if color[neighbor] == GRAY:
-                            cycle_start = path.index(neighbor)
-                            cycles.append(path[cycle_start:])
-                        elif color[neighbor] == WHITE:
-                            color[neighbor] = GRAY
-                            path.append(neighbor)
-                            stack.append((neighbor, 0))
-                    else:
-                        stack.pop()
-                        path.pop()
-                        color[node] = BLACK
-
-            # Step 4: Fetch embedded scripts from sys_variable_value
             activity_sys_ids = [resolve_ref_value(a["sys_id"]) for a in activities]
-            vars_by_activity: dict[str, list[dict[str, Any]]] = {}
+            vars_by_activity = await _fetch_activity_variables(client, activity_sys_ids, settings)
 
-            if activity_sys_ids:
-                vars_query = (
-                    ServiceNowQuery()
-                    .equals("document", "wf_activity")
-                    .in_list("document_key", activity_sys_ids)
-                    .build()
-                )
-                vars_safety = enforce_query_safety("sys_variable_value", vars_query, INTERNAL_QUERY_LIMIT, settings)
-                vars_result = await client.query_records(
-                    "sys_variable_value",
-                    vars_query,
-                    fields=["sys_id", "variable", "value", "document_key"],
-                    limit=vars_safety["limit"],
-                    display_values=False,
-                )
-                for v in vars_result["records"]:
-                    key = resolve_ref_value(v.get("document_key", ""))
-                    vars_by_activity.setdefault(key, []).append(mask_sensitive_fields(v))
+        cycles = _detect_cycles(activities, transitions)
+        activity_mapping = _map_activities(activities, vars_by_activity)
+        extracted_scripts = _extract_script_bodies(activities, vars_by_activity)
 
-        # Step 5: Map activity types to Flow Designer equivalents
+        # Derive complexity metrics from the mapping results.
+        unmapped_names = [
+            m["activity_name"] or m["legacy_type"]
+            for m in activity_mapping
+            if m["flow_designer_equivalent"] in {FD_UNKNOWN, FD_MANUAL_REFACTOR}
+        ]
+        script_penalty = sum(1 for m in activity_mapping if m["has_script"] and m["script_line_count"] > 10)
+        complexity_score = len(activities) + (len(cycles) * 2) + script_penalty + len(unmapped_names)
+
         activity_name_lookup = {
             resolve_ref_value(a["sys_id"]): resolve_ref_value(a.get("name", "")) for a in activities
         }
-        activity_mapping: list[dict[str, Any]] = []
-        unmapped_names: list[str] = []
-        script_penalty = 0
-
-        for a in activities:
-            definition_name = resolve_ref_value(a.get("activity_definition.name", "")).lower().strip()
-            mapped = ACTIVITY_TYPE_MAPPING.get(definition_name, "Unknown (Review Manually)")
-
-            # Count script lines for this activity
-            act_vars = vars_by_activity.get(resolve_ref_value(a["sys_id"]), [])
-            max_script_lines = 0
-            has_script = False
-            for var in act_vars:
-                val = resolve_ref_value(var.get("value", ""))
-                var_name = resolve_ref_value(var.get("variable", "")).lower().strip()
-                if _is_script_content(var_name, val):
-                    line_count = len(val.strip().splitlines())
-                    if line_count > max_script_lines:
-                        max_script_lines = line_count
-                    has_script = True
-
-            if has_script and max_script_lines > 10:
-                script_penalty += 1
-
-            if mapped in ("Unknown (Review Manually)", "No Direct Equivalent (Manual Refactor)"):
-                unmapped_names.append(resolve_ref_value(a.get("name", definition_name)))
-
-            activity_mapping.append(
-                {
-                    "activity_name": resolve_ref_value(a.get("name", "")),
-                    "activity_sys_id": resolve_ref_value(a["sys_id"]),
-                    "legacy_type": resolve_ref_value(a.get("activity_definition.name", "")),
-                    "flow_designer_equivalent": mapped,
-                    "has_script": has_script,
-                    "script_line_count": max_script_lines,
-                }
-            )
-
-        # Step 6: Compute complexity score
-        unmapped_count = len(unmapped_names)
-        complexity_score = len(activities) + (len(cycles) * 2) + script_penalty + unmapped_count
-
-        # Step 7: Build migration blockers
-        migration_blockers: list[dict[str, Any]] = []
-        for cycle in cycles:
-            cycle_names = [activity_name_lookup.get(sid, sid) for sid in cycle]
-            migration_blockers.append(
-                {
-                    "type": "cycle",
-                    "description": f"Cyclic path detected: {' -> '.join(cycle_names)}",
-                    "activities_involved": cycle,
-                }
-            )
-
-        for mapping in activity_mapping:
-            if mapping["flow_designer_equivalent"] in {
-                "No Direct Equivalent (Manual Refactor)",
-                "Unknown (Review Manually)",
-            }:
-                migration_blockers.append(
-                    {
-                        "type": "unmapped_activity",
-                        "description": f"Activity '{mapping['activity_name']}' ({mapping['legacy_type']}) has no direct Flow Designer equivalent",
-                        "activity_name": mapping["activity_name"],
-                    }
-                )
-
-        # Step 8: Build recommendations
-        recommendations: list[str] = []
-        if cycles:
-            recommendations.append("Refactor cyclic paths into Do Until loops or Subflows")
-        if script_penalty > 0:
-            recommendations.append("Extract Run Script activities into reusable Custom Actions")
-        if unmapped_names:
-            recommendations.append(
-                f"Activities {', '.join(unmapped_names)} have no direct Flow Designer equivalent"
-                " - manual redesign required"
-            )
-        recommendations.append("Test migrated flow with same trigger conditions as original workflow")
-
-        # Extract script bodies for reference
-        extracted_scripts: list[dict[str, str]] = []
-        for a in activities:
-            for var in vars_by_activity.get(resolve_ref_value(a["sys_id"]), []):
-                val = resolve_ref_value(var.get("value", ""))
-                var_name = resolve_ref_value(var.get("variable", "")).lower().strip()
-                if _is_script_content(var_name, val):
-                    extracted_scripts.append(
-                        mask_sensitive_fields(
-                            {
-                                "activity_name": resolve_ref_value(a.get("name", "")),
-                                "activity_sys_id": resolve_ref_value(a["sys_id"]),
-                                "variable_name": resolve_ref_value(var.get("variable", "")),
-                                "script_body": val,
-                            }
-                        )
-                    )
+        migration_blockers = _build_migration_blockers(cycles, activity_mapping, activity_name_lookup)
+        recommendations = _build_recommendations(cycles, script_penalty, unmapped_names)
 
         workflow_name = resolve_ref_value(version_record.get("name", ""))
         workflow_table = resolve_ref_value(version_record.get("table", ""))
@@ -1112,7 +1186,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                         "base_activities": len(activities),
                         "cycle_penalty": len(cycles) * 2,
                         "script_penalty": script_penalty,
-                        "unmapped_penalty": unmapped_count,
+                        "unmapped_penalty": len(unmapped_names),
                     },
                 },
                 "recommendations": recommendations,
