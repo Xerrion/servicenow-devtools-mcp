@@ -26,6 +26,16 @@ from servicenow_mcp.tools.domains._helpers import (
 from servicenow_mcp.utils import ServiceNowQuery, format_response
 
 
+TOOL_NAMES: list[str] = [
+    "incident_list",
+    "incident_get",
+    "incident_create",
+    "incident_update",
+    "incident_resolve",
+    "incident_add_comment",
+]
+
+
 def register_tools(
     mcp: FastMCP,
     settings: Settings,

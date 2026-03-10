@@ -22,6 +22,15 @@ def _is_sys_id(value: str) -> bool:
     return bool(_SYS_ID_RE.match(value.lower()))
 
 
+TOOL_NAMES: list[str] = [
+    "cmdb_list",
+    "cmdb_get",
+    "cmdb_relationships",
+    "cmdb_classes",
+    "cmdb_health",
+]
+
+
 def register_tools(
     mcp: FastMCP,
     settings: Settings,

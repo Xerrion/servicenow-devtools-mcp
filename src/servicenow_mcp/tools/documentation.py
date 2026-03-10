@@ -78,6 +78,14 @@ def _classify_br_phases(br_records: list[dict[str, Any]]) -> dict[str, list[dict
     return phases
 
 
+TOOL_NAMES: list[str] = [
+    "docs_logic_map",
+    "docs_artifact_summary",
+    "docs_test_scenarios",
+    "docs_review_notes",
+]
+
+
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
     """Register documentation tools on the MCP server."""
 

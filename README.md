@@ -6,21 +6,20 @@
   <a href="https://pypi.org/project/servicenow-devtools-mcp/"><img src="https://img.shields.io/pypi/v/servicenow-devtools-mcp?color=00c9a7&style=flat-square" alt="PyPI version"></a>
   <a href="https://pypi.org/project/servicenow-devtools-mcp/"><img src="https://img.shields.io/pypi/pyversions/servicenow-devtools-mcp?style=flat-square" alt="Python versions"></a>
   <a href="https://github.com/xerrion/servicenow-devtools-mcp/blob/main/LICENSE"><img src="https://img.shields.io/github/license/xerrion/servicenow-devtools-mcp?style=flat-square" alt="License"></a>
-  <img src="https://img.shields.io/badge/tools-86-00d4ff?style=flat-square" alt="Tool count">
+  <img src="https://img.shields.io/badge/tools-92-00d4ff?style=flat-square" alt="Tool count">
 </p>
 
 # servicenow-devtools-mcp
 
-A developer & debug-focused [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server for ServiceNow. Give your AI agent direct access to your ServiceNow instance for introspection, debugging, change intelligence, ITIL process management, and documentation generation.
+A developer & debug-focused [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server for ServiceNow. Give your AI agent direct access to your ServiceNow instance for schema exploration, debugging, change intelligence, ITIL process management, and documentation generation.
 
 ## Features
 
-- :mag: **Instance Introspection** -- describe tables, query records, compute aggregates, fetch individual records
-- :link: **Relationship Mapping** -- find incoming and outgoing references for any record
+- :mag: **Table & Schema Access** -- describe tables with enriched metadata (sys_db_object + sys_documentation), query records, compute aggregates, build structured queries
+- :link: **Record Access** -- fetch individual records, find incoming and outgoing references for any record
 - :package: **Change Intelligence** -- inspect update sets, diff artifact versions, audit trails, generate release notes
 - :bug: **Debug & Trace** -- trace record timelines, flow executions, email chains, integration errors, import set runs, field mutations
-- :test_tube: **Record CRUD** -- create, update, delete records with direct or preview-then-apply patterns
-- :wrench: **Developer Utilities** -- toggle artifacts on/off, set system properties
+- :test_tube: **Record Write** -- create, update, delete records with direct or preview-then-apply patterns
 - :mag_right: **Investigations** -- 7 built-in analysis modules (stale automations, deprecated APIs, table health, ACL conflicts, error analysis, slow transactions, performance bottlenecks)
 - :page_facing_up: **Documentation** -- generate logic maps, artifact summaries, test scenarios, code review notes
 - :gear: **Workflow Analysis** -- list workflow versions, inspect contexts, map activity structures, trace execution status
@@ -139,7 +138,7 @@ uvx servicenow-devtools-mcp
 ## ServiceNow MCP Server Setup
 
 You have access to a ServiceNow MCP server (`servicenow-devtools-mcp`) that provides
-86 tools for interacting with a ServiceNow instance.
+92 tools for interacting with a ServiceNow instance.
 
 ### Installation
 
@@ -177,13 +176,13 @@ uvx servicenow-devtools-mcp
 }
 ```
 
-### Available Tools (86 total)
+### Available Tools (100 total)
 
-**Introspection (4):** table_describe, table_get, table_query, table_aggregate
-  - Describe table schema, fetch records by sys_id, query with encoded queries, compute stats
+**Table (4):** table_describe, table_query, table_aggregate, build_query
+  - Describe table schema with enriched metadata (sys_db_object + sys_documentation), query with encoded queries, compute stats, build structured queries
 
-**Relationships (2):** rel_references_to, rel_references_from
-  - Find what references a record and what a record references
+**Record (3):** record_get, rel_references_to, rel_references_from
+  - Fetch records by sys_id, find what references a record, find what a record references
 
 **Metadata (4):** meta_list_artifacts, meta_get_artifact, meta_find_references, meta_what_writes
   - List/inspect platform artifacts (business rules, script includes, etc.), find cross-references, find writers to a table
@@ -194,11 +193,8 @@ uvx servicenow-devtools-mcp
 **Debug & Trace (6):** debug_trace, debug_flow_execution, debug_email_trace, debug_integration_health, debug_importset_run, debug_field_mutation_story
   - Build event timelines, inspect flow executions, trace emails, check integration errors, inspect import sets, trace field mutations
 
-**Record CRUD (7):** record_create, record_preview_create, record_update, record_preview_update, record_delete, record_preview_delete, record_apply
+**Record Write (7):** record_create, record_preview_create, record_update, record_preview_update, record_delete, record_preview_delete, record_apply
   - Create, update, delete records directly or via preview-then-apply confirmation pattern
-
-**Developer Utilities (2):** dev_toggle, dev_set_property
-  - Toggle artifacts on/off, set system properties
 
 **Investigations (2 dispatchers, 7 modules):** investigate_run, investigate_explain
   - Modules: stale_automations, deprecated_apis, table_health, acl_conflicts, error_analysis, slow_transactions, performance_bottlenecks
@@ -206,11 +202,11 @@ uvx servicenow-devtools-mcp
 **Documentation (4):** docs_logic_map, docs_artifact_summary, docs_test_scenarios, docs_review_notes
   - Generate automation maps, artifact summaries with dependencies, test scenario suggestions, code review findings
 
-**Query Builder (1):** build_query
-  - Build structured ServiceNow encoded queries from JSON conditions, returns reusable query tokens
-
 **Workflow Analysis (5):** workflow_contexts, workflow_map, workflow_status, workflow_activity_detail, workflow_version_list
   - List workflow contexts for a record, map workflow structure, inspect execution status, view activity details
+
+**Flow Designer (8):** flow_list, flow_get, flow_map, flow_action_detail, flow_execution_list, flow_execution_detail, flow_snapshot_list, workflow_migration_analysis
+  - List, inspect, and map Flow Designer flows. View action details, execution history, published snapshots, and analyze legacy workflows for migration readiness
 
 **Incident Management (6):** incident_list, incident_get, incident_create, incident_update, incident_resolve, incident_add_comment
   - Full incident lifecycle: list, fetch, create, update, resolve, and add comments/work notes
@@ -273,19 +269,22 @@ The server reads from `.env` and `.env.local` files automatically (`.env.local` 
 |---|---|---|
 | `list_tool_packages` | List all available tool packages and their tool groups | -- |
 
-### :mag: Introspection
+### :mag: Table
 
 | Tool | Description | Key Parameters |
 |---|---|---|
-| `table_describe` | Return field metadata for a table (types, references, choices) | `table` |
-| `table_get` | Fetch a single record by sys_id | `table`, `sys_id`, `fields?`, `display_values?` |
+| `table_describe` | Return enriched field metadata for a table (types, references, choices, sys_db_object, sys_documentation) | `table` |
 | `table_query` | Query a table with encoded query string or query token | `table`, `query_token?`, `fields?`, `limit?`, `offset?`, `order_by?`, `display_values?` |
 | `table_aggregate` | Compute aggregate stats (count, avg, min, max, sum) | `table`, `query_token?`, `group_by?`, `avg_fields?`, `sum_fields?` |
+| `build_query` | Build a ServiceNow encoded query from structured JSON conditions | `conditions` (JSON array) |
 
-### :link: Relationships
+The `build_query` tool returns a reusable `query_token` that can be passed to `table_query`, `table_aggregate`, `meta_list_artifacts`, and other query-accepting tools. Supports comparison, string, null, time, date, range, field comparison, reference, change detection, logical, related list, and ordering operators.
+
+### :link: Record
 
 | Tool | Description | Key Parameters |
 |---|---|---|
+| `record_get` | Fetch a single record by sys_id | `table`, `sys_id`, `fields?`, `display_values?` |
 | `rel_references_to` | Find records in other tables that reference a given record | `table`, `sys_id` |
 | `rel_references_from` | Find what a record references via its reference fields | `table`, `sys_id` |
 
@@ -318,7 +317,7 @@ The server reads from `.env` and `.env.local` files automatically (`.env.local` 
 | `debug_importset_run` | Inspect import set run with row-level results | `import_set_sys_id` |
 | `debug_field_mutation_story` | Chronological mutation history of a single field | `table`, `sys_id`, `field`, `limit?` |
 
-### :test_tube: Record CRUD
+### :test_tube: Record Write
 
 | Tool | Description | Key Parameters |
 |---|---|---|
@@ -329,13 +328,6 @@ The server reads from `.env` and `.env.local` files automatically (`.env.local` 
 | `record_delete` | Delete a record | `table`, `sys_id` |
 | `record_preview_delete` | Preview a deletion showing the record to be removed | `table`, `sys_id` |
 | `record_apply` | Apply a previously previewed action (create, update, or delete) | `preview_token` |
-
-### :wrench: Developer Utilities
-
-| Tool | Description | Key Parameters |
-|---|---|---|
-| `dev_toggle` | Toggle active/inactive on a platform artifact | `artifact_type`, `sys_id`, `active` |
-| `dev_set_property` | Set a system property value (returns old value) | `name`, `value` |
 
 ### :mag_right: Investigations
 
@@ -365,14 +357,6 @@ The server reads from `.env` and `.env.local` files automatically (`.env.local` 
 | `docs_test_scenarios` | Analyze script and suggest test scenarios | `artifact_type`, `sys_id` |
 | `docs_review_notes` | Scan script for anti-patterns and generate review notes | `artifact_type`, `sys_id` |
 
-### :hammer_and_wrench: Query Builder
-
-| Tool | Description | Key Parameters |
-|---|---|---|
-| `build_query` | Build a ServiceNow encoded query from structured JSON conditions | `conditions` (JSON array) |
-
-The `build_query` tool returns a reusable `query_token` that can be passed to `table_query`, `table_aggregate`, `meta_list_artifacts`, and other query-accepting tools. Supports comparison, string, null, time, date, range, field comparison, reference, change detection, logical, related list, and ordering operators.
-
 ### :gear: Workflow Analysis
 
 | Tool | Description | Key Parameters |
@@ -382,6 +366,19 @@ The `build_query` tool returns a reusable `query_token` that can be passed to `t
 | `workflow_status` | Show execution status of a workflow context | `context_sys_id` |
 | `workflow_activity_detail` | Fetch detailed info about a workflow activity | `activity_sys_id` |
 | `workflow_version_list` | List workflow versions defined for a table | `table`, `active_only?`, `limit?` |
+
+### :ocean: Flow Designer
+
+| Tool | Description | Key Parameters |
+|---|---|---|
+| `flow_list` | List Flow Designer flows and subflows with optional filters | `table?`, `flow_type?`, `status?`, `active_only?`, `limit?` |
+| `flow_get` | Fetch a Flow Designer flow definition with inputs/outputs | `flow_sys_id` |
+| `flow_map` | Map the structure of a flow (action instances and logic blocks) | `flow_sys_id` |
+| `flow_action_detail` | Fetch detailed info about a flow action instance | `action_instance_sys_id` |
+| `flow_execution_list` | List Flow Designer execution contexts with optional filters | `flow_sys_id?`, `source_record?`, `state?`, `limit?` |
+| `flow_execution_detail` | Fetch detailed execution info including ordered log entries | `context_id` |
+| `flow_snapshot_list` | List published snapshots (versions) for a flow | `flow_sys_id`, `limit?` |
+| `workflow_migration_analysis` | Analyze a legacy workflow for Flow Designer migration readiness | `workflow_version_sys_id` |
 
 ### :fire_engine: Incident Management
 
@@ -472,19 +469,19 @@ Control which tools are loaded using the `MCP_TOOL_PACKAGE` environment variable
 
 | Package | Groups | Description |
 |---|---|---|
-| `full` (default) | 18 | All tool groups -- 86 tools total |
-| `itil` | 12 | ITIL process tools (incidents, changes, problems, requests + platform tools) |
-| `developer` | 11 | Development-focused (introspection, debug, investigations, workflows) |
-| `readonly` | 9 | Read-only operations (no record CRUD, no dev utilities) |
-| `analyst` | 7 | Analysis and reporting (introspection, investigations, docs, workflows) |
-| `incident_management` | 5 | Incident lifecycle with supporting tools |
-| `problem_management` | 5 | Problem lifecycle with supporting tools |
-| `change_management` | 4 | Change request management with change intelligence |
+| `full` (default) | 17 | All tool groups -- 100 tools total |
+| `itil` | 14 | ITIL process tools (incidents, changes, problems, requests + platform tools) |
+| `developer` | 10 | Development-focused (table, record, debug, investigations, workflows) |
+| `readonly` | 9 | Read-only operations (no record writes) |
+| `analyst` | 7 | Analysis and reporting (table, record, investigations, docs, workflows) |
+| `incident_management` | 7 | Incident lifecycle with supporting tools |
+| `problem_management` | 7 | Problem lifecycle with supporting tools |
+| `change_management` | 6 | Change request management with change intelligence |
+| `request_management` | 6 | Request and RITM management |
 | `cmdb` | 4 | CMDB management with relationships |
-| `request_management` | 4 | Request and RITM management |
-| `introspection_only` | 4 | Read-only exploration (introspection, relationships, metadata, utility) |
-| `knowledge_management` | 3 | Knowledge base tools |
-| `service_catalog` | 3 | Service catalog tools |
+| `knowledge_management` | 4 | Knowledge base tools |
+| `service_catalog` | 4 | Service catalog tools |
+| `core_readonly` | 3 | Read-only core tools (table, record, metadata) |
 | `none` | 0 | Only `list_tool_packages` -- minimal/testing |
 
 ### Custom Packages
@@ -492,10 +489,10 @@ Control which tools are loaded using the `MCP_TOOL_PACKAGE` environment variable
 You can also specify a comma-separated list of tool group names to create a custom package:
 
 ```bash
-MCP_TOOL_PACKAGE="introspection,debug,domain_incident"
+MCP_TOOL_PACKAGE="table,record,debug,domain_incident"
 ```
 
-Available tool groups: `introspection`, `relationships`, `metadata`, `changes`, `debug`, `developer`, `dev_utils`, `investigations`, `documentation`, `utility`, `workflow`, `testing`, `domain_incident`, `domain_change`, `domain_problem`, `domain_cmdb`, `domain_request`, `domain_knowledge`, `domain_service_catalog`.
+Available tool groups: `table`, `record`, `record_write`, `metadata`, `changes`, `debug`, `investigations`, `documentation`, `workflow`, `flow_designer`, `testing`, `domain_incident`, `domain_change`, `domain_problem`, `domain_cmdb`, `domain_request`, `domain_knowledge`, `domain_service_catalog`.
 
 ---
 
@@ -507,7 +504,7 @@ The server includes built-in guardrails that are always active:
 - **Sensitive field masking** -- Fields whose names match patterns like `password`, `token`, `secret`, `credential`, `api_key`, or `private_key` are masked with the literal value `***MASKED***` in responses
 - **Row limit caps** -- User-supplied `limit` parameters are capped at `MAX_ROW_LIMIT` (default 100, max 10000). If a larger value is requested, the limit is reduced and a warning is included in the response
 - **Large table protection** -- Tables listed in `LARGE_TABLE_NAMES_CSV` require date-bounded filters in queries to prevent full-table scans
-- **Write gating** -- All write operations (`record_*`, `dev_toggle`, `dev_set_property`, and domain create/update tools) are blocked when `SERVICENOW_ENV` contains "prod" or "production". There is no override - use a sub-production instance for write operations
+- **Write gating** -- All write operations (record_write tools and domain create/update tools) are blocked when `SERVICENOW_ENV` contains "prod" or "production". There is no override - use a sub-production instance for write operations
 - **Query safety** -- Structured query validation with identifier checks and internal query limits
 - **Standardized responses** -- Every tool returns a TOON-serialized envelope with `correlation_id`, `status`, and `data`, and may include `pagination` and `warnings` when applicable
 

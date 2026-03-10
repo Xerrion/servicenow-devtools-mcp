@@ -1,4 +1,4 @@
-"""Tests for record CRUD tools (record_create, record_update, record_delete + preview/apply)."""
+"""Tests for record-level write tools (record_create, record_update, record_delete, previews, record_apply)."""
 
 import json
 from typing import Any
@@ -15,6 +15,10 @@ from tests.helpers import decode_response, get_tool_functions
 
 BASE_URL = "https://test.service-now.com"
 
+# Valid 32-char hex sys_ids for tests (validate_sys_id requires this format)
+SYS_ID_INC001 = "a" * 32  # aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+SYS_ID_MISSING = "b" * 32  # bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+
 
 @pytest.fixture()
 def auth_provider(settings: Settings) -> BasicAuthProvider:
@@ -23,10 +27,10 @@ def auth_provider(settings: Settings) -> BasicAuthProvider:
 
 
 def _register_and_get_tools(settings: Settings, auth_provider: BasicAuthProvider) -> dict[str, Any]:
-    """Helper: register developer tools on a fresh MCP server and return tool map."""
+    """Helper: register record_write tools on a fresh MCP server and return tool map."""
     from mcp.server.fastmcp import FastMCP
 
-    from servicenow_mcp.tools.developer import register_tools
+    from servicenow_mcp.tools.record_write import register_tools
 
     mcp = FastMCP("test")
     register_tools(mcp, settings, auth_provider)
@@ -53,7 +57,7 @@ class TestRecordCreate:
                         "sys_id": "new001",
                         "short_description": "Test incident",
                         "state": "1",
-                        "password": "s3cret",
+                        "password": "s3cret",  # NOSONAR
                     }
                 },
             )
@@ -70,7 +74,7 @@ class TestRecordCreate:
         assert result["data"]["table"] == "incident"
         assert result["data"]["sys_id"] == "new001"
         assert result["data"]["record"]["short_description"] == "Test incident"
-        assert result["data"]["record"]["password"] == "***MASKED***"
+        assert result["data"]["record"]["password"] == "***MASKED***"  # NOSONAR
 
     @pytest.mark.asyncio()
     async def test_blocked_in_prod(self, prod_settings: Settings, prod_auth_provider: BasicAuthProvider) -> None:
@@ -136,7 +140,7 @@ class TestRecordCreate:
 
         tools = _register_and_get_tools(settings, auth_provider)
         with patch(
-            "servicenow_mcp.tools.developer.ServiceNowClient.__aenter__",
+            "servicenow_mcp.tools.record_write.ServiceNowClient.__aenter__",
             new_callable=AsyncMock,
             side_effect=RuntimeError("connection failed"),
         ):
@@ -161,7 +165,7 @@ class TestRecordPreviewCreate:
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["record_preview_create"](
             table="incident",
-            data=json.dumps({"short_description": "Test", "password": "s3cret"}),
+            data=json.dumps({"short_description": "Test", "password": "s3cret"}),  # NOSONAR
         )
         result = decode_response(raw)
 
@@ -169,7 +173,7 @@ class TestRecordPreviewCreate:
         assert "token" in result["data"]
         assert result["data"]["table"] == "incident"
         assert result["data"]["action"] == "create"
-        assert result["data"]["data"]["password"] == "***MASKED***"
+        assert result["data"]["data"]["password"] == "***MASKED***"  # NOSONAR
 
     @pytest.mark.asyncio()
     async def test_blocked_in_prod(self, prod_settings: Settings, prod_auth_provider: BasicAuthProvider) -> None:
@@ -204,14 +208,14 @@ class TestRecordUpdate:
         self, settings: Settings, auth_provider: BasicAuthProvider
     ) -> None:
         """Updates a record and returns it with sensitive fields masked."""
-        respx.patch(f"{BASE_URL}/api/now/table/incident/inc001").mock(
+        respx.patch(f"{BASE_URL}/api/now/table/incident/{SYS_ID_INC001}").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "inc001",
+                        "sys_id": SYS_ID_INC001,
                         "state": "2",
-                        "password": "s3cret",
+                        "password": "s3cret",  # NOSONAR
                     }
                 },
             )
@@ -220,15 +224,15 @@ class TestRecordUpdate:
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["record_update"](
             table="incident",
-            sys_id="inc001",
+            sys_id=SYS_ID_INC001,
             changes=json.dumps({"state": "2"}),
         )
         result = decode_response(raw)
 
         assert result["status"] == "success"
-        assert result["data"]["sys_id"] == "inc001"
+        assert result["data"]["sys_id"] == SYS_ID_INC001
         assert result["data"]["record"]["state"] == "2"
-        assert result["data"]["record"]["password"] == "***MASKED***"
+        assert result["data"]["record"]["password"] == "***MASKED***"  # NOSONAR
 
     @pytest.mark.asyncio()
     async def test_blocked_in_prod(self, prod_settings: Settings, prod_auth_provider: BasicAuthProvider) -> None:
@@ -237,7 +241,7 @@ class TestRecordUpdate:
 
         raw = await tools["record_update"](
             table="incident",
-            sys_id="inc001",
+            sys_id=SYS_ID_INC001,
             changes=json.dumps({"state": "2"}),
         )
         result = decode_response(raw)
@@ -261,14 +265,14 @@ class TestRecordUpdate:
     @respx.mock
     async def test_not_found_returns_error(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Returns error when record doesn't exist."""
-        respx.patch(f"{BASE_URL}/api/now/table/incident/missing").mock(
+        respx.patch(f"{BASE_URL}/api/now/table/incident/{SYS_ID_MISSING}").mock(
             return_value=httpx.Response(404, json={"error": {"message": "Not found"}})
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["record_update"](
             table="incident",
-            sys_id="missing",
+            sys_id=SYS_ID_MISSING,
             changes=json.dumps({"state": "2"}),
         )
         result = decode_response(raw)
@@ -278,14 +282,14 @@ class TestRecordUpdate:
     @respx.mock
     async def test_acl_denied_returns_clear_error(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Returns clear ACL error."""
-        respx.patch(f"{BASE_URL}/api/now/table/incident/inc001").mock(
+        respx.patch(f"{BASE_URL}/api/now/table/incident/{SYS_ID_INC001}").mock(
             return_value=httpx.Response(403, json={"error": {"message": "ACL denied"}})
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["record_update"](
             table="incident",
-            sys_id="inc001",
+            sys_id=SYS_ID_INC001,
             changes=json.dumps({"state": "2"}),
         )
         result = decode_response(raw)
@@ -303,12 +307,12 @@ class TestRecordPreviewUpdate:
     @respx.mock
     async def test_returns_diff_and_token(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Fetches current record and returns field-level diff with token."""
-        respx.get(f"{BASE_URL}/api/now/table/incident/inc001").mock(
+        respx.get(f"{BASE_URL}/api/now/table/incident/{SYS_ID_INC001}").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "inc001",
+                        "sys_id": SYS_ID_INC001,
                         "state": "1",
                         "short_description": "Original",
                     }
@@ -319,7 +323,7 @@ class TestRecordPreviewUpdate:
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["record_preview_update"](
             table="incident",
-            sys_id="inc001",
+            sys_id=SYS_ID_INC001,
             changes=json.dumps({"state": "2", "short_description": "Updated"}),
         )
         result = decode_response(raw)
@@ -335,13 +339,13 @@ class TestRecordPreviewUpdate:
     @respx.mock
     async def test_masks_sensitive_fields_in_diff(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Sensitive fields in the diff are masked."""
-        respx.get(f"{BASE_URL}/api/now/table/incident/inc001").mock(
+        respx.get(f"{BASE_URL}/api/now/table/incident/{SYS_ID_INC001}").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "inc001",
-                        "password": "old_password",
+                        "sys_id": SYS_ID_INC001,
+                        "password": "old_password",  # NOSONAR
                     }
                 },
             )
@@ -350,14 +354,14 @@ class TestRecordPreviewUpdate:
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["record_preview_update"](
             table="incident",
-            sys_id="inc001",
-            changes=json.dumps({"password": "new_password"}),
+            sys_id=SYS_ID_INC001,
+            changes=json.dumps({"password": "new_password"}),  # NOSONAR
         )
         result = decode_response(raw)
 
         assert result["status"] == "success"
-        assert result["data"]["diff"]["password"]["old"] == "***MASKED***"
-        assert result["data"]["diff"]["password"]["new"] == "***MASKED***"
+        assert result["data"]["diff"]["password"]["old"] == "***MASKED***"  # NOSONAR
+        assert result["data"]["diff"]["password"]["new"] == "***MASKED***"  # NOSONAR
 
     @pytest.mark.asyncio()
     async def test_blocked_in_prod(self, prod_settings: Settings, prod_auth_provider: BasicAuthProvider) -> None:
@@ -366,7 +370,7 @@ class TestRecordPreviewUpdate:
 
         raw = await tools["record_preview_update"](
             table="incident",
-            sys_id="inc001",
+            sys_id=SYS_ID_INC001,
             changes=json.dumps({"state": "2"}),
         )
         result = decode_response(raw)
@@ -383,15 +387,15 @@ class TestRecordDelete:
     @respx.mock
     async def test_deletes_record(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Deletes a record and returns confirmation."""
-        respx.delete(f"{BASE_URL}/api/now/table/incident/inc001").mock(return_value=httpx.Response(204))
+        respx.delete(f"{BASE_URL}/api/now/table/incident/{SYS_ID_INC001}").mock(return_value=httpx.Response(204))
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["record_delete"](table="incident", sys_id="inc001")
+        raw = await tools["record_delete"](table="incident", sys_id=SYS_ID_INC001)
         result = decode_response(raw)
 
         assert result["status"] == "success"
         assert result["data"]["table"] == "incident"
-        assert result["data"]["sys_id"] == "inc001"
+        assert result["data"]["sys_id"] == SYS_ID_INC001
         assert result["data"]["deleted"] is True
 
     @pytest.mark.asyncio()
@@ -399,7 +403,7 @@ class TestRecordDelete:
         """Returns error in production."""
         tools = _register_and_get_tools(prod_settings, prod_auth_provider)
 
-        raw = await tools["record_delete"](table="incident", sys_id="inc001")
+        raw = await tools["record_delete"](table="incident", sys_id=SYS_ID_INC001)
         result = decode_response(raw)
         assert result["status"] == "error"
 
@@ -417,12 +421,12 @@ class TestRecordDelete:
     @respx.mock
     async def test_not_found_returns_error(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Returns error when record doesn't exist."""
-        respx.delete(f"{BASE_URL}/api/now/table/incident/missing").mock(
+        respx.delete(f"{BASE_URL}/api/now/table/incident/{SYS_ID_MISSING}").mock(
             return_value=httpx.Response(404, json={"error": {"message": "Not found"}})
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["record_delete"](table="incident", sys_id="missing")
+        raw = await tools["record_delete"](table="incident", sys_id=SYS_ID_MISSING)
         result = decode_response(raw)
         assert result["status"] == "error"
 
@@ -430,12 +434,12 @@ class TestRecordDelete:
     @respx.mock
     async def test_acl_denied_returns_clear_error(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Returns clear ACL error on 403."""
-        respx.delete(f"{BASE_URL}/api/now/table/incident/inc001").mock(
+        respx.delete(f"{BASE_URL}/api/now/table/incident/{SYS_ID_INC001}").mock(
             return_value=httpx.Response(403, json={"error": {"message": "ACL denied"}})
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["record_delete"](table="incident", sys_id="inc001")
+        raw = await tools["record_delete"](table="incident", sys_id=SYS_ID_INC001)
         result = decode_response(raw)
         assert result["status"] == "error"
         assert "acl" in result["error"]["message"].lower()
@@ -451,37 +455,37 @@ class TestRecordPreviewDelete:
     @respx.mock
     async def test_returns_snapshot_and_token(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Fetches record and returns snapshot with preview token."""
-        respx.get(f"{BASE_URL}/api/now/table/incident/inc001").mock(
+        respx.get(f"{BASE_URL}/api/now/table/incident/{SYS_ID_INC001}").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "inc001",
+                        "sys_id": SYS_ID_INC001,
                         "short_description": "Test incident",
                         "state": "1",
-                        "password": "s3cret",
+                        "password": "s3cret",  # NOSONAR
                     }
                 },
             )
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["record_preview_delete"](table="incident", sys_id="inc001")
+        raw = await tools["record_preview_delete"](table="incident", sys_id=SYS_ID_INC001)
         result = decode_response(raw)
 
         assert result["status"] == "success"
         assert "token" in result["data"]
         assert result["data"]["table"] == "incident"
-        assert result["data"]["sys_id"] == "inc001"
+        assert result["data"]["sys_id"] == SYS_ID_INC001
         assert result["data"]["record_snapshot"]["short_description"] == "Test incident"
-        assert result["data"]["record_snapshot"]["password"] == "***MASKED***"
+        assert result["data"]["record_snapshot"]["password"] == "***MASKED***"  # NOSONAR
 
     @pytest.mark.asyncio()
     async def test_blocked_in_prod(self, prod_settings: Settings, prod_auth_provider: BasicAuthProvider) -> None:
         """Returns error in production."""
         tools = _register_and_get_tools(prod_settings, prod_auth_provider)
 
-        raw = await tools["record_preview_delete"](table="incident", sys_id="inc001")
+        raw = await tools["record_preview_delete"](table="incident", sys_id=SYS_ID_INC001)
         result = decode_response(raw)
         assert result["status"] == "error"
 
@@ -489,12 +493,12 @@ class TestRecordPreviewDelete:
     @respx.mock
     async def test_not_found_returns_error(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Returns error when record doesn't exist."""
-        respx.get(f"{BASE_URL}/api/now/table/incident/missing").mock(
+        respx.get(f"{BASE_URL}/api/now/table/incident/{SYS_ID_MISSING}").mock(
             return_value=httpx.Response(404, json={"error": {"message": "Not found"}})
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["record_preview_delete"](table="incident", sys_id="missing")
+        raw = await tools["record_preview_delete"](table="incident", sys_id=SYS_ID_MISSING)
         result = decode_response(raw)
         assert result["status"] == "error"
 
@@ -544,26 +548,26 @@ class TestRecordApply:
     async def test_apply_update(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Applies a previewed update action."""
         # Phase 1: Preview (needs GET mock for current record)
-        respx.get(f"{BASE_URL}/api/now/table/incident/inc001").mock(
+        respx.get(f"{BASE_URL}/api/now/table/incident/{SYS_ID_INC001}").mock(
             return_value=httpx.Response(
                 200,
-                json={"result": {"sys_id": "inc001", "state": "1"}},
+                json={"result": {"sys_id": SYS_ID_INC001, "state": "1"}},
             )
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
         preview_raw = await tools["record_preview_update"](
             table="incident",
-            sys_id="inc001",
+            sys_id=SYS_ID_INC001,
             changes=json.dumps({"state": "2"}),
         )
         token = decode_response(preview_raw)["data"]["token"]
 
         # Phase 2: Apply
-        respx.patch(f"{BASE_URL}/api/now/table/incident/inc001").mock(
+        respx.patch(f"{BASE_URL}/api/now/table/incident/{SYS_ID_INC001}").mock(
             return_value=httpx.Response(
                 200,
-                json={"result": {"sys_id": "inc001", "state": "2"}},
+                json={"result": {"sys_id": SYS_ID_INC001, "state": "2"}},
             )
         )
 
@@ -579,12 +583,12 @@ class TestRecordApply:
     async def test_apply_delete(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Applies a previewed delete action."""
         # Phase 1: Preview (needs GET mock)
-        respx.get(f"{BASE_URL}/api/now/table/incident/inc001").mock(
+        respx.get(f"{BASE_URL}/api/now/table/incident/{SYS_ID_INC001}").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "inc001",
+                        "sys_id": SYS_ID_INC001,
                         "short_description": "To be deleted",
                     }
                 },
@@ -592,11 +596,11 @@ class TestRecordApply:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        preview_raw = await tools["record_preview_delete"](table="incident", sys_id="inc001")
+        preview_raw = await tools["record_preview_delete"](table="incident", sys_id=SYS_ID_INC001)
         token = decode_response(preview_raw)["data"]["token"]
 
         # Phase 2: Apply
-        respx.delete(f"{BASE_URL}/api/now/table/incident/inc001").mock(return_value=httpx.Response(204))
+        respx.delete(f"{BASE_URL}/api/now/table/incident/{SYS_ID_INC001}").mock(return_value=httpx.Response(204))
 
         raw = await tools["record_apply"](preview_token=token)
         result = decode_response(raw)
@@ -662,7 +666,7 @@ class TestRecordApply:
                     "result": {
                         "sys_id": "new001",
                         "short_description": "Test",
-                        "password": "s3cret",
+                        "password": "s3cret",  # NOSONAR
                     }
                 },
             )
@@ -672,7 +676,7 @@ class TestRecordApply:
         result = decode_response(raw)
 
         assert result["status"] == "success"
-        assert result["data"]["record"]["password"] == "***MASKED***"
+        assert result["data"]["record"]["password"] == "***MASKED***"  # NOSONAR
 
     @pytest.mark.asyncio()
     @respx.mock

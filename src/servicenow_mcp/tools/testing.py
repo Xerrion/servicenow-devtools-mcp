@@ -187,6 +187,17 @@ def _compute_trend(records: list[dict[str, Any]]) -> str:
     return "stable"
 
 
+TOOL_NAMES: list[str] = [
+    "atf_list_tests",
+    "atf_get_test",
+    "atf_list_suites",
+    "atf_get_results",
+    "atf_run_test",
+    "atf_run_suite",
+    "atf_test_health",
+]
+
+
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
     """Register ATF (Automated Test Framework) tools on the MCP server."""
     query_store: QueryTokenStore = get_query_store(mcp)

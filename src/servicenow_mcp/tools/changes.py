@@ -42,6 +42,14 @@ def _normalize_release_notes_format(_format_value: str) -> str:
     return "markdown"
 
 
+TOOL_NAMES: list[str] = [
+    "changes_updateset_inspect",
+    "changes_diff_artifact",
+    "changes_last_touched",
+    "changes_release_notes",
+]
+
+
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
     """Register change intelligence tools on the MCP server."""
 

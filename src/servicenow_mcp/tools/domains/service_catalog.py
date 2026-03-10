@@ -13,6 +13,22 @@ from servicenow_mcp.policy import write_gate
 from servicenow_mcp.utils import format_response
 
 
+TOOL_NAMES: list[str] = [
+    "sc_catalogs_list",
+    "sc_catalog_get",
+    "sc_categories_list",
+    "sc_category_get",
+    "sc_items_list",
+    "sc_item_get",
+    "sc_item_variables",
+    "sc_order_now",
+    "sc_add_to_cart",
+    "sc_cart_get",
+    "sc_cart_submit",
+    "sc_cart_checkout",
+]
+
+
 def register_tools(
     mcp: FastMCP,
     settings: Settings,

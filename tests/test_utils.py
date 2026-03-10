@@ -7,7 +7,15 @@ from unittest.mock import patch
 import pytest
 
 from servicenow_mcp.errors import ForbiddenError
-from servicenow_mcp.utils import ServiceNowQuery, safe_tool_call, serialize
+from servicenow_mcp.utils import (
+    ServiceNowQuery,
+    resolve_ref_value,
+    safe_tool_call,
+    sanitize_query_value,
+    serialize,
+    validate_identifier,
+    validate_sys_id,
+)
 from tests.helpers import decode_response
 
 
@@ -984,3 +992,145 @@ class TestSafeToolCall:
         assert isinstance(parsed["error"], dict)
         assert "something broke" in parsed["error"]["message"]
         assert parsed["correlation_id"] == "test-corr-id"
+
+
+# ---------------------------------------------------------------------------
+# resolve_ref_value
+# ---------------------------------------------------------------------------
+
+
+class TestResolveRefValue:
+    """Tests for the resolve_ref_value helper that coerces SN reference fields to strings."""
+
+    def test_string_passthrough(self) -> None:
+        """Plain strings are returned unchanged."""
+        assert resolve_ref_value("abc123") == "abc123"
+
+    def test_empty_string(self) -> None:
+        """Empty strings are returned unchanged."""
+        assert resolve_ref_value("") == ""
+
+    def test_dict_with_display_value_only(self) -> None:
+        """Dicts with only display_value fall back to it when value is absent."""
+        val = {"display_value": "My Workflow", "link": "https://instance.service-now.com/api/..."}
+        assert resolve_ref_value(val) == "My Workflow"
+
+    def test_dict_with_value_only(self) -> None:
+        """Dicts with only value return it directly."""
+        val = {"value": "abc123", "link": "https://instance.service-now.com/api/..."}
+        assert resolve_ref_value(val) == "abc123"
+
+    def test_dict_with_neither(self) -> None:
+        """Dicts with neither display_value nor value return empty string."""
+        val = {"link": "https://instance.service-now.com/api/..."}
+        assert resolve_ref_value(val) == ""
+
+    def test_dict_value_preferred_over_display_value(self) -> None:
+        """Raw sys_id ('value') takes precedence over 'display_value' for ID-based lookups."""
+        val = {"display_value": "Display Name", "value": "sys_id_abc"}
+        assert resolve_ref_value(val) == "sys_id_abc"
+
+    def test_none_returns_empty(self) -> None:
+        """None is coerced to empty string."""
+        assert resolve_ref_value(None) == ""
+
+    def test_integer_returns_str(self) -> None:
+        """Integers are coerced via str()."""
+        assert resolve_ref_value(42) == "42"
+
+    def test_dict_with_empty_display_value_falls_back(self) -> None:
+        """Empty display_value falls through to value key."""
+        val = {"display_value": "", "value": "fallback_id"}
+        assert resolve_ref_value(val) == "fallback_id"
+
+    def test_dict_with_empty_value_falls_back_to_display_value(self) -> None:
+        """Empty value falls through to display_value key."""
+        val = {"value": "", "display_value": "Human Label"}
+        assert resolve_ref_value(val) == "Human Label"
+
+    def test_resolve_ref_value_prefers_value_over_display_value(self) -> None:
+        """Ensure raw sys_id ('value') is preferred over 'display_value' for ID-based lookups."""
+        result = resolve_ref_value({"value": "abc123", "display_value": "Human Label"})
+        assert result == "abc123"
+
+
+# ---------------------------------------------------------------------------
+# validate_identifier - dict coercion
+# ---------------------------------------------------------------------------
+
+
+class TestValidateIdentifierDictCoercion:
+    """Tests that validate_identifier defensively coerces dict reference fields."""
+
+    def test_dict_with_valid_display_value(self) -> None:
+        """Dict containing a valid identifier in display_value is accepted."""
+        ref = {"display_value": "sys_user", "link": "https://instance.service-now.com/api/..."}
+        # Should not raise
+        validate_identifier(ref)
+
+    def test_dict_with_invalid_display_value_raises(self) -> None:
+        """Dict containing an invalid identifier still raises ValueError."""
+        ref = {"display_value": "INVALID IDENTIFIER!", "link": "https://instance.service-now.com/api/..."}
+        with pytest.raises(ValueError, match="Invalid identifier"):
+            validate_identifier(ref)
+
+    def test_none_raises(self) -> None:
+        """None is coerced to empty string which fails validation."""
+        with pytest.raises(ValueError, match="Invalid identifier"):
+            validate_identifier(None)
+
+
+# ---------------------------------------------------------------------------
+# sanitize_query_value - dict coercion
+# ---------------------------------------------------------------------------
+
+
+class TestSanitizeQueryValueDictCoercion:
+    """Tests that sanitize_query_value defensively coerces dict reference fields."""
+
+    def test_dict_with_display_value(self) -> None:
+        """Dict containing a display_value is resolved before sanitizing."""
+        ref = {"display_value": "some^value", "link": "https://instance.service-now.com/api/..."}
+        result = sanitize_query_value(ref)
+        assert result == "some^^value"
+
+    def test_dict_without_caret(self) -> None:
+        """Dict resolved to a value without carets passes through."""
+        ref = {"display_value": "clean_value"}
+        result = sanitize_query_value(ref)
+        assert result == "clean_value"
+
+    def test_none_returns_empty(self) -> None:
+        """None is coerced to empty string."""
+        result = sanitize_query_value(None)
+        assert result == ""
+
+
+# ---------------------------------------------------------------------------
+# validate_sys_id
+# ---------------------------------------------------------------------------
+
+
+class TestValidateSysId:
+    """Tests for validate_sys_id (32-char hex sys_id validation)."""
+
+    def test_valid_sys_id(self) -> None:
+        # Should not raise
+        validate_sys_id("a" * 32)
+        validate_sys_id("0123456789abcdef" * 2)
+
+    def test_invalid_sys_id_too_short(self) -> None:
+        with pytest.raises(ValueError, match="Invalid sys_id"):
+            validate_sys_id("abc123")
+
+    def test_invalid_sys_id_uppercase(self) -> None:
+        with pytest.raises(ValueError, match="Invalid sys_id"):
+            validate_sys_id("A" * 32)
+
+    def test_invalid_sys_id_with_special_chars(self) -> None:
+        with pytest.raises(ValueError, match="Invalid sys_id"):
+            validate_sys_id("a" * 31 + "!")
+
+    def test_empty_string(self) -> None:
+        with pytest.raises(ValueError, match="Invalid sys_id"):
+            validate_sys_id("")

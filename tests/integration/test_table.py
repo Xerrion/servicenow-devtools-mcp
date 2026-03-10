@@ -1,4 +1,4 @@
-"""Integration tests for introspection tools against a live ServiceNow instance."""
+"""Integration tests for table tools against a live ServiceNow instance."""
 
 import pytest
 
@@ -10,8 +10,8 @@ from servicenow_mcp.config import Settings
 pytestmark = pytest.mark.integration
 
 
-class TestIntrospection:
-    """Test table introspection operations on a live instance."""
+class TestTableIntegration:
+    """Test table operations on a live instance."""
 
     async def test_table_describe_returns_fields(self, live_settings: Settings, live_auth: BasicAuthProvider) -> None:
         """table_describe: fetch field metadata for the incident table."""
@@ -40,13 +40,13 @@ class TestIntrospection:
         assert len(result["records"]) > 0, "No active incidents found"
         assert "count" in result
 
-    async def test_table_get_fetches_single_record(
+    async def test_record_get_fetches_single_record(
         self,
         live_settings: Settings,
         live_auth: BasicAuthProvider,
         incident_sys_id: str | None,
     ) -> None:
-        """table_get: fetch a single incident by sys_id."""
+        """record_get: fetch a single incident by sys_id."""
         if not incident_sys_id:
             pytest.skip("No incident found on instance")
 

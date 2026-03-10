@@ -1,4 +1,4 @@
-"""Utility tools for query building and helper operations."""
+"""Table introspection and query tools."""
 
 import json
 import logging
@@ -7,19 +7,31 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 
 from servicenow_mcp.auth import BasicAuthProvider
+from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.config import Settings
+from servicenow_mcp.decorators import tool_handler
 from servicenow_mcp.mcp_state import get_query_store
+from servicenow_mcp.policy import (
+    check_table_access,
+    enforce_query_safety,
+    mask_audit_entry,
+    mask_sensitive_fields,
+)
 from servicenow_mcp.state import QueryTokenStore
 from servicenow_mcp.utils import (
     ServiceNowQuery,
     format_response,
-    generate_correlation_id,
+    resolve_query_token,
+    validate_identifier,
 )
 
 
 logger = logging.getLogger(__name__)
 
-# Map of operator names to ServiceNowQuery method signatures
+# ---------------------------------------------------------------------------
+# build_query operator constants
+# ---------------------------------------------------------------------------
+
 _UNARY_OPERATORS = {
     "is_empty",
     "is_not_empty",
@@ -71,6 +83,10 @@ _ALL_VALID_OPERATORS = sorted(
     | _FIELD_OPERATORS
     | {"order_by", "between", "datepart", "new_query", "rl_query"}
 )
+
+# ---------------------------------------------------------------------------
+# build_query private helpers
+# ---------------------------------------------------------------------------
 
 
 def _require_value(
@@ -313,13 +329,241 @@ def _apply_condition(
     return handler(query, field, operator, condition, correlation_id)
 
 
+def _build_query_impl(
+    conditions_list: list[Any],
+    query_store: QueryTokenStore,
+    correlation_id: str,
+) -> str:
+    """Process a parsed conditions list and return a formatted TOON response.
+
+    Iterates over each condition dict, applies it to a ``ServiceNowQuery``,
+    stores the built query string in *query_store*, and returns the serialized
+    response.
+    """
+    query = ServiceNowQuery()
+    for idx, condition in enumerate(conditions_list):
+        if not isinstance(condition, dict):
+            return format_response(
+                data=None,
+                correlation_id=correlation_id,
+                status="error",
+                error=f"conditions[{idx}] must be a JSON object, got {type(condition).__name__}",
+            )
+        err = _apply_condition(query, condition, correlation_id)
+        if err:
+            return err
+
+    built = query.build()
+    query_token = query_store.create({"query": built})
+    return format_response(
+        data={"query": built, "query_token": query_token},
+        correlation_id=correlation_id,
+    )
+
+
+def _build_field_list(columns: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Build the field metadata list from sys_dictionary entries and documentation."""
+    fields: list[dict[str, Any]] = []
+    for col in columns:
+        # Start with full original entry, ensure key defaults exist
+        field_info = dict(col)  # shallow copy to avoid mutating original
+        field_info.setdefault("element", "")
+        field_info.setdefault("internal_type", "")
+        field_info.setdefault("max_length", "")
+        field_info.setdefault("mandatory", "false")
+        field_info.setdefault("reference", "")
+        field_info.setdefault("column_label", "")
+        field_info.setdefault("default_value", "")
+        fields.append(field_info)
+    return fields
+
+
+# ---------------------------------------------------------------------------
+# Tool registration
+# ---------------------------------------------------------------------------
+
+TOOL_NAMES: list[str] = [
+    "table_describe",
+    "table_query",
+    "table_aggregate",
+    "build_query",
+]
+
+
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
-    """Register utility tools on the MCP server."""
-    _ = settings, auth_provider  # Required by register_tools interface contract
+    """Register table introspection and query tools on the MCP server."""
     query_store: QueryTokenStore = get_query_store(mcp)
 
     @mcp.tool()
-    def build_query(conditions: str) -> str:
+    @tool_handler
+    async def table_describe(table: str, *, correlation_id: str = "") -> str:
+        """Return dictionary metadata for a table: fields, types, references, choices and attributes.
+
+        Args:
+            table: The ServiceNow table name (e.g., 'incident', 'sys_user').
+        """
+        validate_identifier(table)
+        check_table_access(table)
+        async with ServiceNowClient(settings, auth_provider) as client:
+            metadata = await client.get_metadata(table)
+
+            # Fetch table-level metadata from sys_db_object
+            table_meta = await client.query_records(
+                "sys_db_object",
+                ServiceNowQuery().equals("name", table).build(),
+                fields=["label", "super_class", "is_extendable", "number_ref", "sys_id"],
+                limit=1,
+            )
+            table_info = table_meta.get("records", [{}])[0] if table_meta.get("records") else {}
+
+            # Fetch field documentation from sys_documentation
+            docs_result = await client.query_records(
+                "sys_documentation",
+                ServiceNowQuery().equals("name", table).build(),
+                fields=["element", "label", "help", "hint", "url"],
+                limit=500,
+            )
+            docs = {d["element"]: d for d in docs_result.get("records", []) if d.get("element")}
+
+            doc_warnings: list[str] = []
+            if len(docs_result.get("records", [])) >= 500:
+                doc_warnings.append("Documentation records may be truncated at 500 entries")
+
+        fields = _build_field_list(metadata)
+
+        return format_response(
+            data={
+                "table": table_info,
+                "fields": fields,
+                "field_count": len(fields),
+                "documentation": docs,
+            },
+            correlation_id=correlation_id,
+            warnings=doc_warnings or None,
+        )
+
+    @mcp.tool()
+    @tool_handler
+    async def table_query(
+        table: str,
+        query_token: str = "",
+        fields: str = "",
+        limit: int = 100,
+        offset: int = 0,
+        order_by: str = "",
+        display_values: bool = False,
+        *,
+        correlation_id: str = "",
+    ) -> str:
+        """Query any table with filter conditions, returning matching records.
+
+        Args:
+            table: The ServiceNow table name.
+            query_token: Token from the build_query tool representing a ServiceNow encoded query.
+                Use build_query to create a query first, then pass the returned query_token here.
+                Leave empty for no filter.
+            fields: Comma-separated list of fields to return (empty for all).
+            limit: Maximum number of records to return (capped by policy).
+            offset: Number of records to skip for pagination.
+            order_by: Field to sort results by (empty for default).
+            display_values: If True, return display values instead of raw values.
+        """
+        warnings: list[str] = []
+
+        query = resolve_query_token(query_token, query_store, correlation_id)
+        validate_identifier(table)
+        check_table_access(table)
+        safety = enforce_query_safety(table, query, limit, settings)
+        effective_limit = safety["limit"]
+        if effective_limit < limit:
+            warnings.append(f"Limit capped at {effective_limit}")
+
+        field_list = [f.strip() for f in fields.split(",") if f.strip()] if fields else None
+        order = order_by or None
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            result = await client.query_records(
+                table,
+                query,
+                fields=field_list,
+                limit=effective_limit,
+                offset=offset,
+                order_by=order,
+                display_values=display_values,
+            )
+
+        # Mask sensitive fields in each record
+        if table == "sys_audit":
+            masked_records = [mask_audit_entry(r) for r in result["records"]]
+        else:
+            masked_records = [mask_sensitive_fields(r) for r in result["records"]]
+
+        return format_response(
+            data=masked_records,
+            correlation_id=correlation_id,
+            pagination={
+                "offset": offset,
+                "limit": effective_limit,
+                "total": result["count"],
+            },
+            warnings=warnings or None,
+        )
+
+    @mcp.tool()
+    @tool_handler
+    async def table_aggregate(
+        table: str,
+        query_token: str = "",
+        group_by: str = "",
+        avg_fields: str = "",
+        min_fields: str = "",
+        max_fields: str = "",
+        sum_fields: str = "",
+        *,
+        correlation_id: str = "",
+    ) -> str:
+        """Compute aggregate statistics for a table (counts, min, max, avg, sum).
+
+        Count is always included. For field-specific stats, provide comma-separated
+        field names (e.g. avg_fields="priority,impact").
+
+        Args:
+            table: The ServiceNow table name.
+            query_token: Token from the build_query tool representing a ServiceNow encoded query.
+                Use build_query to create a query first, then pass the returned query_token here.
+                Leave empty for no filter.
+            group_by: Field to group results by (empty for no grouping).
+            avg_fields: Comma-separated fields to compute average for.
+            min_fields: Comma-separated fields to compute minimum for.
+            max_fields: Comma-separated fields to compute maximum for.
+            sum_fields: Comma-separated fields to compute sum for.
+        """
+        query = resolve_query_token(query_token, query_store, correlation_id)
+        validate_identifier(table)
+        check_table_access(table)
+        enforce_query_safety(table, query, None, settings)
+        group = group_by or None
+
+        def _split(s: str) -> list[str] | None:
+            parts = [p.strip() for p in s.split(",") if p.strip()]
+            return parts or None
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            result = await client.aggregate(
+                table,
+                query,
+                group_by=group,
+                avg_fields=_split(avg_fields),
+                min_fields=_split(min_fields),
+                max_fields=_split(max_fields),
+                sum_fields=_split(sum_fields),
+            )
+
+        return format_response(data=result, correlation_id=correlation_id)
+
+    @mcp.tool()
+    @tool_handler
+    async def build_query(conditions: str, correlation_id: str = "") -> str:
         """Build a ServiceNow encoded query string from a JSON array of conditions.
 
         Each condition is an object with:
@@ -355,37 +599,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         Returns a response containing both the built query string and a query_token.
         The query_token must be passed to other tools that accept query parameters.
         """
-        correlation_id = generate_correlation_id()
         try:
             parsed = json.loads(conditions)
-            if not isinstance(parsed, list):
-                return format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error="conditions must be a JSON array",
-                )
-
-            query = ServiceNowQuery()
-            for idx, condition in enumerate(parsed):
-                if not isinstance(condition, dict):
-                    return format_response(
-                        data=None,
-                        correlation_id=correlation_id,
-                        status="error",
-                        error=f"conditions[{idx}] must be a JSON object, got {type(condition).__name__}",
-                    )
-                err = _apply_condition(query, condition, correlation_id)
-                if err:
-                    return err
-
-            built = query.build()
-            query_token = query_store.create({"query": built})
-            return format_response(
-                data={"query": built, "query_token": query_token},
-                correlation_id=correlation_id,
-            )
-
         except json.JSONDecodeError as e:
             return format_response(
                 data=None,
@@ -393,10 +608,13 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 status="error",
                 error=f"Invalid JSON: {e}",
             )
-        except Exception as e:
+
+        if not isinstance(parsed, list):
             return format_response(
                 data=None,
                 correlation_id=correlation_id,
                 status="error",
-                error=str(e),
+                error="conditions must be a JSON array",
             )
+
+        return _build_query_impl(parsed, query_store, correlation_id)

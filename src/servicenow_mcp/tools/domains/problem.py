@@ -26,6 +26,15 @@ from servicenow_mcp.tools.domains._helpers import (
 from servicenow_mcp.utils import ServiceNowQuery, format_response
 
 
+TOOL_NAMES: list[str] = [
+    "problem_list",
+    "problem_get",
+    "problem_create",
+    "problem_update",
+    "problem_root_cause",
+]
+
+
 def register_tools(
     mcp: FastMCP,
     settings: Settings,

@@ -14,6 +14,12 @@ from servicenow_mcp.policy import check_table_access
 from servicenow_mcp.utils import format_response, validate_identifier
 
 
+TOOL_NAMES: list[str] = [
+    "investigate_run",
+    "investigate_explain",
+]
+
+
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
     """Register investigation dispatcher tools on the MCP server."""
 
