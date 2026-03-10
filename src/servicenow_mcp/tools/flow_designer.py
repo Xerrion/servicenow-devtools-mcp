@@ -567,6 +567,25 @@ def _detect_cycles(
     cycles: list[list[str]] = []
     path: list[str] = []
 
+    def _process_neighbor(
+        neighbor: str,
+        color: dict[str, int],
+        path: list[str],
+        stack: list[tuple[str, int]],
+        cycles: list[list[str]],
+        adjacency: dict[str, list[str]],
+    ) -> None:
+        """Handle a single neighbor during DFS: detect back-edges or push for exploration."""
+        if neighbor not in color:
+            return
+        if color[neighbor] == GRAY:
+            cycle_start = path.index(neighbor)
+            cycles.append(path[cycle_start:])
+        elif color[neighbor] == WHITE:
+            color[neighbor] = GRAY
+            path.append(neighbor)
+            stack.append((neighbor, 0))
+
     for activity in activities:
         start = resolve_ref_value(activity["sys_id"])
         if color.get(start) != WHITE:
@@ -580,19 +599,12 @@ def _detect_cycles(
             if idx < len(neighbors):
                 stack[-1] = (node, idx + 1)
                 neighbor = neighbors[idx]
-                if neighbor not in color:
-                    continue
-                if color[neighbor] == GRAY:
-                    cycle_start = path.index(neighbor)
-                    cycles.append(path[cycle_start:])
-                elif color[neighbor] == WHITE:
-                    color[neighbor] = GRAY
-                    path.append(neighbor)
-                    stack.append((neighbor, 0))
+                _process_neighbor(neighbor, color, path, stack, cycles, adjacency)
             else:
                 stack.pop()
-                path.pop()
                 color[node] = BLACK
+                if path and path[-1] == node:
+                    path.pop()
 
     return cycles, activity_name_lookup
 
