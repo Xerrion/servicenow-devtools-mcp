@@ -59,6 +59,14 @@ def _resolve_artifact_table(artifact_type: str) -> str:
     return table
 
 
+TOOL_NAMES: list[str] = [
+    "meta_list_artifacts",
+    "meta_get_artifact",
+    "meta_find_references",
+    "meta_what_writes",
+]
+
+
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
     """Register metadata tools on the MCP server."""
     query_store: QueryTokenStore = get_query_store(mcp)

@@ -145,6 +145,17 @@ def _build_update_diff(
     return diff
 
 
+TOOL_NAMES: list[str] = [
+    "record_create",
+    "record_preview_create",
+    "record_update",
+    "record_preview_update",
+    "record_delete",
+    "record_preview_delete",
+    "record_apply",
+]
+
+
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
     """Register record write operation tools on the MCP server."""
 

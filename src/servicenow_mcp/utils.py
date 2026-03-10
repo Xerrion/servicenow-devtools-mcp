@@ -81,7 +81,7 @@ def resolve_ref_value(val: Any) -> str:
     if isinstance(val, str):
         return val
     if isinstance(val, dict):
-        return str(val.get("display_value") or val.get("value") or "")
+        return str(val.get("value") or val.get("display_value") or "")
     if val is None:
         return ""
     return str(val)

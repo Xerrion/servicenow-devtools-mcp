@@ -27,6 +27,15 @@ def _collect_non_empty(**fields: str) -> dict[str, str]:
     return {k: stripped for k, v in fields.items() if (stripped := v.strip())}
 
 
+TOOL_NAMES: list[str] = [
+    "knowledge_search",
+    "knowledge_get",
+    "knowledge_create",
+    "knowledge_update",
+    "knowledge_feedback",
+]
+
+
 def register_tools(
     mcp: FastMCP,
     settings: Settings,

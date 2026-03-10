@@ -473,8 +473,88 @@ def _build_manual_migration_instructions(
     }
 
 
-def _detect_cycles(activities: list[dict[str, Any]], transitions: list[dict[str, Any]]) -> list[list[str]]:
-    """Detect cycles in a workflow graph using iterative DFS with 3-color marking."""
+async def _fetch_topology(
+    workflow_version_sys_id: str,
+    client: ServiceNowClient,
+    settings: Settings,
+) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
+    """Fetch the workflow version record, activities, and transitions from ServiceNow.
+
+    Validates table access and enforces query safety before issuing the three
+    parallel API calls.
+
+    Args:
+        workflow_version_sys_id: The sys_id of the wf_workflow_version record.
+        client: An already-opened ServiceNowClient.
+        settings: Server settings for query safety limits.
+
+    Returns:
+        A tuple of (version_record, activities, transitions).
+    """
+    check_table_access("wf_workflow_version")
+    check_table_access("wf_activity")
+    check_table_access("wf_transition")
+
+    act_query = ServiceNowQuery().equals("workflow_version", workflow_version_sys_id).order_by("x").build()
+    trans_query = ServiceNowQuery().equals("from.workflow_version", workflow_version_sys_id).build()
+
+    act_safety = enforce_query_safety("wf_activity", act_query, 200, settings)
+    trans_safety = enforce_query_safety("wf_transition", trans_query, 500, settings)
+
+    version_record, activity_result, transition_result = await asyncio.gather(
+        client.get_record("wf_workflow_version", workflow_version_sys_id, display_values=True),
+        client.query_records(
+            "wf_activity",
+            act_query,
+            fields=[
+                "sys_id",
+                "name",
+                "activity_definition",
+                FIELD_ACTIVITY_DEF_NAME,
+                "activity_definition.category",
+                "x",
+                "y",
+                "timeout",
+                "notes",
+            ],
+            limit=act_safety["limit"],
+            display_values=True,
+        ),
+        client.query_records(
+            "wf_transition",
+            trans_query,
+            fields=[
+                "sys_id",
+                "from",
+                "from.name",
+                "to",
+                FIELD_TO_NAME,
+                "condition",
+            ],
+            limit=trans_safety["limit"],
+            display_values=True,
+        ),
+    )
+
+    return version_record, activity_result["records"], transition_result["records"]
+
+
+def _detect_cycles(
+    activities: list[dict[str, Any]],
+    transitions: list[dict[str, Any]],
+) -> tuple[list[list[str]], dict[str, str]]:
+    """Detect cycles in a workflow graph and build the activity name lookup.
+
+    Uses iterative DFS with 3-color marking to find back-edges.
+
+    Returns:
+        A tuple of (cycles, activity_name_lookup) where activity_name_lookup
+        maps each activity sys_id to its display name.
+    """
+    activity_name_lookup: dict[str, str] = {
+        resolve_ref_value(a["sys_id"]): resolve_ref_value(a.get("name", "")) for a in activities
+    }
+
     adjacency: dict[str, list[str]] = {}
     for t in transitions:
         src = resolve_ref_value(t.get("from", ""))
@@ -514,18 +594,36 @@ def _detect_cycles(activities: list[dict[str, Any]], transitions: list[dict[str,
                 path.pop()
                 color[node] = BLACK
 
-    return cycles
+    return cycles, activity_name_lookup
 
 
-async def _fetch_activity_variables(
-    client: ServiceNowClient,
+async def _extract_activity_scripts(
     activity_sys_ids: list[str],
+    activities: list[dict[str, Any]],
+    client: ServiceNowClient,
     settings: Settings,
-) -> dict[str, list[dict[str, Any]]]:
-    """Fetch sys_variable_value records grouped by activity sys_id."""
+) -> tuple[dict[str, list[dict[str, Any]]], list[dict[str, str]]]:
+    """Fetch activity variables and extract embedded script bodies.
+
+    Combines the variable fetch from sys_variable_value with script body
+    extraction into a single helper.
+
+    Args:
+        activity_sys_ids: sys_ids of the activities to fetch variables for.
+        activities: The full activity records (needed for name resolution in extracted scripts).
+        client: An already-opened ServiceNowClient.
+        settings: Server settings for query safety limits.
+
+    Returns:
+        A tuple of (vars_by_activity, extracted_scripts) where vars_by_activity
+        groups variable records by activity sys_id, and extracted_scripts contains
+        script bodies found in those variables.
+    """
+    check_table_access("sys_variable_value")
+
     vars_by_activity: dict[str, list[dict[str, Any]]] = {}
     if not activity_sys_ids:
-        return vars_by_activity
+        return vars_by_activity, []
 
     vars_query = ServiceNowQuery().equals("document", "wf_activity").in_list("document_key", activity_sys_ids).build()
     vars_safety = enforce_query_safety("sys_variable_value", vars_query, INTERNAL_QUERY_LIMIT, settings)
@@ -540,16 +638,46 @@ async def _fetch_activity_variables(
         key = resolve_ref_value(v.get("document_key", ""))
         vars_by_activity.setdefault(key, []).append(mask_sensitive_fields(v))
 
-    return vars_by_activity
+    # Extract embedded script bodies from the fetched variables.
+    extracted_scripts: list[dict[str, str]] = []
+    for a in activities:
+        for var in vars_by_activity.get(resolve_ref_value(a["sys_id"]), []):
+            val = resolve_ref_value(var.get("value", ""))
+            var_name = resolve_ref_value(var.get("variable", "")).lower().strip()
+            if _is_script_content(var_name, val):
+                extracted_scripts.append(
+                    mask_sensitive_fields(
+                        {
+                            "activity_name": resolve_ref_value(a.get("name", "")),
+                            "activity_sys_id": resolve_ref_value(a["sys_id"]),
+                            "variable_name": resolve_ref_value(var.get("variable", "")),
+                            "script_body": val,
+                        }
+                    )
+                )
+
+    return vars_by_activity, extracted_scripts
 
 
-def _map_activities(
+def _assemble_migration_response(
     activities: list[dict[str, Any]],
+    transitions: list[dict[str, Any]],
+    cycles: list[list[str]],
+    activity_name_lookup: dict[str, str],
     vars_by_activity: dict[str, list[dict[str, Any]]],
-) -> list[dict[str, Any]]:
-    """Map legacy activity types to Flow Designer equivalents and score scripts."""
-    activity_mapping: list[dict[str, Any]] = []
+    extracted_scripts: list[dict[str, str]],
+    version_record: dict[str, Any],
+) -> dict[str, Any]:
+    """Build the complete migration analysis response from pre-fetched data.
 
+    Maps activities, computes complexity metrics, identifies migration blockers,
+    generates recommendations, and assembles manual migration instructions.
+
+    Returns:
+        The full response dict suitable for format_response(data=...).
+    """
+    # Map legacy activity types to Flow Designer equivalents.
+    activity_mapping: list[dict[str, Any]] = []
     for a in activities:
         definition_name = resolve_ref_value(a.get(FIELD_ACTIVITY_DEF_NAME, "")).lower().strip()
         mapped = ACTIVITY_TYPE_MAPPING.get(definition_name, FD_UNKNOWN)
@@ -577,17 +705,17 @@ def _map_activities(
             }
         )
 
-    return activity_mapping
+    # Derive complexity metrics.
+    unmapped_names = [
+        m["activity_name"] or m["legacy_type"]
+        for m in activity_mapping
+        if m["flow_designer_equivalent"] in {FD_UNKNOWN, FD_MANUAL_REFACTOR}
+    ]
+    script_penalty = sum(1 for m in activity_mapping if m["has_script"] and m["script_line_count"] > 10)
+    complexity_score = len(activities) + (len(cycles) * 2) + script_penalty + len(unmapped_names)
 
-
-def _build_migration_blockers(
-    cycles: list[list[str]],
-    activity_mapping: list[dict[str, Any]],
-    activity_name_lookup: dict[str, str],
-) -> list[dict[str, Any]]:
-    """Build the list of migration blockers from cycles and unmapped activities."""
+    # Build migration blockers.
     migration_blockers: list[dict[str, Any]] = []
-
     for cycle in cycles:
         cycle_names = [activity_name_lookup.get(sid, sid) for sid in cycle]
         migration_blockers.append(
@@ -597,7 +725,6 @@ def _build_migration_blockers(
                 "activities_involved": cycle,
             }
         )
-
     for mapping in activity_mapping:
         if mapping["flow_designer_equivalent"] in {FD_MANUAL_REFACTOR, FD_UNKNOWN}:
             migration_blockers.append(
@@ -611,15 +738,7 @@ def _build_migration_blockers(
                 }
             )
 
-    return migration_blockers
-
-
-def _build_recommendations(
-    cycles: list[list[str]],
-    script_penalty: int,
-    unmapped_names: list[str],
-) -> list[str]:
-    """Build migration recommendation strings."""
+    # Build recommendations.
     recommendations: list[str] = []
     if cycles:
         recommendations.append("Refactor cyclic paths into Do Until loops or Subflows")
@@ -630,31 +749,61 @@ def _build_recommendations(
             f"Activities {', '.join(unmapped_names)} have no direct Flow Designer equivalent - manual redesign required"
         )
     recommendations.append("Test migrated flow with same trigger conditions as original workflow")
-    return recommendations
+
+    workflow_name = resolve_ref_value(version_record.get("name", ""))
+    workflow_table = resolve_ref_value(version_record.get("table", ""))
+    workflow_condition = resolve_ref_value(version_record.get("condition", ""))
+
+    return {
+        "workflow": {
+            "name": workflow_name,
+            "table": workflow_table,
+            "condition": workflow_condition,
+            "activity_count": len(activities),
+            "transition_count": len(transitions),
+        },
+        "topology": {
+            "activities": [mask_sensitive_fields(a) for a in activities],
+            "transitions": [mask_sensitive_fields(t) for t in transitions],
+            "cycles": cycles,
+        },
+        "migration_blockers": migration_blockers,
+        "activity_mapping": activity_mapping,
+        "extracted_scripts": extracted_scripts,
+        "complexity": {
+            "score": complexity_score,
+            "breakdown": {
+                "base_activities": len(activities),
+                "cycle_penalty": len(cycles) * 2,
+                "script_penalty": script_penalty,
+                "unmapped_penalty": len(unmapped_names),
+            },
+        },
+        "recommendations": recommendations,
+        "manual_migration_instructions": _build_manual_migration_instructions(
+            workflow_name,
+            workflow_table,
+            workflow_condition,
+            activities,
+            transitions,
+            cycles,
+            migration_blockers,
+            activity_mapping,
+            extracted_scripts,
+        ),
+    }
 
 
-def _extract_script_bodies(
-    activities: list[dict[str, Any]],
-    vars_by_activity: dict[str, list[dict[str, Any]]],
-) -> list[dict[str, str]]:
-    """Extract embedded script bodies from activity variables for reference."""
-    extracted_scripts: list[dict[str, str]] = []
-    for a in activities:
-        for var in vars_by_activity.get(resolve_ref_value(a["sys_id"]), []):
-            val = resolve_ref_value(var.get("value", ""))
-            var_name = resolve_ref_value(var.get("variable", "")).lower().strip()
-            if _is_script_content(var_name, val):
-                extracted_scripts.append(
-                    mask_sensitive_fields(
-                        {
-                            "activity_name": resolve_ref_value(a.get("name", "")),
-                            "activity_sys_id": resolve_ref_value(a["sys_id"]),
-                            "variable_name": resolve_ref_value(var.get("variable", "")),
-                            "script_body": val,
-                        }
-                    )
-                )
-    return extracted_scripts
+TOOL_NAMES: list[str] = [
+    "flow_list",
+    "flow_get",
+    "flow_map",
+    "flow_action_detail",
+    "flow_execution_list",
+    "flow_execution_detail",
+    "flow_snapshot_list",
+    "workflow_migration_analysis",
+]
 
 
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
@@ -1088,120 +1237,17 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             workflow_version_sys_id: The sys_id of the wf_workflow_version record to analyze.
         """
         validate_identifier(workflow_version_sys_id)
-        check_table_access("wf_workflow_version")
-        check_table_access("wf_activity")
-        check_table_access("wf_transition")
-        check_table_access("sys_variable_value")
-
-        act_query = ServiceNowQuery().equals("workflow_version", workflow_version_sys_id).order_by("x").build()
-        trans_query = ServiceNowQuery().equals("from.workflow_version", workflow_version_sys_id).build()
-
-        act_safety = enforce_query_safety("wf_activity", act_query, 200, settings)
-        trans_safety = enforce_query_safety("wf_transition", trans_query, 500, settings)
 
         async with ServiceNowClient(settings, auth_provider) as client:
-            version_record, activity_result, transition_result = await asyncio.gather(
-                client.get_record("wf_workflow_version", workflow_version_sys_id, display_values=True),
-                client.query_records(
-                    "wf_activity",
-                    act_query,
-                    fields=[
-                        "sys_id",
-                        "name",
-                        "activity_definition",
-                        FIELD_ACTIVITY_DEF_NAME,
-                        "activity_definition.category",
-                        "x",
-                        "y",
-                        "timeout",
-                        "notes",
-                    ],
-                    limit=act_safety["limit"],
-                    display_values=True,
-                ),
-                client.query_records(
-                    "wf_transition",
-                    trans_query,
-                    fields=[
-                        "sys_id",
-                        "from",
-                        "from.name",
-                        "to",
-                        FIELD_TO_NAME,
-                        "condition",
-                    ],
-                    limit=trans_safety["limit"],
-                    display_values=True,
-                ),
+            version_record, activities, transitions = await _fetch_topology(workflow_version_sys_id, client, settings)
+            cycles, activity_name_lookup = _detect_cycles(activities, transitions)
+            activity_sys_ids = [resolve_ref_value(a["sys_id"]) for a in activities if a.get("sys_id")]
+            vars_by_activity, extracted_scripts = await _extract_activity_scripts(
+                activity_sys_ids, activities, client, settings
             )
 
-            activities = activity_result["records"]
-            transitions = transition_result["records"]
-
-            activity_sys_ids = [resolve_ref_value(a["sys_id"]) for a in activities]
-            vars_by_activity = await _fetch_activity_variables(client, activity_sys_ids, settings)
-
-        cycles = _detect_cycles(activities, transitions)
-        activity_mapping = _map_activities(activities, vars_by_activity)
-        extracted_scripts = _extract_script_bodies(activities, vars_by_activity)
-
-        # Derive complexity metrics from the mapping results.
-        unmapped_names = [
-            m["activity_name"] or m["legacy_type"]
-            for m in activity_mapping
-            if m["flow_designer_equivalent"] in {FD_UNKNOWN, FD_MANUAL_REFACTOR}
-        ]
-        script_penalty = sum(1 for m in activity_mapping if m["has_script"] and m["script_line_count"] > 10)
-        complexity_score = len(activities) + (len(cycles) * 2) + script_penalty + len(unmapped_names)
-
-        activity_name_lookup = {
-            resolve_ref_value(a["sys_id"]): resolve_ref_value(a.get("name", "")) for a in activities
-        }
-        migration_blockers = _build_migration_blockers(cycles, activity_mapping, activity_name_lookup)
-        recommendations = _build_recommendations(cycles, script_penalty, unmapped_names)
-
-        workflow_name = resolve_ref_value(version_record.get("name", ""))
-        workflow_table = resolve_ref_value(version_record.get("table", ""))
-        workflow_condition = resolve_ref_value(version_record.get("condition", ""))
-
-        return format_response(
-            data={
-                "workflow": {
-                    "name": workflow_name,
-                    "table": workflow_table,
-                    "condition": workflow_condition,
-                    "activity_count": len(activities),
-                    "transition_count": len(transitions),
-                },
-                "topology": {
-                    "activities": [mask_sensitive_fields(a) for a in activities],
-                    "transitions": [mask_sensitive_fields(t) for t in transitions],
-                    "cycles": cycles,
-                },
-                "migration_blockers": migration_blockers,
-                "activity_mapping": activity_mapping,
-                "extracted_scripts": extracted_scripts,
-                "complexity": {
-                    "score": complexity_score,
-                    "breakdown": {
-                        "base_activities": len(activities),
-                        "cycle_penalty": len(cycles) * 2,
-                        "script_penalty": script_penalty,
-                        "unmapped_penalty": len(unmapped_names),
-                    },
-                },
-                "recommendations": recommendations,
-                "manual_migration_instructions": _build_manual_migration_instructions(
-                    workflow_name,
-                    workflow_table,
-                    workflow_condition,
-                    activities,
-                    transitions,
-                    cycles,
-                    migration_blockers,
-                    activity_mapping,
-                    extracted_scripts,
-                ),
-            },
-            correlation_id=correlation_id,
+        result = _assemble_migration_response(
+            activities, transitions, cycles, activity_name_lookup, vars_by_activity, extracted_scripts, version_record
         )
+
+        return format_response(data=result, correlation_id=correlation_id)

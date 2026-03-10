@@ -24,6 +24,15 @@ from servicenow_mcp.tools.domains._helpers import (
 from servicenow_mcp.utils import ServiceNowQuery, format_response
 
 
+TOOL_NAMES: list[str] = [
+    "request_list",
+    "request_get",
+    "request_items",
+    "request_item_get",
+    "request_item_update",
+]
+
+
 def register_tools(
     mcp: FastMCP,
     settings: Settings,

@@ -176,7 +176,7 @@ uvx servicenow-devtools-mcp
 }
 ```
 
-### Available Tools (92 total)
+### Available Tools (100 total)
 
 **Table (4):** table_describe, table_query, table_aggregate, build_query
   - Describe table schema with enriched metadata (sys_db_object + sys_documentation), query with encoded queries, compute stats, build structured queries
@@ -204,6 +204,9 @@ uvx servicenow-devtools-mcp
 
 **Workflow Analysis (5):** workflow_contexts, workflow_map, workflow_status, workflow_activity_detail, workflow_version_list
   - List workflow contexts for a record, map workflow structure, inspect execution status, view activity details
+
+**Flow Designer (8):** flow_list, flow_get, flow_map, flow_action_detail, flow_execution_list, flow_execution_detail, flow_snapshot_list, workflow_migration_analysis
+  - List, inspect, and map Flow Designer flows. View action details, execution history, published snapshots, and analyze legacy workflows for migration readiness
 
 **Incident Management (6):** incident_list, incident_get, incident_create, incident_update, incident_resolve, incident_add_comment
   - Full incident lifecycle: list, fetch, create, update, resolve, and add comments/work notes
@@ -364,6 +367,19 @@ The `build_query` tool returns a reusable `query_token` that can be passed to `t
 | `workflow_activity_detail` | Fetch detailed info about a workflow activity | `activity_sys_id` |
 | `workflow_version_list` | List workflow versions defined for a table | `table`, `active_only?`, `limit?` |
 
+### :ocean: Flow Designer
+
+| Tool | Description | Key Parameters |
+|---|---|---|
+| `flow_list` | List Flow Designer flows and subflows with optional filters | `table?`, `flow_type?`, `status?`, `active_only?`, `limit?` |
+| `flow_get` | Fetch a Flow Designer flow definition with inputs/outputs | `flow_sys_id` |
+| `flow_map` | Map the structure of a flow (action instances and logic blocks) | `flow_sys_id` |
+| `flow_action_detail` | Fetch detailed info about a flow action instance | `action_instance_sys_id` |
+| `flow_execution_list` | List Flow Designer execution contexts with optional filters | `flow_sys_id?`, `source_record?`, `state?`, `limit?` |
+| `flow_execution_detail` | Fetch detailed execution info including ordered log entries | `context_id` |
+| `flow_snapshot_list` | List published snapshots (versions) for a flow | `flow_sys_id`, `limit?` |
+| `workflow_migration_analysis` | Analyze a legacy workflow for Flow Designer migration readiness | `workflow_version_sys_id` |
+
 ### :fire_engine: Incident Management
 
 | Tool | Description | Key Parameters |
@@ -453,7 +469,7 @@ Control which tools are loaded using the `MCP_TOOL_PACKAGE` environment variable
 
 | Package | Groups | Description |
 |---|---|---|
-| `full` (default) | 17 | All tool groups -- 92 tools total |
+| `full` (default) | 17 | All tool groups -- 100 tools total |
 | `itil` | 14 | ITIL process tools (incidents, changes, problems, requests + platform tools) |
 | `developer` | 10 | Development-focused (table, record, debug, investigations, workflows) |
 | `readonly` | 9 | Read-only operations (no record writes) |

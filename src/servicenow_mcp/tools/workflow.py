@@ -115,6 +115,15 @@ async def _fetch_activity_definition(
         return None, warnings
 
 
+TOOL_NAMES: list[str] = [
+    "workflow_contexts",
+    "workflow_map",
+    "workflow_status",
+    "workflow_activity_detail",
+    "workflow_version_list",
+]
+
+
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
     """Register workflow introspection tools on the MCP server."""
 

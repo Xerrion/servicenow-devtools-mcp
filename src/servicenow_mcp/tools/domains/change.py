@@ -28,6 +28,15 @@ from servicenow_mcp.utils import ServiceNowQuery, format_response
 _CHANGE_ENTITY_LABEL = "change request"
 _CHANGE_ENTITY_TITLE = "Change request"
 
+TOOL_NAMES: list[str] = [
+    "change_list",
+    "change_get",
+    "change_create",
+    "change_update",
+    "change_tasks",
+    "change_add_comment",
+]
+
 
 def register_tools(
     mcp: FastMCP,

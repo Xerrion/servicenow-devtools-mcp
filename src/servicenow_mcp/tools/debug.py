@@ -22,6 +22,16 @@ from servicenow_mcp.utils import (
 )
 
 
+TOOL_NAMES: list[str] = [
+    "debug_trace",
+    "debug_flow_execution",
+    "debug_email_trace",
+    "debug_integration_health",
+    "debug_importset_run",
+    "debug_field_mutation_story",
+]
+
+
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
     """Register debug/trace tools on the MCP server."""
 

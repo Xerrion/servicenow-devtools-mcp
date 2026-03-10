@@ -144,6 +144,13 @@ async def _resolve_table_hierarchy(client: ServiceNowClient, table: str) -> list
     return tables
 
 
+TOOL_NAMES: list[str] = [
+    "record_get",
+    "rel_references_to",
+    "rel_references_from",
+]
+
+
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
     """Register record read operation tools on the MCP server."""
 

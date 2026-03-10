@@ -538,12 +538,11 @@ class TestToolNameUniqueness:
         for group_name in tool_groups:
             module_path = _TOOL_GROUP_MODULES.get(group_name)
             if module_path:
-                try:
-                    module = importlib.import_module(module_path)
-                    if hasattr(module, "TOOL_NAMES"):
-                        tools_by_module[group_name] = module.TOOL_NAMES
-                except ImportError:
-                    pass
+                module = importlib.import_module(module_path)
+                assert hasattr(module, "TOOL_NAMES"), (
+                    f"Module {module_path} (group '{group_name}') must export a TOOL_NAMES list"
+                )
+                tools_by_module[group_name] = module.TOOL_NAMES
 
         return tools_by_module
 

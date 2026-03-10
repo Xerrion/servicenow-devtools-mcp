@@ -14,13 +14,13 @@ from servicenow_mcp.mcp_state import get_query_store
 from servicenow_mcp.policy import (
     check_table_access,
     enforce_query_safety,
+    mask_audit_entry,
     mask_sensitive_fields,
 )
 from servicenow_mcp.state import QueryTokenStore
 from servicenow_mcp.utils import (
     ServiceNowQuery,
     format_response,
-    generate_correlation_id,
     resolve_query_token,
     validate_identifier,
 )
@@ -364,16 +364,16 @@ def _build_query_impl(
 def _build_field_list(columns: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Build the field metadata list from sys_dictionary entries and documentation."""
     fields: list[dict[str, Any]] = []
-    for entry in columns:
-        field_info: dict[str, Any] = {
-            "element": entry.get("element", ""),
-            "internal_type": entry.get("internal_type", ""),
-            "max_length": entry.get("max_length", ""),
-            "mandatory": entry.get("mandatory", "false"),
-            "reference": entry.get("reference", ""),
-            "column_label": entry.get("column_label", ""),
-            "default_value": entry.get("default_value", ""),
-        }
+    for col in columns:
+        # Start with full original entry, ensure key defaults exist
+        field_info = dict(col)  # shallow copy to avoid mutating original
+        field_info.setdefault("element", "")
+        field_info.setdefault("internal_type", "")
+        field_info.setdefault("max_length", "")
+        field_info.setdefault("mandatory", "false")
+        field_info.setdefault("reference", "")
+        field_info.setdefault("column_label", "")
+        field_info.setdefault("default_value", "")
         fields.append(field_info)
     return fields
 
@@ -382,6 +382,13 @@ def _build_field_list(columns: list[dict[str, Any]]) -> list[dict[str, Any]]:
 # Tool registration
 # ---------------------------------------------------------------------------
 
+TOOL_NAMES: list[str] = [
+    "table_describe",
+    "table_query",
+    "table_aggregate",
+    "build_query",
+]
+
 
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
     """Register table introspection and query tools on the MCP server."""
@@ -389,7 +396,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
 
     @mcp.tool()
     @tool_handler
-    async def table_describe(table: str, *, correlation_id: str) -> str:
+    async def table_describe(table: str, *, correlation_id: str = "") -> str:
         """Return dictionary metadata for a table: fields, types, references, choices and attributes.
 
         Args:
@@ -441,7 +448,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         order_by: str = "",
         display_values: bool = False,
         *,
-        correlation_id: str,
+        correlation_id: str = "",
     ) -> str:
         """Query any table with filter conditions, returning matching records.
 
@@ -481,7 +488,10 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             )
 
         # Mask sensitive fields in each record
-        masked_records = [mask_sensitive_fields(r) for r in result["records"]]
+        if table == "sys_audit":
+            masked_records = [mask_audit_entry(r) for r in result["records"]]
+        else:
+            masked_records = [mask_sensitive_fields(r) for r in result["records"]]
 
         return format_response(
             data=masked_records,
@@ -505,7 +515,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         max_fields: str = "",
         sum_fields: str = "",
         *,
-        correlation_id: str,
+        correlation_id: str = "",
     ) -> str:
         """Compute aggregate statistics for a table (counts, min, max, avg, sum).
 
@@ -547,7 +557,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         return format_response(data=result, correlation_id=correlation_id)
 
     @mcp.tool()
-    def build_query(conditions: str) -> str:
+    @tool_handler
+    async def build_query(conditions: str, correlation_id: str = "") -> str:
         """Build a ServiceNow encoded query string from a JSON array of conditions.
 
         Each condition is an object with:
@@ -583,19 +594,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         Returns a response containing both the built query string and a query_token.
         The query_token must be passed to other tools that accept query parameters.
         """
-        correlation_id = generate_correlation_id()
         try:
             parsed = json.loads(conditions)
-            if not isinstance(parsed, list):
-                return format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error="conditions must be a JSON array",
-                )
-
-            return _build_query_impl(parsed, query_store, correlation_id)
-
         except json.JSONDecodeError as e:
             return format_response(
                 data=None,
@@ -603,10 +603,13 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 status="error",
                 error=f"Invalid JSON: {e}",
             )
-        except Exception as e:
+
+        if not isinstance(parsed, list):
             return format_response(
                 data=None,
                 correlation_id=correlation_id,
                 status="error",
-                error=str(e),
+                error="conditions must be a JSON array",
             )
+
+        return _build_query_impl(parsed, query_store, correlation_id)
