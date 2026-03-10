@@ -1,6 +1,7 @@
-"""Relationship tools for traversing ServiceNow reference fields."""
+"""Record-level read operations for ServiceNow tables."""
 
 import asyncio
+import logging
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
@@ -20,6 +21,9 @@ from servicenow_mcp.utils import (
     format_response,
     validate_identifier,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 async def _resolve_table_hierarchy(client: ServiceNowClient, table: str) -> list[str]:
@@ -66,7 +70,41 @@ async def _resolve_table_hierarchy(client: ServiceNowClient, table: str) -> list
 
 
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
-    """Register relationship tools on the MCP server."""
+    """Register record read operation tools on the MCP server."""
+
+    # ------------------------------------------------------------------
+    # Read tools
+    # ------------------------------------------------------------------
+
+    @mcp.tool()
+    @tool_handler
+    async def record_get(
+        table: str,
+        sys_id: str,
+        fields: str = "",
+        display_values: bool = False,
+        *,
+        correlation_id: str,
+    ) -> str:
+        """Fetch a single record by sys_id with optional field selection.
+
+        Args:
+            table: The ServiceNow table name.
+            sys_id: The sys_id of the record to fetch.
+            fields: Comma-separated list of fields to return (empty for all).
+            display_values: If True, return display values instead of raw values.
+        """
+        validate_identifier(table)
+        check_table_access(table)
+        field_list = [f.strip() for f in fields.split(",") if f.strip()] if fields else None
+        async with ServiceNowClient(settings, auth_provider) as client:
+            record = await client.get_record(table, sys_id, fields=field_list, display_values=display_values)
+        record = mask_sensitive_fields(record)
+        return format_response(data=record, correlation_id=correlation_id)
+
+    # ------------------------------------------------------------------
+    # Relationship tools
+    # ------------------------------------------------------------------
 
     @mcp.tool()
     @tool_handler

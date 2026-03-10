@@ -1,4 +1,4 @@
-"""Record CRUD tools for creating, reading, updating, and deleting ServiceNow records."""
+"""Record-level write operations for ServiceNow tables."""
 
 import json
 import logging
@@ -25,10 +25,14 @@ logger = logging.getLogger(__name__)
 
 
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
-    """Register record CRUD tools on the MCP server."""
+    """Register record write operation tools on the MCP server."""
 
     # In-memory preview token store, shared across preview/apply tools via closure
     preview_store = PreviewTokenStore()
+
+    # ------------------------------------------------------------------
+    # Private helpers (closure over settings / auth_provider)
+    # ------------------------------------------------------------------
 
     async def _check_mandatory_fields(
         client: ServiceNowClient,
@@ -127,6 +131,10 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             status="error",
             error=f"Unknown preview action: '{action}'",
         )
+
+    # ------------------------------------------------------------------
+    # Write tools (CRUD)
+    # ------------------------------------------------------------------
 
     @mcp.tool()
     @tool_handler
