@@ -15,19 +15,20 @@ pytestmark = pytest.mark.integration
 # Expected tool counts per package (verified in Wave FINAL F3).
 # +1 for the always-registered list_tool_packages tool.
 EXPECTED_TOOL_COUNTS: dict[str, int] = {
-    "full": 76,
-    "introspection_only": 12,
+    "full": 92,
+    "core_readonly": 12,
     "none": 1,
-    "itil": 48,
-    "developer": 37,
-    "readonly": 28,
-    "analyst": 18,
-    "incident_management": 18,
-    "change_management": 16,
-    "cmdb": 13,
-    "problem_management": 17,
-    "request_management": 11,
-    "knowledge_management": 11,
+    "itil": 68,
+    "developer": 48,
+    "readonly": 41,
+    "analyst": 31,
+    "incident_management": 40,
+    "change_management": 33,
+    "cmdb": 20,
+    "problem_management": 39,
+    "request_management": 33,
+    "knowledge_management": 20,
+    "service_catalog": 27,
 }
 
 
@@ -82,14 +83,14 @@ class TestPackageLoading:
     @pytest.mark.parametrize(
         "groups_csv",
         [
-            "introspection,relationships",
+            "table,record",
             "domain_incident,domain_change",
-            "metadata,documentation,utility",
+            "metadata,documentation",
         ],
         ids=[
-            "introspection+relationships",
+            "table+record",
             "incident+change",
-            "metadata+docs+utility",
+            "metadata+docs",
         ],
     )
     def test_comma_separated_groups_load(self, groups_csv: str) -> None:

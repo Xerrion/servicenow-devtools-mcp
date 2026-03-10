@@ -1,4 +1,4 @@
-"""Integration tests for relationship tools against a live ServiceNow instance."""
+"""Integration tests for record tools against a live ServiceNow instance."""
 
 import pytest
 
@@ -10,8 +10,8 @@ from servicenow_mcp.config import Settings
 pytestmark = pytest.mark.integration
 
 
-class TestRelationships:
-    """Test relationship discovery on a live instance."""
+class TestRecordIntegration:
+    """Test record operations on a live instance."""
 
     async def test_rel_references_from(
         self,
