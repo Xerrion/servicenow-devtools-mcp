@@ -2,7 +2,7 @@
 
 ## 📋 Project Overview
 
-- Python 3.12+ async MCP server for ServiceNow platform introspection, debugging, and change intelligence.
+- Python 3.12+ async MCP server for ServiceNow schema access, record inspection, debugging, and change intelligence.
 - Package manager: **uv** (not pip/poetry). Build system: hatchling.
 - Source layout: `src/servicenow_mcp/` (src-layout). Entry point: `servicenow_mcp.server:main`.
 - Config via `pydantic-settings` loading env vars from `.env` / `.env.local`.
@@ -412,26 +412,26 @@ async def explain(client, element_id) -> dict:
 
 ## 📦 Packages & Tool Groups
 
-14 named packages with 19 tool groups total.
+14 named packages with 17 tool groups total (18 registered modules, but `testing` is disabled in `full`).
 
 ### Preset Packages
 
-| Package              | Groups | Description                        |
-| -------------------- | ------ | ---------------------------------- |
-| `full`                 | 18     | Default - all standard tool groups |
-| `introspection_only`   | 4      | Read-only introspection tools      |
-| `none`                 | 0      | No tools loaded                    |
-| `itil`                 | 12     | ITIL process tools                 |
-| `developer`            | 11     | Development-focused tools          |
-| `readonly`             | 9      | Read-only operations               |
-| `analyst`              | 7      | Analysis and reporting             |
-| `incident_management`  | 5      | Incident lifecycle tools           |
-| `change_management`    | 4      | Change request tools               |
-| `cmdb`                 | 4      | CMDB management tools              |
-| `problem_management`   | 5      | Problem lifecycle tools            |
-| `request_management`   | 4      | Request/RITM tools                 |
-| `knowledge_management` | 3      | Knowledge base tools               |
-| `service_catalog`      | 3      | Service catalog tools              |
+| Package              | Groups | Description                                     |
+| -------------------- | ------ | ----------------------------------------------- |
+| `full`                 | 17     | Default - all standard tool groups              |
+| `core_readonly`        | 3      | Read-only core tools (table, record, metadata)  |
+| `none`                 | 0      | No tools loaded                                 |
+| `itil`                 | 14     | ITIL process tools                              |
+| `developer`            | 10     | Development-focused tools                       |
+| `readonly`             | 9      | Read-only operations                            |
+| `analyst`              | 7      | Analysis and reporting                          |
+| `incident_management`  | 7      | Incident lifecycle tools                        |
+| `change_management`    | 6      | Change request tools                            |
+| `cmdb`                 | 4      | CMDB management tools                           |
+| `problem_management`   | 7      | Problem lifecycle tools                         |
+| `request_management`   | 6      | Request/RITM tools                              |
+| `knowledge_management` | 4      | Knowledge base tools                            |
+| `service_catalog`      | 4      | Service catalog tools                           |
 
 ### Custom Packages
 
