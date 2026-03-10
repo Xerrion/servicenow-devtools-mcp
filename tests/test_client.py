@@ -1158,6 +1158,24 @@ class TestUrlBuilderValidation:
         url = client._table_url("incident")
         assert "incident" in url
 
+    def test_attachment_url_rejects_invalid_sys_id(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
+        """_attachment_url raises ValueError for invalid attachment sys_id."""
+        from servicenow_mcp.client import ServiceNowClient
+
+        client = ServiceNowClient(settings, auth_provider)
+        with pytest.raises(ValueError, match="Invalid sys_id"):
+            client._attachment_url("invalid-sys-id")
+
+    def test_attachment_by_name_url_rejects_invalid_table_sys_id(
+        self, settings: Settings, auth_provider: BasicAuthProvider
+    ) -> None:
+        """_attachment_file_by_name_url raises ValueError for invalid table_sys_id."""
+        from servicenow_mcp.client import ServiceNowClient
+
+        client = ServiceNowClient(settings, auth_provider)
+        with pytest.raises(ValueError, match="Invalid sys_id"):
+            client._attachment_file_by_name_url("bad-id", "hello.txt")
+
 
 class TestATFCloudRunner404:
     """Test ATF Cloud Runner methods raise NotFoundError with plugin hint on 404."""
