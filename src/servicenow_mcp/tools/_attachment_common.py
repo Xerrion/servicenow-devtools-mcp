@@ -75,7 +75,7 @@ def get_attachment_size_bytes(metadata: dict[str, Any]) -> int:
 
     try:
         size_bytes = int(raw_size)
-    except (TypeError, ValueError) as exc:
+    except ValueError as exc:
         raise ValueError("Attachment metadata field 'size_bytes' must be an integer") from exc
 
     if size_bytes < 0:
