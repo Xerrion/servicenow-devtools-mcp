@@ -1,6 +1,7 @@
 """Tests for attachment MCP tools."""
 
 import base64
+import importlib
 from typing import Any
 
 import httpx
@@ -10,13 +11,15 @@ import respx
 from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.config import Settings
 from servicenow_mcp.policy import DENIED_TABLES
-from servicenow_mcp.tools._attachment_common import MAX_ATTACHMENT_BYTES
 from tests.helpers import decode_response, get_tool_functions
 
 
 BASE_URL = "https://test.service-now.com"
 ATTACHMENT_SYS_ID = "a" * 32
 TABLE_SYS_ID = "b" * 32
+_attachment_common: Any = importlib.import_module("servicenow_mcp.tools._attachment_common")
+attachment: Any = importlib.import_module("servicenow_mcp.tools.attachment")
+MAX_ATTACHMENT_BYTES = _attachment_common.MAX_ATTACHMENT_BYTES
 
 
 @pytest.fixture()
@@ -229,6 +232,56 @@ class TestAttachmentReadTools:
         assert "exceeds the maximum supported size" in result["error"]["message"]
         assert not download_route.called
 
+    @pytest.mark.asyncio()
+    @respx.mock
+    async def test_attachment_download_by_name_not_found_returns_error(
+        self, settings: Settings, auth_provider: BasicAuthProvider
+    ) -> None:
+        """Returns a stable not-found error when no metadata matches the logical attachment identity."""
+        respx.get(f"{BASE_URL}/api/now/table/sys_attachment").mock(
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
+        )
+
+        tools = _register_read_tools(settings, auth_provider)
+        raw = await tools["attachment_download_by_name"](
+            table_name="incident",
+            table_sys_id=TABLE_SYS_ID,
+            file_name="hello.txt",
+        )
+        result = decode_response(raw)
+
+        assert result["status"] == "error"
+        assert "was not found" in result["error"]["message"]
+
+    @pytest.mark.asyncio()
+    @respx.mock
+    async def test_attachment_download_by_name_warns_when_multiple_matches_exist(
+        self, settings: Settings, auth_provider: BasicAuthProvider
+    ) -> None:
+        """Returns the earliest attachment plus a warning when metadata lookup finds multiple matches."""
+        respx.get(f"{BASE_URL}/api/now/table/sys_attachment").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": [_metadata(), _metadata(sys_id="c" * 32)]},
+                headers={"X-Total-Count": "2"},
+            )
+        )
+        respx.get(f"{BASE_URL}/api/now/attachment/{ATTACHMENT_SYS_ID}/file").mock(
+            return_value=httpx.Response(200, content=b"hello")
+        )
+
+        tools = _register_read_tools(settings, auth_provider)
+        raw = await tools["attachment_download_by_name"](
+            table_name="incident",
+            table_sys_id=TABLE_SYS_ID,
+            file_name="hello.txt",
+        )
+        result = decode_response(raw)
+
+        assert result["status"] == "success"
+        assert result["data"]["sys_id"] == ATTACHMENT_SYS_ID
+        assert result["warnings"] == ["Multiple attachments matched; returned the earliest created attachment"]
+
 
 class TestAttachmentWriteTools:
     """Tests for attachment write tools."""
@@ -325,3 +378,83 @@ class TestAttachmentWriteTools:
 
         assert result["status"] == "error"
         assert "production" in result["error"]["message"].lower()
+
+    @pytest.mark.asyncio()
+    @respx.mock
+    async def test_delete_blocked_in_prod(self, prod_settings: Settings, prod_auth_provider: BasicAuthProvider) -> None:
+        """Blocks deletes in production environments after reading attachment metadata."""
+        delete_route = respx.delete(
+            f"{prod_settings.servicenow_instance_url}/api/now/attachment/{ATTACHMENT_SYS_ID}"
+        ).mock(return_value=httpx.Response(204))
+        respx.get(f"{prod_settings.servicenow_instance_url}/api/now/attachment/{ATTACHMENT_SYS_ID}").mock(
+            return_value=httpx.Response(200, json={"result": _metadata()})
+        )
+
+        tools = _register_write_tools(prod_settings, prod_auth_provider)
+        raw = await tools["attachment_delete"](sys_id=ATTACHMENT_SYS_ID)
+        result = decode_response(raw)
+
+        assert result["status"] == "error"
+        assert "production" in result["error"]["message"].lower()
+        assert not delete_route.called
+
+
+class TestAttachmentHelperFunctions:
+    """Tests for small attachment helper branches."""
+
+    def test_get_attachment_size_bytes_rejects_missing_value(self) -> None:
+        """Missing size metadata fails fast."""
+        with pytest.raises(ValueError, match="missing required field 'size_bytes'"):
+            _attachment_common.get_attachment_size_bytes(_metadata(size_bytes=""))
+
+    def test_get_attachment_size_bytes_rejects_non_integer_value(self) -> None:
+        """Malformed size metadata fails fast."""
+        with pytest.raises(ValueError, match="must be an integer"):
+            _attachment_common.get_attachment_size_bytes(_metadata(size_bytes="not-a-number"))
+
+    def test_get_attachment_size_bytes_rejects_negative_value(self) -> None:
+        """Negative size metadata fails fast."""
+        with pytest.raises(ValueError, match="must be non-negative"):
+            _attachment_common.get_attachment_size_bytes(_metadata(size_bytes="-1"))
+
+    def test_get_attachment_field_rejects_missing_value(self) -> None:
+        """Missing required metadata fields fail fast."""
+        metadata = _metadata()
+        metadata["file_name"] = ""
+
+        with pytest.raises(ValueError, match="missing required field 'file_name'"):
+            _attachment_common.get_attachment_field(metadata, "file_name")
+
+    def test_append_attachment_order_by_returns_original_query_when_blank(self) -> None:
+        """Blank ordering leaves attachment queries unchanged."""
+        assert attachment._append_attachment_order_by("table_name=incident", "") == "table_name=incident"
+
+    def test_filter_and_mask_attachment_records_skips_repeated_blocked_table_without_warning_noise(self) -> None:
+        """Once a table is denied, later attachments from the same table are skipped immediately."""
+        denied_table = next(iter(DENIED_TABLES))
+
+        records, omitted = attachment._filter_and_mask_attachment_records(
+            [_metadata(table_name=denied_table), _metadata(table_name=denied_table, sys_id="c" * 32)],
+            table_name="",
+        )
+
+        assert records == []
+        assert omitted is True
+
+    def test_build_attachment_list_metadata_includes_limit_cap_warning(self) -> None:
+        """Pagination metadata includes the limit cap warning when safety reduces the limit."""
+        pagination, warnings = attachment._build_attachment_list_metadata(
+            requested_limit=50,
+            effective_limit=20,
+            offset=5,
+            visible_total=3,
+            omitted_by_policy=False,
+        )
+
+        assert pagination == {"offset": 5, "limit": 20, "total": 3}
+        assert warnings == ["Limit capped at 20"]
+
+    def test_require_bytes_content_rejects_non_bytes(self) -> None:
+        """Download payloads only accept binary content."""
+        with pytest.raises(TypeError, match="must be bytes"):
+            attachment._require_bytes_content("hello")
