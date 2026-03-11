@@ -45,6 +45,74 @@ def _build_attachment_query(table_name: str, table_sys_id: str, file_name: str) 
     return query.build()
 
 
+def _validate_attachment_list_inputs(table_name: str, table_sys_id: str, order_by: str) -> None:
+    """Validate attachment list filters before querying ServiceNow."""
+    if table_name:
+        validate_identifier(table_name)
+        check_table_access(table_name)
+    if table_sys_id:
+        validate_sys_id(table_sys_id)
+    if order_by:
+        validate_identifier(order_by)
+
+
+def _append_attachment_order_by(query: str, order_by: str) -> str:
+    """Append an order-by clause to an attachment query when requested."""
+    if not order_by:
+        return query
+
+    order_query = ServiceNowQuery().order_by(order_by).build()
+    return f"{query}^{order_query}" if query else order_query
+
+
+def _filter_and_mask_attachment_records(
+    records: list[dict[str, Any]],
+    *,
+    table_name: str,
+) -> tuple[list[dict[str, Any]], bool]:
+    """Return visible attachment records and whether any were omitted by policy."""
+    if table_name:
+        return [mask_sensitive_fields(record) for record in records], False
+
+    visible_records: list[dict[str, Any]] = []
+    blocked_tables: set[str] = set()
+    for record in records:
+        record_table_name = get_attachment_table_name(record)
+        if record_table_name in blocked_tables:
+            continue
+        try:
+            check_table_access(record_table_name)
+        except PolicyError:
+            blocked_tables.add(record_table_name)
+            continue
+        visible_records.append(mask_sensitive_fields(record))
+
+    return visible_records, bool(blocked_tables)
+
+
+def _build_attachment_list_metadata(
+    *,
+    requested_limit: int,
+    effective_limit: int,
+    offset: int,
+    visible_total: int,
+    omitted_by_policy: bool,
+) -> tuple[dict[str, int], list[str] | None]:
+    """Build stable pagination and warnings for attachment list responses."""
+    warnings: list[str] = []
+    if effective_limit < requested_limit:
+        warnings.append(f"Limit capped at {effective_limit}")
+    if omitted_by_policy:
+        warnings.append("Some attachments were omitted due to table access policy")
+
+    pagination = {
+        "offset": offset,
+        "limit": effective_limit,
+        "total": visible_total,
+    }
+    return pagination, warnings or None
+
+
 def _require_bytes_content(content: object) -> bytes:
     """Return attachment content only when the client result is binary."""
     if not isinstance(content, bytes):
@@ -67,8 +135,7 @@ async def _get_attachment_metadata_by_name_checked(
 ) -> tuple[dict[str, Any], str, list[str] | None]:
     """Resolve attachment metadata by logical identity before downloading content."""
     query = _build_attachment_query(table_name, table_sys_id, file_name)
-    order_query = ServiceNowQuery().order_by("sys_created_on").build()
-    query = f"{query}^{order_query}" if query else order_query
+    query = _append_attachment_order_by(query, "sys_created_on")
     result = await client.query_records(
         "sys_attachment",
         query,
@@ -115,23 +182,11 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             offset: Number of matching attachments to skip.
             order_by: Field to sort by.
         """
-        if table_name:
-            validate_identifier(table_name)
-            check_table_access(table_name)
-        if table_sys_id:
-            validate_sys_id(table_sys_id)
-        if order_by:
-            validate_identifier(order_by)
+        _validate_attachment_list_inputs(table_name, table_sys_id, order_by)
 
-        query = _build_attachment_query(table_name, table_sys_id, file_name)
-        if order_by:
-            order_query = ServiceNowQuery().order_by(order_by).build()
-            query = f"{query}^{order_query}" if query else order_query
+        query = _append_attachment_order_by(_build_attachment_query(table_name, table_sys_id, file_name), order_by)
         safety = enforce_query_safety("sys_attachment", query, limit, settings)
         effective_limit = safety["limit"]
-        warnings: list[str] = []
-        if effective_limit < limit:
-            warnings.append(f"Limit capped at {effective_limit}")
 
         async with ServiceNowClient(settings, auth_provider) as client:
             result = await client.list_attachments(
@@ -140,35 +195,21 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 offset,
             )
 
-        allowed_records: list[dict[str, Any]] = []
-        blocked_tables: set[str] = set()
-        for record in result["records"]:
-            record_table_name = get_attachment_table_name(record)
-            if table_name:
-                allowed_records.append(record)
-                continue
-            if record_table_name in blocked_tables:
-                continue
-            try:
-                check_table_access(record_table_name)
-            except PolicyError:
-                blocked_tables.add(record_table_name)
-                continue
-            allowed_records.append(record)
-
-        if blocked_tables:
-            warnings.append("Some attachments were omitted due to table access policy")
-
-        masked_records = [mask_sensitive_fields(record) for record in allowed_records]
+        masked_records, omitted_by_policy = _filter_and_mask_attachment_records(
+            result["records"], table_name=table_name
+        )
+        pagination, warnings = _build_attachment_list_metadata(
+            requested_limit=limit,
+            effective_limit=effective_limit,
+            offset=offset,
+            visible_total=len(masked_records),
+            omitted_by_policy=omitted_by_policy,
+        )
         return format_response(
             data=masked_records,
             correlation_id=correlation_id,
-            pagination={
-                "offset": offset,
-                "limit": effective_limit,
-                "total": len(masked_records),
-            },
-            warnings=warnings or None,
+            pagination=pagination,
+            warnings=warnings,
         )
 
     @mcp.tool()

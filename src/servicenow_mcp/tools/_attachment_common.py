@@ -29,7 +29,7 @@ def decode_content_base64(content_base64: str) -> bytes:
     """Decode validated base64 attachment content into raw bytes."""
     try:
         return base64.b64decode(content_base64, validate=True)
-    except (binascii.Error, ValueError) as exc:
+    except binascii.Error as exc:
         raise ValueError("Invalid base64 content") from exc
 
 
