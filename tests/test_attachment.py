@@ -47,7 +47,9 @@ def _register_write_tools(settings: Settings, auth_provider: BasicAuthProvider) 
     return get_tool_functions(mcp)
 
 
-def _metadata(*, table_name: str = "incident", sys_id: str = ATTACHMENT_SYS_ID) -> dict[str, str]:
+def _metadata(
+    *, table_name: str = "incident", sys_id: str = ATTACHMENT_SYS_ID, size_bytes: str = "5"
+) -> dict[str, str]:
     """Build a representative attachment metadata payload."""
     return {
         "sys_id": sys_id,
@@ -55,7 +57,7 @@ def _metadata(*, table_name: str = "incident", sys_id: str = ATTACHMENT_SYS_ID) 
         "table_sys_id": TABLE_SYS_ID,
         "file_name": "hello.txt",
         "content_type": "text/plain",
-        "size_bytes": "5",
+        "size_bytes": size_bytes,
     }
 
 
@@ -82,6 +84,32 @@ class TestAttachmentReadTools:
         assert result["data"][0]["sys_id"] == ATTACHMENT_SYS_ID
         assert result["pagination"]["total"] == 1
         assert route.called
+
+    @pytest.mark.asyncio()
+    @respx.mock
+    async def test_attachment_list_filters_denied_tables_without_table_filter(
+        self, settings: Settings, auth_provider: BasicAuthProvider
+    ) -> None:
+        """Omits denied-table attachments instead of failing the full response."""
+        denied_table = next(iter(DENIED_TABLES))
+        respx.get(f"{BASE_URL}/api/now/attachment").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": [_metadata(table_name="incident"), _metadata(table_name=denied_table, sys_id="c" * 32)]
+                },
+                headers={"X-Total-Count": "2"},
+            )
+        )
+
+        tools = _register_read_tools(settings, auth_provider)
+        raw = await tools["attachment_list"]()
+        result = decode_response(raw)
+
+        assert result["status"] == "success"
+        assert [record["table_name"] for record in result["data"]] == ["incident"]
+        assert result["pagination"]["total"] == 1
+        assert "Some attachments were omitted due to table access policy" in result["warnings"]
 
     @pytest.mark.asyncio()
     @respx.mock
@@ -146,6 +174,8 @@ class TestAttachmentReadTools:
         assert result["status"] == "success"
         assert result["data"]["sys_id"] == ATTACHMENT_SYS_ID
         assert query_route.called
+        assert query_route.calls.last is not None
+        assert "ORDERBYsys_created_on" in query_route.calls.last.request.url.params["sysparm_query"]
         assert download_route.called
         assert not by_name_route.called
 
@@ -180,11 +210,14 @@ class TestAttachmentReadTools:
     @pytest.mark.asyncio()
     @respx.mock
     async def test_oversized_download_rejection(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
-        """Rejects downloads larger than the MCP attachment transfer limit."""
+        """Rejects downloads larger than the MCP attachment transfer limit before fetch."""
         respx.get(f"{BASE_URL}/api/now/attachment/{ATTACHMENT_SYS_ID}").mock(
-            return_value=httpx.Response(200, json={"result": _metadata()})
+            return_value=httpx.Response(
+                200,
+                json={"result": _metadata(size_bytes=str(MAX_ATTACHMENT_BYTES + 1))},
+            )
         )
-        respx.get(f"{BASE_URL}/api/now/attachment/{ATTACHMENT_SYS_ID}/file").mock(
+        download_route = respx.get(f"{BASE_URL}/api/now/attachment/{ATTACHMENT_SYS_ID}/file").mock(
             return_value=httpx.Response(200, content=b"x" * (MAX_ATTACHMENT_BYTES + 1))
         )
 
@@ -194,6 +227,7 @@ class TestAttachmentReadTools:
 
         assert result["status"] == "error"
         assert "exceeds the maximum supported size" in result["error"]["message"]
+        assert not download_route.called
 
 
 class TestAttachmentWriteTools:

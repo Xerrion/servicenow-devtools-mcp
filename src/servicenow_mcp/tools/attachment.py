@@ -1,5 +1,6 @@
 """Attachment read tools for ServiceNow attachments."""
 
+import logging
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
@@ -8,16 +9,20 @@ from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.config import Settings
 from servicenow_mcp.decorators import tool_handler
-from servicenow_mcp.errors import NotFoundError
-from servicenow_mcp.policy import check_table_access, enforce_query_safety
-from servicenow_mcp.utils import ServiceNowQuery, format_response, validate_identifier, validate_sys_id
-
-from ._attachment_common import (
+from servicenow_mcp.errors import NotFoundError, PolicyError
+from servicenow_mcp.policy import check_table_access, enforce_query_safety, mask_sensitive_fields
+from servicenow_mcp.tools._attachment_common import (
     build_attachment_download_payload,
+    ensure_attachment_size_value_within_limit,
     ensure_attachment_size_within_limit,
+    get_attachment_size_bytes,
     get_attachment_sys_id,
     get_attachment_table_name,
 )
+from servicenow_mcp.utils import ServiceNowQuery, format_response, validate_identifier, validate_sys_id
+
+
+logger = logging.getLogger(__name__)
 
 
 TOOL_NAMES: list[str] = [
@@ -40,6 +45,13 @@ def _build_attachment_query(table_name: str, table_sys_id: str, file_name: str) 
     return query.build()
 
 
+def _require_bytes_content(content: object) -> bytes:
+    """Return attachment content only when the client result is binary."""
+    if not isinstance(content, bytes):
+        raise TypeError("Attachment download content must be bytes")
+    return content
+
+
 async def _get_attachment_metadata_checked(client: ServiceNowClient, sys_id: str) -> dict[str, Any]:
     """Fetch attachment metadata and enforce real-table read access."""
     metadata = await client.get_attachment(sys_id)
@@ -55,6 +67,8 @@ async def _get_attachment_metadata_by_name_checked(
 ) -> tuple[dict[str, Any], str, list[str] | None]:
     """Resolve attachment metadata by logical identity before downloading content."""
     query = _build_attachment_query(table_name, table_sys_id, file_name)
+    order_query = ServiceNowQuery().order_by("sys_created_on").build()
+    query = f"{query}^{order_query}" if query else order_query
     result = await client.query_records(
         "sys_attachment",
         query,
@@ -115,7 +129,9 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             query = f"{query}^{order_query}" if query else order_query
         safety = enforce_query_safety("sys_attachment", query, limit, settings)
         effective_limit = safety["limit"]
-        warnings = [f"Limit capped at {effective_limit}"] if effective_limit < limit else None
+        warnings: list[str] = []
+        if effective_limit < limit:
+            warnings.append(f"Limit capped at {effective_limit}")
 
         async with ServiceNowClient(settings, auth_provider) as client:
             result = await client.list_attachments(
@@ -124,15 +140,35 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 offset,
             )
 
+        allowed_records: list[dict[str, Any]] = []
+        blocked_tables: set[str] = set()
+        for record in result["records"]:
+            record_table_name = get_attachment_table_name(record)
+            if table_name:
+                allowed_records.append(record)
+                continue
+            if record_table_name in blocked_tables:
+                continue
+            try:
+                check_table_access(record_table_name)
+            except PolicyError:
+                blocked_tables.add(record_table_name)
+                continue
+            allowed_records.append(record)
+
+        if blocked_tables:
+            warnings.append("Some attachments were omitted due to table access policy")
+
+        masked_records = [mask_sensitive_fields(record) for record in allowed_records]
         return format_response(
-            data=result["records"],
+            data=masked_records,
             correlation_id=correlation_id,
             pagination={
                 "offset": offset,
                 "limit": effective_limit,
-                "total": result["count"],
+                "total": len(masked_records),
             },
-            warnings=warnings,
+            warnings=warnings or None,
         )
 
     @mcp.tool()
@@ -146,7 +182,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         validate_sys_id(sys_id)
         async with ServiceNowClient(settings, auth_provider) as client:
             metadata = await _get_attachment_metadata_checked(client, sys_id)
-        return format_response(data=metadata, correlation_id=correlation_id)
+        return format_response(data=mask_sensitive_fields(metadata), correlation_id=correlation_id)
 
     @mcp.tool()
     @tool_handler
@@ -159,11 +195,13 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         validate_sys_id(sys_id)
         async with ServiceNowClient(settings, auth_provider) as client:
             metadata = await _get_attachment_metadata_checked(client, sys_id)
-            content: bytes = await client.download_attachment(sys_id)
+            ensure_attachment_size_value_within_limit(get_attachment_size_bytes(metadata), operation="download")
+            content = _require_bytes_content(await client.download_attachment(sys_id))
 
         ensure_attachment_size_within_limit(content, operation="download")
+        masked_metadata = mask_sensitive_fields(metadata)
         return format_response(
-            data=build_attachment_download_payload(metadata, content),
+            data=build_attachment_download_payload(masked_metadata, content),
             correlation_id=correlation_id,
         )
 
@@ -194,11 +232,13 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 table_sys_id,
                 file_name,
             )
-            content: bytes = await client.download_attachment(attachment_sys_id)
+            ensure_attachment_size_value_within_limit(get_attachment_size_bytes(metadata), operation="download")
+            content = _require_bytes_content(await client.download_attachment(attachment_sys_id))
 
         ensure_attachment_size_within_limit(content, operation="download")
+        masked_metadata = mask_sensitive_fields(metadata)
         return format_response(
-            data=build_attachment_download_payload(metadata, content),
+            data=build_attachment_download_payload(masked_metadata, content),
             correlation_id=correlation_id,
             warnings=warnings,
         )

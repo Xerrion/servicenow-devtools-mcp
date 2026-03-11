@@ -1,5 +1,7 @@
 """Attachment write tools for ServiceNow attachments."""
 
+import logging
+
 from mcp.server.fastmcp import FastMCP
 
 from servicenow_mcp.auth import BasicAuthProvider
@@ -7,13 +9,15 @@ from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.config import Settings
 from servicenow_mcp.decorators import tool_handler
 from servicenow_mcp.policy import check_table_access, write_gate
-from servicenow_mcp.utils import format_response, validate_identifier, validate_sys_id
-
-from ._attachment_common import (
+from servicenow_mcp.tools._attachment_common import (
     decode_content_base64,
     ensure_attachment_size_within_limit,
     get_attachment_table_name,
 )
+from servicenow_mcp.utils import format_response, validate_identifier, validate_sys_id
+
+
+logger = logging.getLogger(__name__)
 
 
 TOOL_NAMES: list[str] = [
