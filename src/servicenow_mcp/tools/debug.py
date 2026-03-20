@@ -2,6 +2,7 @@
 
 import asyncio
 from collections import Counter
+from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
@@ -32,6 +33,169 @@ TOOL_NAMES: list[str] = [
 ]
 
 
+# ---------------------------------------------------------------------------
+# Module-level helpers (extracted from nested tool bodies to reduce complexity)
+# ---------------------------------------------------------------------------
+
+
+def _build_timeline_entries(
+    audit_records: list[dict[str, Any]],
+    syslog_records: list[dict[str, Any]],
+    journal_records: list[dict[str, Any]],
+) -> list[dict[str, str]]:
+    """Build a sorted timeline from audit, syslog, and journal records."""
+    timeline: list[dict[str, str]] = []
+
+    for entry in audit_records:
+        masked = mask_audit_entry(entry)
+        timeline.append(
+            {
+                "source": "sys_audit",
+                "timestamp": masked.get("sys_created_on", ""),
+                "user": masked.get("user", ""),
+                "detail": (
+                    f"Field '{masked.get('fieldname', '')}' changed "
+                    f"from '{masked.get('oldvalue', '')}' "
+                    f"to '{masked.get('newvalue', '')}'"
+                ),
+            }
+        )
+
+    for entry in syslog_records:
+        masked = mask_sensitive_fields(entry)
+        timeline.append(
+            {
+                "source": "syslog",
+                "timestamp": masked.get("sys_created_on", ""),
+                "user": "",
+                "detail": masked.get("message", ""),
+            }
+        )
+
+    for entry in journal_records:
+        masked = mask_sensitive_fields(entry)
+        timeline.append(
+            {
+                "source": "sys_journal_field",
+                "timestamp": masked.get("sys_created_on", ""),
+                "user": masked.get("sys_created_by", ""),
+                "detail": f"[{masked.get('element', '')}] {masked.get('value', '')[:200]}",
+            }
+        )
+
+    timeline.sort(key=lambda e: e["timestamp"])
+    return timeline
+
+
+def _build_flow_steps(log_records: list[dict[str, Any]]) -> list[dict[str, str]]:
+    """Transform flow log records into step summaries."""
+    steps: list[dict[str, str]] = []
+    for entry in log_records:
+        masked = mask_sensitive_fields(entry)
+        steps.append(
+            {
+                "step_label": masked.get("step_label", ""),
+                "state": masked.get("state", ""),
+                "timestamp": masked.get("sys_created_on", ""),
+                "output_data": masked.get("output_data", ""),
+                "error_message": masked.get("error_message", ""),
+            }
+        )
+    return steps
+
+
+def _build_email_entries(email_records: list[dict[str, Any]]) -> list[dict[str, str]]:
+    """Transform email records into email chain entries."""
+    emails: list[dict[str, str]] = []
+    for entry in email_records:
+        masked = mask_sensitive_fields(entry)
+        emails.append(
+            {
+                "sys_id": masked.get("sys_id", ""),
+                "type": masked.get("type", ""),
+                "subject": masked.get("subject", ""),
+                "recipients": masked.get("recipients", ""),
+                "timestamp": masked.get("sys_created_on", ""),
+                "body_preview": masked.get("body_text", "")[:300],
+            }
+        )
+    return emails
+
+
+def _build_ecc_errors(records: list[dict[str, Any]]) -> list[dict[str, str]]:
+    """Transform ECC queue error records into error summaries."""
+    errors: list[dict[str, str]] = []
+    for entry in records:
+        masked = mask_sensitive_fields(entry)
+        errors.append(
+            {
+                "sys_id": masked.get("sys_id", ""),
+                "name": masked.get("name", ""),
+                "queue": masked.get("queue", ""),
+                "error": masked.get("error_string", ""),
+                "timestamp": masked.get("sys_created_on", ""),
+            }
+        )
+    return errors
+
+
+def _build_rest_errors(records: list[dict[str, Any]]) -> list[dict[str, str]]:
+    """Transform REST transaction error records into error summaries."""
+    errors: list[dict[str, str]] = []
+    for entry in records:
+        masked = mask_sensitive_fields(entry)
+        errors.append(
+            {
+                "sys_id": masked.get("sys_id", ""),
+                "rest_message": masked.get("rest_message", ""),
+                "http_method": masked.get("http_method", ""),
+                "http_status": masked.get("http_status", ""),
+                "endpoint": masked.get("endpoint", ""),
+                "timestamp": masked.get("sys_created_on", ""),
+            }
+        )
+    return errors
+
+
+def _build_importset_summary(rows: list[dict[str, Any]]) -> tuple[dict[str, int], list[dict[str, str]]]:
+    """Build import set state counts and error details from masked rows."""
+    state_counts: Counter[str] = Counter()
+    error_details: list[dict[str, str]] = []
+    for row in rows:
+        state = row.get("sys_import_state", "unknown")
+        state_counts[state] += 1
+        if state == "error":
+            error_details.append(
+                {
+                    "sys_id": row.get("sys_id", ""),
+                    "comment": row.get("sys_import_state_comment", ""),
+                }
+            )
+    summary: dict[str, int] = {"total": len(rows), **dict(state_counts)}
+    return summary, error_details
+
+
+def _build_mutation_entries(audit_records: list[dict[str, Any]]) -> list[dict[str, str]]:
+    """Transform audit records into field mutation entries."""
+    mutations: list[dict[str, str]] = []
+    for entry in audit_records:
+        masked = mask_audit_entry(entry)
+        mutations.append(
+            {
+                "user": masked.get("user", ""),
+                "old_value": masked.get("oldvalue", ""),
+                "new_value": masked.get("newvalue", ""),
+                "timestamp": masked.get("sys_created_on", ""),
+            }
+        )
+    return mutations
+
+
+# ---------------------------------------------------------------------------
+# Tool registration
+# ---------------------------------------------------------------------------
+
+
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
     """Register debug/trace tools on the MCP server."""
 
@@ -54,10 +218,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         validate_identifier(table)
         check_table_access(table)
 
-        timeline = []
-
         async with ServiceNowClient(settings, auth_provider) as client:
-            # Fetch audit, syslog, and journal entries in parallel
             audit_query = (
                 ServiceNowQuery()
                 .equals("tablename", table)
@@ -77,84 +238,31 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 client.query_records(
                     "sys_audit",
                     audit_query,
-                    fields=[
-                        "sys_id",
-                        "user",
-                        "fieldname",
-                        "oldvalue",
-                        "newvalue",
-                        "sys_created_on",
-                    ],
+                    fields=["sys_id", "user", "fieldname", "oldvalue", "newvalue", "sys_created_on"],
                     limit=INTERNAL_QUERY_LIMIT,
                     order_by="sys_created_on",
                 ),
                 client.query_records(
                     "syslog",
                     syslog_query,
-                    fields=[
-                        "sys_id",
-                        "message",
-                        "source",
-                        "level",
-                        "sys_created_on",
-                    ],
+                    fields=["sys_id", "message", "source", "level", "sys_created_on"],
                     limit=INTERNAL_QUERY_LIMIT,
                     order_by="sys_created_on",
                 ),
                 client.query_records(
                     "sys_journal_field",
                     journal_query,
-                    fields=[
-                        "sys_id",
-                        "element",
-                        "value",
-                        "sys_created_on",
-                        "sys_created_by",
-                    ],
+                    fields=["sys_id", "element", "value", "sys_created_on", "sys_created_by"],
                     limit=INTERNAL_QUERY_LIMIT,
                     order_by="sys_created_on",
                 ),
             )
 
-            for entry in audit_result["records"]:
-                masked_entry = mask_audit_entry(entry)
-                timeline.append(
-                    {
-                        "source": "sys_audit",
-                        "timestamp": masked_entry.get("sys_created_on", ""),
-                        "user": masked_entry.get("user", ""),
-                        "detail": (
-                            f"Field '{masked_entry.get('fieldname', '')}' changed "
-                            f"from '{masked_entry.get('oldvalue', '')}' "
-                            f"to '{masked_entry.get('newvalue', '')}'"
-                        ),
-                    }
-                )
-
-            for entry in syslog_result["records"]:
-                masked_entry = mask_sensitive_fields(entry)
-                timeline.append(
-                    {
-                        "source": "syslog",
-                        "timestamp": masked_entry.get("sys_created_on", ""),
-                        "user": "",
-                        "detail": masked_entry.get("message", ""),
-                    }
-                )
-
-            for entry in journal_result["records"]:
-                masked_entry = mask_sensitive_fields(entry)
-                timeline.append(
-                    {
-                        "source": "sys_journal_field",
-                        "timestamp": masked_entry.get("sys_created_on", ""),
-                        "user": masked_entry.get("sys_created_by", ""),
-                        "detail": (f"[{masked_entry.get('element', '')}] {masked_entry.get('value', '')[:200]}"),
-                    }
-                )
-
-        # Sort by timestamp
-        timeline.sort(key=lambda e: e["timestamp"])
+        timeline = _build_timeline_entries(
+            audit_result["records"],
+            syslog_result["records"],
+            journal_result["records"],
+        )
 
         return format_response(
             data={
@@ -175,37 +283,17 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             context_id: The sys_id of the flow context (sys_flow_context).
         """
         async with ServiceNowClient(settings, auth_provider) as client:
-            # Fetch flow context
             context = mask_sensitive_fields(await client.get_record("sys_flow_context", context_id))
 
-            # Fetch flow log entries
             log_result = await client.query_records(
                 "sys_flow_log",
                 ServiceNowQuery().equals("context", context_id).build(),
-                fields=[
-                    "sys_id",
-                    "step_label",
-                    "state",
-                    "sys_created_on",
-                    "output_data",
-                    "error_message",
-                ],
+                fields=["sys_id", "step_label", "state", "sys_created_on", "output_data", "error_message"],
                 limit=INTERNAL_QUERY_LIMIT,
                 order_by="sys_created_on",
             )
 
-        steps = []
-        for entry in log_result["records"]:
-            masked_entry = mask_sensitive_fields(entry)
-            steps.append(
-                {
-                    "step_label": masked_entry.get("step_label", ""),
-                    "state": masked_entry.get("state", ""),
-                    "timestamp": masked_entry.get("sys_created_on", ""),
-                    "output_data": masked_entry.get("output_data", ""),
-                    "error_message": masked_entry.get("error_message", ""),
-                }
-            )
+        steps = _build_flow_steps(log_result["records"])
 
         return format_response(
             data={
@@ -234,32 +322,12 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             email_result = await client.query_records(
                 "sys_email",
                 ServiceNowQuery().equals("instance", record_sys_id).build(),
-                fields=[
-                    "sys_id",
-                    "type",
-                    "subject",
-                    "recipients",
-                    "sys_created_on",
-                    "direct",
-                    "body_text",
-                ],
+                fields=["sys_id", "type", "subject", "recipients", "sys_created_on", "direct", "body_text"],
                 limit=INTERNAL_QUERY_LIMIT,
                 order_by="sys_created_on",
             )
 
-        emails = []
-        for entry in email_result["records"]:
-            masked_entry = mask_sensitive_fields(entry)
-            emails.append(
-                {
-                    "sys_id": masked_entry.get("sys_id", ""),
-                    "type": masked_entry.get("type", ""),
-                    "subject": masked_entry.get("subject", ""),
-                    "recipients": masked_entry.get("recipients", ""),
-                    "timestamp": masked_entry.get("sys_created_on", ""),
-                    "body_preview": masked_entry.get("body_text", "")[:300],
-                }
-            )
+        emails = _build_email_entries(email_result["records"])
 
         return format_response(
             data={
@@ -281,10 +349,16 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         """Summarize recent integration errors from ecc_queue or REST message transactions.
 
         Args:
-            kind: The integration type to check — 'ecc_queue' or 'rest_message'.
+            kind: The integration type to check - 'ecc_queue' or 'rest_message'.
             hours: How many hours of history to review (default 24).
         """
-        errors = []
+        if kind not in ("ecc_queue", "rest_message"):
+            return format_response(
+                data=None,
+                correlation_id=correlation_id,
+                status="error",
+                error=f"Unknown kind '{kind}'. Use 'ecc_queue' or 'rest_message'.",
+            )
 
         async with ServiceNowClient(settings, auth_provider) as client:
             if kind == "ecc_queue":
@@ -292,65 +366,23 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 result = await client.query_records(
                     "ecc_queue",
                     ecc_query,
-                    fields=[
-                        "sys_id",
-                        "name",
-                        "queue",
-                        "state",
-                        "error_string",
-                        "sys_created_on",
-                    ],
+                    fields=["sys_id", "name", "queue", "state", "error_string", "sys_created_on"],
                     limit=INTERNAL_QUERY_LIMIT,
                     order_by="sys_created_on",
                 )
-                for entry in result["records"]:
-                    masked_entry = mask_sensitive_fields(entry)
-                    errors.append(
-                        {
-                            "sys_id": masked_entry.get("sys_id", ""),
-                            "name": masked_entry.get("name", ""),
-                            "queue": masked_entry.get("queue", ""),
-                            "error": masked_entry.get("error_string", ""),
-                            "timestamp": masked_entry.get("sys_created_on", ""),
-                        }
-                    )
-            elif kind == "rest_message":
+                errors = _build_ecc_errors(result["records"])
+            else:
                 rest_query = (
                     ServiceNowQuery().greater_or_equal("http_status", "400").hours_ago("sys_created_on", hours).build()
                 )
                 result = await client.query_records(
                     "sys_rest_transaction",
                     rest_query,
-                    fields=[
-                        "sys_id",
-                        "rest_message",
-                        "http_method",
-                        "http_status",
-                        "endpoint",
-                        "sys_created_on",
-                    ],
+                    fields=["sys_id", "rest_message", "http_method", "http_status", "endpoint", "sys_created_on"],
                     limit=INTERNAL_QUERY_LIMIT,
                     order_by="sys_created_on",
                 )
-                for entry in result["records"]:
-                    masked_entry = mask_sensitive_fields(entry)
-                    errors.append(
-                        {
-                            "sys_id": masked_entry.get("sys_id", ""),
-                            "rest_message": masked_entry.get("rest_message", ""),
-                            "http_method": masked_entry.get("http_method", ""),
-                            "http_status": masked_entry.get("http_status", ""),
-                            "endpoint": masked_entry.get("endpoint", ""),
-                            "timestamp": masked_entry.get("sys_created_on", ""),
-                        }
-                    )
-            else:
-                return format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error=f"Unknown kind '{kind}'. Use 'ecc_queue' or 'rest_message'.",
-                )
+                errors = _build_rest_errors(result["records"])
 
         return format_response(
             data={
@@ -370,43 +402,18 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             import_set_sys_id: The sys_id of the import set (sys_import_set).
         """
         async with ServiceNowClient(settings, auth_provider) as client:
-            # Fetch import set header
             import_set = mask_sensitive_fields(await client.get_record("sys_import_set", import_set_sys_id))
 
-            # Fetch import set rows
             rows_result = await client.query_records(
                 "sys_import_set_row",
                 ServiceNowQuery().equals("sys_import_set", import_set_sys_id).build(),
-                fields=[
-                    "sys_id",
-                    "sys_import_state",
-                    "sys_target_sys_id",
-                    "sys_import_state_comment",
-                ],
+                fields=["sys_id", "sys_import_state", "sys_target_sys_id", "sys_import_state_comment"],
                 limit=INTERNAL_QUERY_LIMIT,
                 order_by="sys_created_on",
             )
 
         rows = [mask_sensitive_fields(row) for row in rows_result["records"]]
-
-        # Build summary by state
-        state_counts: Counter[str] = Counter()
-        error_details = []
-        for row in rows:
-            state = row.get("sys_import_state", "unknown")
-            state_counts[state] += 1
-            if state == "error":
-                error_details.append(
-                    {
-                        "sys_id": row.get("sys_id", ""),
-                        "comment": row.get("sys_import_state_comment", ""),
-                    }
-                )
-
-        summary = {
-            "total": len(rows),
-            **dict(state_counts),
-        }
+        summary, error_details = _build_importset_summary(rows)
 
         return format_response(
             data={
@@ -454,29 +461,12 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             audit_result = await client.query_records(
                 "sys_audit",
                 audit_query,
-                fields=[
-                    "sys_id",
-                    "user",
-                    "fieldname",
-                    "oldvalue",
-                    "newvalue",
-                    "sys_created_on",
-                ],
+                fields=["sys_id", "user", "fieldname", "oldvalue", "newvalue", "sys_created_on"],
                 limit=limit,
                 order_by="sys_created_on",
             )
 
-        mutations = []
-        for entry in audit_result["records"]:
-            masked_entry = mask_audit_entry(entry)
-            mutations.append(
-                {
-                    "user": masked_entry.get("user", ""),
-                    "old_value": masked_entry.get("oldvalue", ""),
-                    "new_value": masked_entry.get("newvalue", ""),
-                    "timestamp": masked_entry.get("sys_created_on", ""),
-                }
-            )
+        mutations = _build_mutation_entries(audit_result["records"])
 
         return format_response(
             data={

@@ -36,6 +36,92 @@ TOOL_NAMES: list[str] = [
 ]
 
 
+# ------------------------------------------------------------------
+# Module-scope helpers (extracted from register_tools closure)
+# ------------------------------------------------------------------
+
+
+async def _resolve_article_sys_id(
+    client: ServiceNowClient,
+    number_or_sys_id: str,
+    correlation_id: str,
+    display_values: bool = False,
+) -> tuple[str, dict[str, str] | None, str | None]:
+    """Resolve a KB number or sys_id to (sys_id, record_or_None, error_or_None).
+
+    When display_values=True, returns the full record (for knowledge_get).
+    Otherwise returns just the sys_id (for update/feedback).
+    """
+    is_sys_id = bool(_SYS_ID_PATTERN.match(number_or_sys_id.lower()))
+
+    result = await client.query_records(
+        table="kb_knowledge",
+        query=ServiceNowQuery().equals("number", number_or_sys_id.upper()).build(),
+        display_values=display_values,
+        limit=1,
+    )
+
+    if not result["records"] and is_sys_id:
+        result = await client.query_records(
+            table="kb_knowledge",
+            query=ServiceNowQuery().equals("sys_id", number_or_sys_id).build(),
+            display_values=display_values,
+            limit=1,
+        )
+
+    if not result["records"]:
+        return (
+            "",
+            None,
+            format_response(
+                data=None,
+                correlation_id=correlation_id,
+                status="error",
+                error=f"Knowledge article '{number_or_sys_id}' not found.",
+            ),
+        )
+
+    record = result["records"][0]
+    return record["sys_id"], record, None
+
+
+_OPTIONAL_KB_CREATE_FIELDS = ("kb_knowledge_base", "kb_category")
+
+
+def _build_knowledge_create_body(
+    short_description: str,
+    text: str,
+    workflow_state: str,
+    **optional_fields: str,
+) -> dict[str, str]:
+    """Build the record data dict for knowledge article creation."""
+    data: dict[str, str] = {
+        "short_description": short_description,
+        "text": text,
+        "workflow_state": workflow_state,
+    }
+    for key in _OPTIONAL_KB_CREATE_FIELDS:
+        value = optional_fields.get(key, "")
+        if value:
+            data[key] = value
+    return data
+
+
+def _build_feedback_data(article_sys_id: str, rating: int | None, comment: str) -> dict[str, str]:
+    """Build the feedback record data dict."""
+    data: dict[str, str] = {"article": article_sys_id}
+    if rating is not None:
+        data["rating"] = str(rating)
+    if comment.strip():
+        data["comments"] = comment
+    return data
+
+
+# ------------------------------------------------------------------
+# Tool registration
+# ------------------------------------------------------------------
+
+
 def register_tools(
     mcp: FastMCP,
     settings: Settings,
@@ -51,49 +137,6 @@ def register_tools(
         choices: Optional choice registry for resolving field values
     """
     _ = choices  # Accepted for interface conformance with domain tool convention
-
-    async def _resolve_article_sys_id(
-        client: ServiceNowClient,
-        number_or_sys_id: str,
-        correlation_id: str,
-        display_values: bool = False,
-    ) -> tuple[str, dict[str, str] | None, str | None]:
-        """Resolve a KB number or sys_id to (sys_id, record_or_None, error_or_None).
-
-        When display_values=True, returns the full record (for knowledge_get).
-        Otherwise returns just the sys_id (for update/feedback).
-        """
-        is_sys_id = bool(_SYS_ID_PATTERN.match(number_or_sys_id.lower()))
-
-        result = await client.query_records(
-            table="kb_knowledge",
-            query=ServiceNowQuery().equals("number", number_or_sys_id.upper()).build(),
-            display_values=display_values,
-            limit=1,
-        )
-
-        if not result["records"] and is_sys_id:
-            result = await client.query_records(
-                table="kb_knowledge",
-                query=ServiceNowQuery().equals("sys_id", number_or_sys_id).build(),
-                display_values=display_values,
-                limit=1,
-            )
-
-        if not result["records"]:
-            return (
-                "",
-                None,
-                format_response(
-                    data=None,
-                    correlation_id=correlation_id,
-                    status="error",
-                    error=f"Knowledge article '{number_or_sys_id}' not found.",
-                ),
-            )
-
-        record = result["records"][0]
-        return record["sys_id"], record, None
 
     @mcp.tool()
     @tool_handler
@@ -201,15 +244,13 @@ def register_tools(
             return gate_error
 
         # Build data dict with provided fields
-        data = {
-            "short_description": short_description,
-            "text": text,
-            "workflow_state": workflow_state,
-        }
-        if kb_knowledge_base:
-            data["kb_knowledge_base"] = kb_knowledge_base
-        if kb_category:
-            data["kb_category"] = kb_category
+        data = _build_knowledge_create_body(
+            short_description,
+            text,
+            workflow_state,
+            kb_knowledge_base=kb_knowledge_base,
+            kb_category=kb_category,
+        )
 
         async with ServiceNowClient(settings, auth_provider) as client:
             result = await client.create_record(table="kb_knowledge", data=data)
@@ -314,11 +355,7 @@ def register_tools(
             if err:
                 return err
 
-            feedback_data: dict[str, str] = {"article": article_sys_id}
-            if rating is not None:
-                feedback_data["rating"] = str(rating)
-            if comment.strip():
-                feedback_data["comments"] = comment
+            feedback_data = _build_feedback_data(article_sys_id, rating, comment)
 
             created = await client.create_record(
                 table="kb_feedback",

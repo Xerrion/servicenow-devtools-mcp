@@ -264,8 +264,92 @@ uvx servicenow-devtools-mcp
 | `SERVICENOW_ENV` | Environment label (`dev`, `test`, `staging`, `prod`) | `dev` | No |
 | `MAX_ROW_LIMIT` | Maximum rows returned per query (range: 1-10000) | `100` | No |
 | `LARGE_TABLE_NAMES_CSV` | Comma-separated tables requiring date filters | `syslog,sys_audit,sys_log_transaction,sys_email_log` | No |
+| `OTEL_ENABLED` | Enable OpenTelemetry tracing | `false` | No |
+| `OTEL_SERVICE_NAME` | Service name for traces | `servicenow-mcp` | No |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP exporter endpoint | `http://localhost:4318` | No |
+| `OTEL_EXPORTER_CONSOLE` | Enable console span exporter | `false` | No |
+| `SENTRY_DSN` | Sentry DSN for error reporting (enables Sentry when set) | `""` | No |
+| `SENTRY_ENVIRONMENT` | Sentry environment label | Falls back to `SERVICENOW_ENV` | No |
 
 The server reads from `.env` and `.env.local` files automatically (`.env.local` takes precedence).
+
+---
+
+## OpenTelemetry
+
+Opt-in distributed tracing with zero impact when disabled.
+
+### Install with tracing support
+
+```bash
+uv pip install "servicenow-devtools-mcp[otel]"
+```
+
+### Enable tracing
+
+```bash
+# Required - turns on instrumentation
+OTEL_ENABLED=true
+
+# Optional - customize
+OTEL_SERVICE_NAME=servicenow-mcp
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+OTEL_EXPORTER_CONSOLE=false
+```
+
+### What gets traced
+
+- **Tool spans** - every MCP tool invocation with name, correlation ID, and status
+- **HTTP spans** - all ServiceNow API calls with method, URL, and status code
+- **W3C propagation** - `traceparent` header forwarded to ServiceNow
+- **Response enrichment** - `trace_id` and `span_id` included in tool response envelopes when active
+
+### Graceful degradation
+
+- Without `opentelemetry` packages installed: zero overhead, no-op stubs used
+- With packages installed but `OTEL_ENABLED=false` (default): no tracer initialized
+- With packages installed and `OTEL_ENABLED=true`: full instrumentation active
+
+---
+
+## Sentry Error Tracking
+
+Opt-in error tracking designed for MCP servers. Since MCP servers run as child processes of AI agents via stdio, the user never sees stdout or stderr - Sentry provides the primary way to get error visibility in production.
+
+### Install with Sentry support
+
+```bash
+uv pip install "servicenow-devtools-mcp[sentry]"
+```
+
+### Enable error tracking
+
+```bash
+# Required - provide a Sentry DSN to activate
+SENTRY_DSN=https://your-key@o123.ingest.sentry.io/456
+
+# Optional - override environment label (defaults to SERVICENOW_ENV)
+SENTRY_ENVIRONMENT=production
+```
+
+| Variable | Description | Default | Required |
+|---|---|---|---|
+| `SENTRY_DSN` | Sentry DSN for error reporting | `""` (disabled) | No |
+| `SENTRY_ENVIRONMENT` | Sentry environment label | Falls back to `SERVICENOW_ENV` | No |
+
+### What gets captured
+
+- **Tool errors** - every unhandled exception in tool execution, with tool name and correlation ID as tags
+- **HTTP errors** - ServiceNow API failures with status code, method, and URL as structured context
+- **Infrastructure failures** - broken tool group imports, persistent `sys_choice` fetch failures, TOON encoding bugs
+
+### Graceful degradation
+
+- Without `sentry-sdk` installed: zero overhead, all functions no-op
+- With package installed but no `SENTRY_DSN` set: no client initialized
+- With package installed and `SENTRY_DSN` set: full error capture active
+
+Performance monitoring is intentionally disabled in Sentry (`traces_sample_rate=None`) - OpenTelemetry handles distributed tracing.
 
 ---
 

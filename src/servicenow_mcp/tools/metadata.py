@@ -59,6 +59,59 @@ def _resolve_artifact_table(artifact_type: str) -> str:
     return table
 
 
+def _search_via_code_search_api(
+    cs_result: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Extract matches from the Code Search API response, filtering out inaccessible tables."""
+    matches: list[dict[str, Any]] = []
+    for sr in cs_result.get("search_results", []):
+        result_table = sr.get("className", "")
+        try:
+            check_table_access(result_table)
+        except Exception:
+            continue
+        matches.append(
+            {
+                "table": result_table,
+                "sys_id": sr.get("sys_id", ""),
+                "name": sr.get("name", ""),
+                "sys_class_name": result_table,
+            }
+        )
+    return matches
+
+
+async def _search_via_table_scan(
+    client: ServiceNowClient,
+    target: str,
+    effective_limit: int,
+) -> list[dict[str, Any]]:
+    """Fallback: search for a target string across all script tables using scriptCONTAINS queries."""
+    matches: list[dict[str, Any]] = []
+    for table in SCRIPT_TABLES:
+        query = ServiceNowQuery().contains("script", target).build()
+        try:
+            check_table_access(table)
+            result = await client.query_records(
+                table,
+                query,
+                fields=["sys_id", "name", "sys_class_name"],
+                limit=effective_limit,
+            )
+            matches.extend(
+                {
+                    "table": table,
+                    "sys_id": record.get("sys_id", ""),
+                    "name": record.get("name", ""),
+                    "sys_class_name": record.get("sys_class_name", table),
+                }
+                for record in result["records"]
+            )
+        except Exception:
+            continue
+    return matches
+
+
 TOOL_NAMES: list[str] = [
     "meta_list_artifacts",
     "meta_get_artifact",
@@ -155,54 +208,16 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             target: The string to search for in script bodies (e.g., 'GlideRecord', 'incident', a function name).
             limit: Maximum number of matches to return per table.
         """
-        matches: list[dict[str, Any]] = []
         search_method = "code_search_api"
         effective_limit = min(limit, settings.max_row_limit)
 
         async with ServiceNowClient(settings, auth_provider) as client:
-            # Try Code Search API first (indexed, single call)
             try:
                 cs_result = await client.code_search(term=target, limit=effective_limit * len(SCRIPT_TABLES))
-                search_results = cs_result.get("search_results", [])
-                for sr in search_results:
-                    result_table = sr.get("className", "")
-                    try:
-                        check_table_access(result_table)
-                    except Exception:
-                        continue
-                    matches.append(
-                        {
-                            "table": result_table,
-                            "sys_id": sr.get("sys_id", ""),
-                            "name": sr.get("name", ""),
-                            "sys_class_name": result_table,
-                        }
-                    )
+                matches = _search_via_code_search_api(cs_result)
             except Exception:
-                # Fallback to per-table scriptCONTAINS search
                 search_method = "table_scan_fallback"
-                for table in SCRIPT_TABLES:
-                    query = ServiceNowQuery().contains("script", target).build()
-                    try:
-                        check_table_access(table)
-                        result = await client.query_records(
-                            table,
-                            query,
-                            fields=["sys_id", "name", "sys_class_name"],
-                            limit=effective_limit,
-                        )
-                        matches.extend(
-                            {
-                                "table": table,
-                                "sys_id": record.get("sys_id", ""),
-                                "name": record.get("name", ""),
-                                "sys_class_name": record.get("sys_class_name", table),
-                            }
-                            for record in result["records"]
-                        )
-                    except Exception:
-                        # Skip tables that fail (e.g., access issues)
-                        continue
+                matches = await _search_via_table_scan(client, target, effective_limit)
 
         return format_response(
             data={

@@ -2,7 +2,7 @@
 
 import json
 import uuid
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -959,9 +959,7 @@ class TestSafeToolCall:
 
     async def test_success_passthrough(self) -> None:
         """Successful fn return passes through unchanged."""
-
-        async def fn() -> str:
-            return '{"status": "ok"}'
+        fn = AsyncMock(return_value='{"status": "ok"}')
 
         result = await safe_tool_call(fn, "test-corr-id")
         assert result == '{"status": "ok"}'

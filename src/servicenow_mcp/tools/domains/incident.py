@@ -36,6 +36,119 @@ TOOL_NAMES: list[str] = [
 ]
 
 
+# ------------------------------------------------------------------
+# Module-scope helpers (extracted from register_tools closure)
+# ------------------------------------------------------------------
+
+_OPTIONAL_BODY_FIELDS = (
+    "description",
+    "caller_id",
+    "assignment_group",
+    "assigned_to",
+    "category",
+    "subcategory",
+)
+
+
+def _build_incident_create_body(
+    short_description: str,
+    urgency: int,
+    impact: int,
+    priority: int,
+    **optional_fields: str,
+) -> dict[str, str]:
+    """Build the record data dict for incident creation.
+
+    Always includes the required fields. Optional string fields are included
+    only when non-empty.
+    """
+    body: dict[str, str] = {
+        "short_description": short_description,
+        "urgency": str(urgency),
+        "impact": str(impact),
+        "priority": str(priority),
+    }
+    for key in _OPTIONAL_BODY_FIELDS:
+        value = optional_fields.get(key, "")
+        if value:
+            body[key] = value
+    return body
+
+
+async def _build_incident_update_changes(
+    short_description: str,
+    urgency: int,
+    impact: int,
+    priority: int,
+    state: str,
+    description: str,
+    assignment_group: str,
+    assigned_to: str,
+    category: str,
+    subcategory: str,
+    choices: ChoiceRegistry | None,
+) -> dict[str, str]:
+    """Build the changes dict for incident update.
+
+    Integer fields with value > 0 are included as strings. String fields
+    are included only when non-empty. State is resolved via choices registry.
+    """
+    changes: dict[str, str] = {}
+    if short_description:
+        changes["short_description"] = short_description
+    if urgency > 0:
+        changes["urgency"] = str(urgency)
+    if impact > 0:
+        changes["impact"] = str(impact)
+    if priority > 0:
+        changes["priority"] = str(priority)
+    if state:
+        changes["state"] = await resolve_state("incident", state, choices)
+    for key, value in (
+        ("description", description),
+        ("assignment_group", assignment_group),
+        ("assigned_to", assigned_to),
+        ("category", category),
+        ("subcategory", subcategory),
+    ):
+        if value:
+            changes[key] = value
+    return changes
+
+
+async def _build_incident_list_query(
+    state: str,
+    priority: str,
+    assigned_to: str,
+    assignment_group: str,
+    choices: ChoiceRegistry | None,
+) -> str:
+    """Build the encoded query string for incident listing."""
+    q = ServiceNowQuery()
+    if state and state != "all":
+        resolved = await resolve_state("incident", state, choices)
+        q = q.equals_if("state", resolved, True)
+    q = q.equals_if("priority", priority, bool(priority))
+    q = q.equals_if("assigned_to", assigned_to, bool(assigned_to))
+    q = q.equals_if("assignment_group", assignment_group, bool(assignment_group))
+    return q.build()
+
+
+def _build_comment_changes(comment: str, work_note: str) -> dict[str, str]:
+    """Build changes dict for adding comments/work notes."""
+    changes: dict[str, str] = {}
+    if comment:
+        changes["comments"] = comment
+    if work_note:
+        changes["work_notes"] = work_note
+    return changes
+
+
+# ------------------------------------------------------------------
+# Tool registration
+# ------------------------------------------------------------------
+
+
 def register_tools(
     mcp: FastMCP,
     settings: Settings,
@@ -75,15 +188,7 @@ def register_tools(
         """
         check_table_access("incident")
 
-        q = ServiceNowQuery()
-        if state and state != "all":
-            resolved = await resolve_state("incident", state, choices)
-            q = q.equals_if("state", resolved, True)
-        q = q.equals_if("priority", priority, bool(priority))
-        q = q.equals_if("assigned_to", assigned_to, bool(assigned_to))
-        q = q.equals_if("assignment_group", assignment_group, bool(assignment_group))
-
-        query = q.build()
+        query = await _build_incident_list_query(state, priority, assigned_to, assignment_group, choices)
         field_list = parse_field_list(fields)
 
         safety = enforce_query_safety("incident", query, limit, settings)
@@ -169,25 +274,18 @@ def register_tools(
         if err:
             return err
 
-        record_data = {
-            "short_description": short_description,
-            "urgency": str(urgency),
-            "impact": str(impact),
-            "priority": str(priority),
-        }
-
-        if description:
-            record_data["description"] = description
-        if caller_id:
-            record_data["caller_id"] = caller_id
-        if assignment_group:
-            record_data["assignment_group"] = assignment_group
-        if assigned_to:
-            record_data["assigned_to"] = assigned_to
-        if category:
-            record_data["category"] = category
-        if subcategory:
-            record_data["subcategory"] = subcategory
+        record_data = _build_incident_create_body(
+            short_description,
+            urgency,
+            impact,
+            priority,
+            description=description,
+            caller_id=caller_id,
+            assignment_group=assignment_group,
+            assigned_to=assigned_to,
+            category=category,
+            subcategory=subcategory,
+        )
 
         async with ServiceNowClient(settings, auth_provider) as client:
             created = await client.create_record("incident", record_data)
@@ -241,27 +339,19 @@ def register_tools(
             if err:
                 return err
 
-            changes = {}
-            if short_description:
-                changes["short_description"] = short_description
-            if urgency > 0:
-                changes["urgency"] = str(urgency)
-            if impact > 0:
-                changes["impact"] = str(impact)
-            if priority > 0:
-                changes["priority"] = str(priority)
-            if state:
-                changes["state"] = await resolve_state("incident", state, choices)
-            if description:
-                changes["description"] = description
-            if assignment_group:
-                changes["assignment_group"] = assignment_group
-            if assigned_to:
-                changes["assigned_to"] = assigned_to
-            if category:
-                changes["category"] = category
-            if subcategory:
-                changes["subcategory"] = subcategory
+            changes = await _build_incident_update_changes(
+                short_description,
+                urgency,
+                impact,
+                priority,
+                state,
+                description,
+                assignment_group,
+                assigned_to,
+                category,
+                subcategory,
+                choices,
+            )
 
             err = validate_no_empty_changes(changes, correlation_id)
             if err:
@@ -360,11 +450,7 @@ def register_tools(
             if err:
                 return err
 
-            changes = {}
-            if comment:
-                changes["comments"] = comment
-            if work_note:
-                changes["work_notes"] = work_note
+            changes = _build_comment_changes(comment, work_note)
 
             updated = await client.update_record("incident", sys_id, changes)
             masked = mask_sensitive_fields(updated)

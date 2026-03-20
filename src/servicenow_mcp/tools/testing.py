@@ -187,6 +187,57 @@ def _compute_trend(records: list[dict[str, Any]]) -> str:
     return "stable"
 
 
+def _build_result_query_params(test_id: str, suite_id: str) -> tuple[str, str, list[str], str]:
+    """Build query params for atf_get_results based on test_id or suite_id.
+
+    Returns:
+        (table, query_string, fields, result_type)
+    """
+    if test_id:
+        check_table_access("sys_atf_test_result")
+        return (
+            "sys_atf_test_result",
+            ServiceNowQuery().equals("test", test_id).order_by("sys_created_on", descending=True).build(),
+            ["sys_id", "status", "start_time", "end_time", "run_time", "output", "first_failing_step"],
+            "test_results",
+        )
+    check_table_access("sys_atf_test_suite_result")
+    return (
+        "sys_atf_test_suite_result",
+        ServiceNowQuery().equals("test_suite", suite_id).order_by("sys_created_on", descending=True).build(),
+        [
+            "sys_id",
+            "status",
+            "start_time",
+            "end_time",
+            "success_count",
+            "failure_count",
+            "error_count",
+            "skipped_count",
+        ],
+        "suite_results",
+    )
+
+
+def _build_health_query_params(test_id: str, suite_id: str, days: int) -> tuple[str, str]:
+    """Build query params for atf_test_health based on test_id or suite_id.
+
+    Returns:
+        (table, query_string)
+    """
+    if test_id:
+        check_table_access("sys_atf_test_result")
+        table = "sys_atf_test_result"
+        q = ServiceNowQuery().equals("test", test_id)
+    else:
+        check_table_access("sys_atf_test_suite_result")
+        table = "sys_atf_test_suite_result"
+        q = ServiceNowQuery().equals("test_suite", suite_id)
+
+    query_str = q.days_ago("sys_created_on", days).order_by("sys_created_on", descending=False).build()
+    return table, query_str
+
+
 TOOL_NAMES: list[str] = [
     "atf_list_tests",
     "atf_get_test",
@@ -370,35 +421,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         if err:
             return err
 
-        if test_id:
-            check_table_access("sys_atf_test_result")
-            table = "sys_atf_test_result"
-            query = ServiceNowQuery().equals("test", test_id).order_by("sys_created_on", descending=True).build()
-            fields = [
-                "sys_id",
-                "status",
-                "start_time",
-                "end_time",
-                "run_time",
-                "output",
-                "first_failing_step",
-            ]
-            result_type = "test_results"
-        else:
-            check_table_access("sys_atf_test_suite_result")
-            table = "sys_atf_test_suite_result"
-            query = ServiceNowQuery().equals("test_suite", suite_id).order_by("sys_created_on", descending=True).build()
-            fields = [
-                "sys_id",
-                "status",
-                "start_time",
-                "end_time",
-                "success_count",
-                "failure_count",
-                "error_count",
-                "skipped_count",
-            ]
-            result_type = "suite_results"
+        table, query, fields, result_type = _build_result_query_params(test_id, suite_id)
 
         async with ServiceNowClient(settings, auth_provider) as client:
             result = await client.query_records(
@@ -519,16 +542,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         if err:
             return err
 
-        if test_id:
-            check_table_access("sys_atf_test_result")
-            table = "sys_atf_test_result"
-            q = ServiceNowQuery().equals("test", test_id)
-        else:
-            check_table_access("sys_atf_test_suite_result")
-            table = "sys_atf_test_suite_result"
-            q = ServiceNowQuery().equals("test_suite", suite_id)
-
-        full_query = q.days_ago("sys_created_on", days).order_by("sys_created_on", descending=False).build()
+        table, full_query = _build_health_query_params(test_id, suite_id, days)
 
         async with ServiceNowClient(settings, auth_provider) as client:
             result = await client.query_records(

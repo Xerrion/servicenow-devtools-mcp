@@ -31,6 +31,59 @@ TOOL_NAMES: list[str] = [
 ]
 
 
+# ------------------------------------------------------------------
+# Module-scope helpers (extracted from register_tools closure)
+# ------------------------------------------------------------------
+
+
+async def _resolve_ci_sys_id(
+    client: ServiceNowClient,
+    name_or_sys_id: str,
+    ci_class: str,
+    correlation_id: str,
+) -> tuple[str, str | None]:
+    """Resolve a CI name to its sys_id. Returns (sys_id, error_or_None).
+
+    If the input is already a sys_id (32-char hex), returns it directly.
+    Otherwise performs a name lookup against the given ci_class.
+    """
+    if _is_sys_id(name_or_sys_id):
+        return name_or_sys_id, None
+
+    lookup_result = await client.query_records(
+        table=ci_class,
+        query=ServiceNowQuery().equals("name", name_or_sys_id).build(),
+        limit=1,
+    )
+    if not lookup_result["records"]:
+        return "", format_response(
+            data=None,
+            correlation_id=correlation_id,
+            status="error",
+            error=f"CI '{name_or_sys_id}' not found in {ci_class}.",
+        )
+    return lookup_result["records"][0]["sys_id"], None
+
+
+def _build_relationship_query(ci_sys_id: str, direction: str) -> str | None:
+    """Build the encoded query string for CMDB relationship lookup.
+
+    Returns None if the direction is invalid.
+    """
+    if direction == "parent":
+        return ServiceNowQuery().equals("child.sys_id", ci_sys_id).build()
+    if direction == "child":
+        return ServiceNowQuery().equals("parent.sys_id", ci_sys_id).build()
+    if direction == "both":
+        return ServiceNowQuery().equals("child.sys_id", ci_sys_id).or_equals("parent.sys_id", ci_sys_id).build()
+    return None
+
+
+# ------------------------------------------------------------------
+# Tool registration
+# ------------------------------------------------------------------
+
+
 def register_tools(
     mcp: FastMCP,
     settings: Settings,
@@ -148,38 +201,15 @@ def register_tools(
         check_table_access(ci_class)
         check_table_access("cmdb_rel_ci")
 
-        # Detect if input is sys_id (32-char hex string)
-        is_sys_id = _is_sys_id(name_or_sys_id)
-
         async with ServiceNowClient(settings, auth_provider) as client:
-            # If name provided, resolve to sys_id first
-            if not is_sys_id:
-                lookup_result = await client.query_records(
-                    table=ci_class,
-                    query=ServiceNowQuery().equals("name", name_or_sys_id).build(),
-                    limit=1,
-                )
-                if not lookup_result["records"]:
-                    return format_response(
-                        data=None,
-                        correlation_id=correlation_id,
-                        status="error",
-                        error=f"CI '{name_or_sys_id}' not found in {ci_class}.",
-                    )
-                ci_sys_id = lookup_result["records"][0]["sys_id"]
-            else:
-                ci_sys_id = name_or_sys_id
+            # Resolve name to sys_id if needed
+            ci_sys_id, err = await _resolve_ci_sys_id(client, name_or_sys_id, ci_class, correlation_id)
+            if err:
+                return err
 
             # Build relationship query based on direction
-            if direction == "parent":
-                query = ServiceNowQuery().equals("child.sys_id", ci_sys_id).build()
-            elif direction == "child":
-                query = ServiceNowQuery().equals("parent.sys_id", ci_sys_id).build()
-            elif direction == "both":
-                query = (
-                    ServiceNowQuery().equals("child.sys_id", ci_sys_id).or_equals("parent.sys_id", ci_sys_id).build()
-                )
-            else:
+            query = _build_relationship_query(ci_sys_id, direction)
+            if query is None:
                 return format_response(
                     data=None,
                     correlation_id=correlation_id,
