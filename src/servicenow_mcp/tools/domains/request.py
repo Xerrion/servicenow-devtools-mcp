@@ -33,6 +33,53 @@ TOOL_NAMES: list[str] = [
 ]
 
 
+# ------------------------------------------------------------------
+# Module-scope helpers (extracted from register_tools closure)
+# ------------------------------------------------------------------
+
+
+async def _build_request_list_query(
+    state: str,
+    requested_for: str,
+    assignment_group: str,
+    choices: ChoiceRegistry | None,
+) -> str:
+    """Build the encoded query string for request listing."""
+    q = ServiceNowQuery()
+    if state:
+        resolved = await resolve_state("sc_request", state, choices)
+        q = q.equals_if("state", resolved, True)
+    q = q.equals_if("requested_for", requested_for, bool(requested_for))
+    q = q.equals_if("assignment_group", assignment_group, bool(assignment_group))
+    return q.build()
+
+
+async def _build_request_item_update_changes(
+    state: str,
+    assignment_group: str,
+    assigned_to: str,
+    choices: ChoiceRegistry | None,
+) -> dict[str, str]:
+    """Build the changes dict for request item update.
+
+    State is resolved via choices registry. String fields are included
+    only when non-empty.
+    """
+    changes: dict[str, str] = {}
+    if state:
+        changes["state"] = await resolve_state("sc_req_item", state, choices)
+    if assignment_group:
+        changes["assignment_group"] = assignment_group
+    if assigned_to:
+        changes["assigned_to"] = assigned_to
+    return changes
+
+
+# ------------------------------------------------------------------
+# Tool registration
+# ------------------------------------------------------------------
+
+
 def register_tools(
     mcp: FastMCP,
     settings: Settings,
@@ -70,13 +117,7 @@ def register_tools(
         """
         check_table_access("sc_request")
 
-        q = ServiceNowQuery()
-        if state:
-            resolved = await resolve_state("sc_request", state, choices)
-            q = q.equals_if("state", resolved, True)
-        q = q.equals_if("requested_for", requested_for, bool(requested_for))
-        q = q.equals_if("assignment_group", assignment_group, bool(assignment_group))
-        query = q.build()
+        query = await _build_request_list_query(state, requested_for, assignment_group, choices)
         field_list = parse_field_list(fields)
 
         safety = enforce_query_safety("sc_request", query, limit, settings)
@@ -199,13 +240,7 @@ def register_tools(
             if err:
                 return err
 
-            changes = {}
-            if state:
-                changes["state"] = await resolve_state("sc_req_item", state, choices)
-            if assignment_group:
-                changes["assignment_group"] = assignment_group
-            if assigned_to:
-                changes["assigned_to"] = assigned_to
+            changes = await _build_request_item_update_changes(state, assignment_group, assigned_to, choices)
 
             err = validate_no_empty_changes(changes, correlation_id)
             if err:

@@ -16,25 +16,23 @@ from tests.helpers import decode_response, get_tool_functions
 BASE_URL = "https://test.service-now.com"
 SC_BASE = f"{BASE_URL}/api/sn_sc/servicecatalog"
 
-_UNSET: Any = object()
-
 
 def _register_and_get_tools(
     settings: Settings,
     auth_provider: BasicAuthProvider,
-    choices: ChoiceRegistry | None = _UNSET,
+    choices: ChoiceRegistry | None = None,
 ) -> dict[str, Any]:
     """Helper to register service catalog tools and extract callables.
 
-    When *choices* is omitted a ``ChoiceRegistry`` pre-loaded with defaults is
-    created automatically, matching the behaviour most tests expect.  Pass
-    ``choices=None`` explicitly to register tools without a ChoiceRegistry.
+    When *choices* is ``None`` (the default) a ``ChoiceRegistry`` pre-loaded
+    with defaults is created automatically, matching the behaviour most tests
+    expect.
     """
     from mcp.server.fastmcp import FastMCP
 
     from servicenow_mcp.tools.domains.service_catalog import register_tools
 
-    if choices is _UNSET:
+    if choices is None:
         choices = ChoiceRegistry(settings, auth_provider)
         choices._fetched = True
         choices._cache = {k: dict(v) for k, v in ChoiceRegistry._DEFAULTS.items()}

@@ -1,11 +1,26 @@
 """Shared test fixtures and helpers."""
 
+from collections.abc import Generator
 from unittest.mock import patch
 
 import pytest
 
 from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.config import Settings
+
+
+@pytest.fixture(autouse=True)
+def _disable_sentry_capture() -> Generator[None, None, None]:
+    """Prevent Sentry from capturing exceptions during tests.
+
+    Resets the module-level ``_initialized`` flag so that
+    ``capture_exception()`` short-circuits before reaching the real SDK.
+    """
+    import servicenow_mcp.sentry as _sentry_mod
+
+    _sentry_mod._initialized = False
+    yield
+    _sentry_mod._initialized = False
 
 
 @pytest.fixture()

@@ -9,6 +9,7 @@ import respx
 
 from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.config import Settings
+from servicenow_mcp.tools.flow_designer import _process_neighbor
 from tests.helpers import decode_response, get_tool_functions
 
 
@@ -1959,3 +1960,27 @@ class TestFlowDesignerDictReferenceFields:
         # Definition names should be resolved from dicts
         assert mapping[0]["legacy_type"] == "Begin"
         assert mapping[1]["legacy_type"] == "End"
+
+
+# ---------------------------------------------------------------------------
+# _process_neighbor helper
+# ---------------------------------------------------------------------------
+
+
+class TestProcessNeighborHelper:
+    """Unit tests for the _process_neighbor graph traversal helper."""
+
+    def test_neighbor_not_in_color_returns_early(self) -> None:
+        """When neighbor is not in the color dict, _process_neighbor returns without side effects."""
+        color: dict[str, int] = {"A": 0}  # neighbor "B" is not in color
+        path: list[str] = ["A"]
+        stack: list[tuple[str, int]] = [("A", 0)]
+        cycles: list[list[str]] = []
+
+        _process_neighbor("B", color, path, stack, cycles)
+
+        # Nothing should change
+        assert color == {"A": 0}
+        assert path == ["A"]
+        assert stack == [("A", 0)]
+        assert cycles == []

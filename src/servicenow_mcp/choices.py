@@ -7,9 +7,53 @@ from typing import Any, ClassVar
 from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.config import Settings
+from servicenow_mcp.sentry import capture_exception as sentry_capture
 
 
 logger = logging.getLogger(__name__)
+
+
+def _normalize_choice_label(label: str) -> str:
+    """Normalize a choice label to lowercase with underscores replacing spaces."""
+    return label.lower().replace(" ", "_")
+
+
+def _group_choice_records(records: list[dict[str, Any]]) -> dict[tuple[str, str], dict[str, str]]:
+    """Group sys_choice records into a {(table, field): {label: value}} lookup."""
+    grouped: dict[tuple[str, str], dict[str, str]] = {}
+    for record in records:
+        name: Any = record.get("name", "")
+        element: Any = record.get("element", "")
+        label: Any = record.get("label", "")
+        value: Any = record.get("value", "")
+        if not (name and element and label):
+            continue
+        key = (str(name), str(element))
+        if key not in grouped:
+            grouped[key] = {}
+        grouped[key][_normalize_choice_label(str(label))] = str(value)
+    return grouped
+
+
+def _merge_with_defaults(
+    grouped: dict[tuple[str, str], dict[str, str]],
+    defaults: dict[tuple[str, str], dict[str, str]],
+) -> dict[tuple[str, str], dict[str, str]]:
+    """Merge instance choices with defaults: instance data overlays defaults."""
+    merged: dict[tuple[str, str], dict[str, str]] = {}
+
+    for key in defaults:
+        base = dict(defaults[key])
+        if key in grouped:
+            base.update(grouped[key])
+        merged[key] = base
+
+    # Include any instance-only choices not in defaults
+    for key, value in grouped.items():
+        if key not in merged:
+            merged[key] = value
+
+    return merged
 
 
 class ChoiceRegistry:
@@ -127,11 +171,12 @@ class ChoiceRegistry:
 
             try:
                 await self._fetch_from_instance()
-            except Exception:
+            except Exception as e:
                 logger.warning(
                     "Failed to fetch choice lists from instance; using OOTB defaults",
                     exc_info=True,
                 )
+                sentry_capture(e)
                 self._cache = {k: dict(v) for k, v in self._DEFAULTS.items()}
 
             self._fetched = True
@@ -162,32 +207,5 @@ class ChoiceRegistry:
                 limit=500,
             )
 
-        # Group results by (name, element)
-        grouped: dict[tuple[str, str], dict[str, str]] = {}
-        for record in result.get("records", []):
-            name: Any = record.get("name", "")
-            element: Any = record.get("element", "")
-            label: Any = record.get("label", "")
-            value: Any = record.get("value", "")
-            if name and element and label:
-                key = (str(name), str(element))
-                if key not in grouped:
-                    grouped[key] = {}
-                # Normalize label: lowercase, spaces to underscores
-                normalized = str(label).lower().replace(" ", "_")
-                grouped[key][normalized] = str(value)
-
-        # Merge: instance data takes priority, fill gaps from defaults
-        for key in self._DEFAULTS:
-            if key in grouped:
-                # Start with defaults, overlay instance data
-                merged = dict(self._DEFAULTS[key])
-                merged.update(grouped[key])
-                self._cache[key] = merged
-            else:
-                self._cache[key] = dict(self._DEFAULTS[key])
-
-        # Also include any instance-only choices not in defaults
-        for key, value in grouped.items():
-            if key not in self._cache:
-                self._cache[key] = value
+        grouped = _group_choice_records(result.get("records", []))
+        self._cache = _merge_with_defaults(grouped, self._DEFAULTS)

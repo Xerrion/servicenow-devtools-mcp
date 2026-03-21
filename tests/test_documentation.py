@@ -887,3 +887,50 @@ class TestDocsReviewNotes:
         assert result["status"] == "success"
         categories = [f["category"] for f in result["data"]["findings"]]
         assert "gliderecord_in_loop" not in categories
+
+
+class TestDocumentationHelpers:
+    """Unit tests for extracted helper functions _find_block_end and _extract_loop_body."""
+
+    def test_find_block_end_no_matching_brace(self) -> None:
+        """Return last index when script has no closing brace."""
+        from servicenow_mcp.tools.documentation import _find_block_end
+
+        script = "function test() {"
+        result = _find_block_end(script, 16)
+        assert result == len(script) - 1
+
+    def test_find_block_end_nested_braces(self) -> None:
+        """Correctly match the outermost closing brace with nested blocks."""
+        from servicenow_mcp.tools.documentation import _find_block_end
+
+        script = "function test() { if (x) { } }"
+        result = _find_block_end(script, 16)
+        assert result == len(script) - 1
+        assert script[result] == "}"
+
+    def test_extract_loop_body_single_statement_semicolon(self) -> None:
+        """Extract single statement terminated by semicolon (no braces)."""
+        from servicenow_mcp.tools.documentation import _extract_loop_body
+
+        script = "while (gr.next()) doSomething();\nvar x = 1;"
+        result = _extract_loop_body(script, 18)
+        assert "doSomething();" in result
+        assert "var x" not in result
+
+    def test_extract_loop_body_single_statement_newline(self) -> None:
+        """Extract single statement terminated by newline (no semicolon before newline)."""
+        from servicenow_mcp.tools.documentation import _extract_loop_body
+
+        script = "while (gr.next()) doSomething()\nvar x = 1;"
+        result = _extract_loop_body(script, 18)
+        assert "doSomething()" in result
+        assert "var x" not in result
+
+    def test_extract_loop_body_empty_past_end(self) -> None:
+        """Return empty string when only whitespace remains after condition."""
+        from servicenow_mcp.tools.documentation import _extract_loop_body
+
+        script = "while (true) "
+        result = _extract_loop_body(script, 13)
+        assert result == ""

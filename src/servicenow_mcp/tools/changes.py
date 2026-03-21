@@ -2,6 +2,7 @@
 
 import difflib
 from collections import defaultdict
+from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
@@ -50,6 +51,111 @@ TOOL_NAMES: list[str] = [
 ]
 
 
+# ---------------------------------------------------------------------------
+# Module-level helpers (extracted from nested tool bodies to reduce complexity)
+# ---------------------------------------------------------------------------
+
+
+def _group_updateset_members(
+    members: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """Group update set members by type and flag risky artifact types.
+
+    Returns a tuple of (group_summary, risk_flags).
+    """
+    groups: dict[str, list[dict[str, str]]] = defaultdict(list)
+    for member in members:
+        artifact_type = member.get("type", "unknown")
+        groups[artifact_type].append(
+            {
+                "sys_id": member.get("sys_id", ""),
+                "name": member.get("name", ""),
+                "target_name": member.get("target_name", ""),
+                "action": member.get("action", ""),
+            }
+        )
+
+    group_summary = [
+        {"type": type_name, "count": len(items), "items": items} for type_name, items in sorted(groups.items())
+    ]
+
+    risky_found = set(groups.keys()) & RISKY_TYPES
+    risk_flags = [
+        f"Contains {len(groups[risky_type])} '{risky_type}' artifact(s) - review carefully"
+        for risky_type in sorted(risky_found)
+    ]
+
+    return group_summary, risk_flags
+
+
+def _build_audit_changes(audit_records: list[dict[str, Any]]) -> list[dict[str, str]]:
+    """Transform audit records into change summaries."""
+    changes: list[dict[str, str]] = []
+    for entry in audit_records:
+        masked = mask_audit_entry(entry)
+        changes.append(
+            {
+                "user": masked.get("user", ""),
+                "field": masked.get("fieldname", ""),
+                "old_value": masked.get("oldvalue", ""),
+                "new_value": masked.get("newvalue", ""),
+                "timestamp": masked.get("sys_created_on", ""),
+            }
+        )
+    return changes
+
+
+def _build_release_notes_markdown(
+    update_set: dict[str, Any],
+    members: list[dict[str, Any]],
+) -> tuple[str, str]:
+    """Build release notes markdown from update set metadata and members."""
+    us_name = update_set.get("name", "Unnamed Update Set")
+    us_description = update_set.get("description", "")
+    us_state = update_set.get("state", "")
+    us_updated = update_set.get("sys_updated_on", "")
+    us_author = update_set.get("sys_created_by", "")
+
+    # Group by type for the notes
+    groups: dict[str, list[str]] = defaultdict(list)
+    for member in members:
+        artifact_type = member.get("type", "unknown")
+        target = member.get("target_name", member.get("sys_id", "?"))
+        action = member.get("action", "")
+        groups[artifact_type].append(f"{target} ({action})")
+
+    lines = [f"# Release Notes: {us_name}", ""]
+    if us_description:
+        lines.append(f"**Description:** {us_description}")
+        lines.append("")
+    if us_state:
+        lines.append(f"**State:** {us_state}")
+    if us_author:
+        lines.append(f"**Author:** {us_author}")
+    if us_updated:
+        lines.append(f"**Last Updated:** {us_updated}")
+    lines.append(f"**Total Changes:** {len(members)}")
+    lines.append("")
+
+    if groups:
+        lines.append("## Changes by Type")
+        lines.append("")
+        for type_name, items in sorted(groups.items()):
+            lines.append(f"### {type_name} ({len(items)})")
+            lines.extend(f"- {item}" for item in items)
+            lines.append("")
+    else:
+        lines.append("_No changes in this update set._")
+        lines.append("")
+
+    return us_name, "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Tool registration
+# ---------------------------------------------------------------------------
+
+
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
     """Register change intelligence tools on the MCP server."""
 
@@ -64,59 +170,17 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         validate_identifier(update_set_id)
 
         async with ServiceNowClient(settings, auth_provider) as client:
-            # Fetch update set metadata
-            update_set = await client.get_record(
-                "sys_update_set",
-                update_set_id,
-            )
+            update_set = await client.get_record("sys_update_set", update_set_id)
 
-            # Fetch all members of the update set
             members_result = await client.query_records(
                 "sys_update_xml",
                 ServiceNowQuery().equals("update_set", update_set_id).build(),
-                fields=[
-                    "sys_id",
-                    "name",
-                    "type",
-                    "action",
-                    "target_name",
-                ],
+                fields=["sys_id", "name", "type", "action", "target_name"],
                 limit=INTERNAL_QUERY_LIMIT,
             )
 
         members = [mask_sensitive_fields(m) for m in members_result["records"]]
-
-        # Group members by type
-        groups: dict[str, list[dict[str, str]]] = defaultdict(list)
-        for member in members:
-            artifact_type = member.get("type", "unknown")
-            groups[artifact_type].append(
-                {
-                    "sys_id": member.get("sys_id", ""),
-                    "name": member.get("name", ""),
-                    "target_name": member.get("target_name", ""),
-                    "action": member.get("action", ""),
-                }
-            )
-
-        # Build grouped summary
-        group_summary = []
-        for type_name, items in sorted(groups.items()):
-            group_summary.append(
-                {
-                    "type": type_name,
-                    "count": len(items),
-                    "items": items,
-                }
-            )
-
-        # Flag risks
-        member_types = set(groups.keys())
-        risky_found = member_types & RISKY_TYPES
-        risk_flags = [
-            f"Contains {len(groups[risky_type])} '{risky_type}' artifact(s) - review carefully"
-            for risky_type in sorted(risky_found)
-        ]
+        group_summary, risk_flags = _group_updateset_members(members)
 
         return format_response(
             data={
@@ -147,7 +211,6 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         validate_identifier(table)
         check_table_access(table)
 
-        # Build the update name pattern: {table}_{sys_id}
         update_name = f"{table}_{sys_id}"
 
         async with ServiceNowClient(settings, auth_provider) as client:
@@ -168,7 +231,6 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 error=f"Need at least 2 versions to diff, found {len(versions)}",
             )
 
-        # versions[0] is newest (DESC order), versions[1] is second-newest
         old_version = versions[1]
         new_version = versions[0]
         old_payload = old_version.get("payload", "")
@@ -218,31 +280,12 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             audit_result = await client.query_records(
                 "sys_audit",
                 ServiceNowQuery().equals("tablename", table).equals("documentkey", sys_id).build(),
-                fields=[
-                    "sys_id",
-                    "user",
-                    "fieldname",
-                    "oldvalue",
-                    "newvalue",
-                    "sys_created_on",
-                    "documentkey",
-                ],
+                fields=["sys_id", "user", "fieldname", "oldvalue", "newvalue", "sys_created_on", "documentkey"],
                 limit=limit,
                 order_by="sys_created_on",
             )
 
-        changes = []
-        for entry in audit_result["records"]:
-            masked_entry = mask_audit_entry(entry)
-            changes.append(
-                {
-                    "user": masked_entry.get("user", ""),
-                    "field": masked_entry.get("fieldname", ""),
-                    "old_value": masked_entry.get("oldvalue", ""),
-                    "new_value": masked_entry.get("newvalue", ""),
-                    "timestamp": masked_entry.get("sys_created_on", ""),
-                }
-            )
+        changes = _build_audit_changes(audit_result["records"])
 
         return format_response(
             data={
@@ -272,13 +315,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         release_notes_format = _normalize_release_notes_format(format)
 
         async with ServiceNowClient(settings, auth_provider) as client:
-            # Fetch update set metadata
-            update_set = await client.get_record(
-                "sys_update_set",
-                update_set_id,
-            )
+            update_set = await client.get_record("sys_update_set", update_set_id)
 
-            # Fetch members
             members_result = await client.query_records(
                 "sys_update_xml",
                 ServiceNowQuery().equals("update_set", update_set_id).build(),
@@ -287,49 +325,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             )
 
         members = [mask_sensitive_fields(m) for m in members_result["records"]]
-        us_name = update_set.get("name", "Unnamed Update Set")
-        us_description = update_set.get("description", "")
-        us_state = update_set.get("state", "")
-        us_updated = update_set.get("sys_updated_on", "")
-        us_author = update_set.get("sys_created_by", "")
-
-        # Group by type for the notes
-        groups: dict[str, list[str]] = defaultdict(list)
-        for member in members:
-            artifact_type = member.get("type", "unknown")
-            target = member.get("target_name", member.get("sys_id", "?"))
-            action = member.get("action", "")
-            groups[artifact_type].append(f"{target} ({action})")
-
-        # Build Markdown
-        lines = [
-            f"# Release Notes: {us_name}",
-            "",
-        ]
-        if us_description:
-            lines.append(f"**Description:** {us_description}")
-            lines.append("")
-        if us_state:
-            lines.append(f"**State:** {us_state}")
-        if us_author:
-            lines.append(f"**Author:** {us_author}")
-        if us_updated:
-            lines.append(f"**Last Updated:** {us_updated}")
-        lines.append(f"**Total Changes:** {len(members)}")
-        lines.append("")
-
-        if groups:
-            lines.append("## Changes by Type")
-            lines.append("")
-            for type_name, items in sorted(groups.items()):
-                lines.append(f"### {type_name} ({len(items)})")
-                lines.extend(f"- {item}" for item in items)
-                lines.append("")
-        else:
-            lines.append("_No changes in this update set._")
-            lines.append("")
-
-        release_notes = "\n".join(lines)
+        us_name, release_notes = _build_release_notes_markdown(update_set, members)
 
         return format_response(
             data={

@@ -16,25 +16,27 @@ from tests.helpers import decode_response, get_tool_functions
 
 BASE_URL = "https://test.service-now.com"
 
-_UNSET: Any = object()
-
 
 def _register_and_get_tools(
     settings: Settings,
     auth_provider: BasicAuthProvider,
-    choices: ChoiceRegistry | None = _UNSET,
+    choices: ChoiceRegistry | None = None,
+    *,
+    use_default_choices: bool = True,
 ) -> dict[str, Any]:
     """Helper to register incident tools and extract callables.
 
-    When *choices* is omitted a ``ChoiceRegistry`` pre-loaded with defaults is
-    created automatically, matching the behaviour most tests expect.  Pass
-    ``choices=None`` explicitly to register tools without a ChoiceRegistry.
+    When *choices* is ``None`` and *use_default_choices* is ``True`` (the
+    default), a ``ChoiceRegistry`` pre-loaded with defaults is created
+    automatically, matching the behaviour most tests expect.  Pass
+    ``choices=None, use_default_choices=False`` to register tools without
+    a ChoiceRegistry.
     """
     from mcp.server.fastmcp import FastMCP
 
     from servicenow_mcp.tools.domains.incident import register_tools
 
-    if choices is _UNSET:
+    if choices is None and use_default_choices:
         choices = ChoiceRegistry(settings, auth_provider)
         choices._fetched = True
         choices._cache = {k: dict(v) for k, v in ChoiceRegistry._DEFAULTS.items()}
@@ -595,7 +597,7 @@ class TestIncidentResolve:
             )
         )
 
-        tools = _register_and_get_tools(settings, auth_provider, choices=None)
+        tools = _register_and_get_tools(settings, auth_provider, use_default_choices=False)
         result = await tools["incident_resolve"](
             number="INC0010001",
             close_code="Solved (Permanently)",

@@ -78,6 +78,49 @@ def _classify_br_phases(br_records: list[dict[str, Any]]) -> dict[str, list[dict
     return phases
 
 
+def _classify_client_script_phases(
+    cs_records: list[dict[str, Any]],
+    phases: dict[str, list[dict[str, Any]]],
+) -> None:
+    """Add client script entries into the phases dict, grouped by script type."""
+    for cs in cs_records:
+        cs_type = cs.get("type", "onChange")
+        phase_key = f"client_{cs_type}"
+        if phase_key not in phases:
+            phases[phase_key] = []
+        phases[phase_key].append(
+            {
+                "type": "client_script",
+                "sys_id": cs.get("sys_id", ""),
+                "name": cs.get("name", ""),
+            }
+        )
+
+
+def _classify_ui_policies(uip_records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Build UI policy entries for the phase map."""
+    return [
+        {
+            "type": "ui_policy",
+            "sys_id": p.get("sys_id", ""),
+            "name": p.get("short_description", ""),
+        }
+        for p in uip_records
+    ]
+
+
+def _classify_ui_actions(uia_records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Build UI action entries for the phase map."""
+    return [
+        {
+            "type": "ui_action",
+            "sys_id": a.get("sys_id", ""),
+            "name": a.get("name", ""),
+        }
+        for a in uia_records
+    ]
+
+
 TOOL_NAMES: list[str] = [
     "docs_logic_map",
     "docs_artifact_summary",
@@ -149,45 +192,17 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         # Build phase map from business rules
         phases = _classify_br_phases(br_result["records"])
 
-        # Add client scripts under 'client' phase
+        # Add client scripts, UI policies, and UI actions
         cs_records = cs_result["records"]
-        if cs_records:
-            for cs in cs_records:
-                cs_type = cs.get("type", "onChange")
-                phase_key = f"client_{cs_type}"
-                if phase_key not in phases:
-                    phases[phase_key] = []
-                phases[phase_key].append(
-                    {
-                        "type": "client_script",
-                        "sys_id": cs.get("sys_id", ""),
-                        "name": cs.get("name", ""),
-                    }
-                )
+        _classify_client_script_phases(cs_records, phases)
 
-        # Add UI policies under 'ui_policy' phase
         uip_records = uip_result["records"]
         if uip_records:
-            phases["ui_policy"] = [
-                {
-                    "type": "ui_policy",
-                    "sys_id": p.get("sys_id", ""),
-                    "name": p.get("short_description", ""),
-                }
-                for p in uip_records
-            ]
+            phases["ui_policy"] = _classify_ui_policies(uip_records)
 
-        # Add UI actions under 'ui_action' phase
         uia_records = uia_result["records"]
         if uia_records:
-            phases["ui_action"] = [
-                {
-                    "type": "ui_action",
-                    "sys_id": a.get("sys_id", ""),
-                    "name": a.get("name", ""),
-                }
-                for a in uia_records
-            ]
+            phases["ui_action"] = _classify_ui_actions(uia_records)
 
         total = len(br_result["records"]) + len(cs_records) + len(uip_records) + len(uia_records)
 
@@ -460,6 +475,58 @@ def _find_block_end(script: str, open_brace_idx: int) -> int:
     return len(script) - 1
 
 
+def _find_matching_paren(script: str, open_paren_idx: int) -> int:
+    """Return the index after the matching closing parenthesis, or end of script."""
+    depth = 1
+    pos = open_paren_idx + 1
+    while pos < len(script) and depth > 0:
+        if script[pos] == "(":
+            depth += 1
+        elif script[pos] == ")":
+            depth -= 1
+        pos += 1
+    return pos
+
+
+def _extract_loop_body(script: str, after_condition_idx: int) -> str:
+    """Extract the body of a loop starting after its condition's closing paren."""
+    body_start = after_condition_idx
+    while body_start < len(script) and script[body_start] in " \t\r\n":
+        body_start += 1
+
+    if body_start >= len(script):
+        return ""
+
+    if script[body_start] == "{":
+        block_end = _find_block_end(script, body_start)
+        return script[body_start : block_end + 1]
+
+    # Single statement (no braces) - find the next semicolon or newline
+    stmt_end = len(script)
+    for terminator in (";", "\n"):
+        idx = script.find(terminator, body_start)
+        if idx != -1:
+            stmt_end = min(stmt_end, idx + 1)
+    return script[body_start:stmt_end]
+
+
+def _check_gr_in_loops(script: str) -> bool:
+    """Return True if any while/for loop body contains a GlideRecord instantiation."""
+    loop_matches = sorted(
+        itertools.chain(_WHILE_BLOCK_RE.finditer(script), _FOR_BLOCK_RE.finditer(script)),
+        key=lambda m: m.start(),
+    )
+    for m in loop_matches:
+        open_paren = script.find("(", m.start())
+        if open_paren == -1:
+            continue  # pragma: no cover
+        after_condition = _find_matching_paren(script, open_paren)
+        body = _extract_loop_body(script, after_condition)
+        if body and _GR_IN_BLOCK_RE.search(body):
+            return True
+    return False
+
+
 def _scan_for_anti_patterns(script: str) -> list[dict[str, str]]:
     """Scan script for common ServiceNow anti-patterns."""
     findings: list[dict[str, str]] = []
@@ -468,51 +535,7 @@ def _scan_for_anti_patterns(script: str) -> list[dict[str, str]]:
         return findings
 
     # 1. GlideRecord inside a loop (while/for containing new GlideRecord)
-    has_gr_in_loop = False
-    loop_matches = sorted(
-        itertools.chain(_WHILE_BLOCK_RE.finditer(script), _FOR_BLOCK_RE.finditer(script)),
-        key=lambda m: m.start(),
-    )
-    for m in loop_matches:
-        # Find the matching closing paren for the condition
-        open_paren = script.find("(", m.start())
-        if open_paren == -1:
-            continue  # pragma: no cover
-        depth = 1
-        pos = open_paren + 1
-        while pos < len(script) and depth > 0:
-            if script[pos] == "(":
-                depth += 1
-            elif script[pos] == ")":
-                depth -= 1
-            pos += 1
-        # pos is now right after the closing ")"
-
-        # Skip whitespace to find block start
-        body_start = pos
-        while body_start < len(script) and script[body_start] in " \t\r\n":
-            body_start += 1
-
-        if body_start >= len(script):
-            continue
-
-        if script[body_start] == "{":
-            # Braced block - use existing _find_block_end
-            block_end = _find_block_end(script, body_start)
-            block = script[body_start : block_end + 1]
-        else:
-            # Single statement (no braces) - find the next semicolon or newline
-            stmt_end = len(script)
-            for terminator in (";", "\n"):
-                idx = script.find(terminator, body_start)
-                if idx != -1:
-                    stmt_end = min(stmt_end, idx + 1)
-            block = script[body_start:stmt_end]
-
-        if _GR_IN_BLOCK_RE.search(block):
-            has_gr_in_loop = True
-            break
-    if has_gr_in_loop:
+    if _check_gr_in_loops(script):
         findings.append(
             {
                 "category": "gliderecord_in_loop",
