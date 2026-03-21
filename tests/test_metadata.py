@@ -540,7 +540,7 @@ class TestMetadataHelpers:
         """Tables where query_records raises are silently skipped."""
         mock_client = AsyncMock()
 
-        async def _selective_query(
+        def _selective_query(
             table: str, query: str, fields: list[str] | None = None, limit: int = 100
         ) -> dict[str, Any]:
             if table == "sys_script":
@@ -548,7 +548,7 @@ class TestMetadataHelpers:
                     "records": [{"sys_id": "rec1", "name": "Found BR", "sys_class_name": "sys_script"}],
                     "count": 1,
                 }
-            raise Exception(f"HTTP error for table {table}")
+            raise RuntimeError(f"HTTP error for table {table}")
 
         mock_client.query_records = AsyncMock(side_effect=_selective_query)
 

@@ -16,6 +16,15 @@ from servicenow_mcp.sentry import (
 )
 
 
+_TEST_ENV: dict[str, str] = {
+    "SERVICENOW_INSTANCE_URL": "https://test.service-now.com",
+    "SERVICENOW_USERNAME": "admin",
+    "SERVICENOW_PASSWORD": "s3cret",  # NOSONAR - test fixture with dummy value
+    "SERVICENOW_ENV": "dev",
+    "MCP_TOOL_PACKAGE": "full",
+}
+
+
 @pytest.fixture(autouse=True)
 def _reset_sentry_state() -> Generator[None, None, None]:
     """Reset sentry module state between tests."""
@@ -27,13 +36,7 @@ def _reset_sentry_state() -> Generator[None, None, None]:
 
 def _make_settings(**overrides: Any) -> Any:
     """Build a minimal Settings for Sentry tests."""
-    env = {
-        "SERVICENOW_INSTANCE_URL": "https://test.service-now.com",
-        "SERVICENOW_USERNAME": "admin",
-        "SERVICENOW_PASSWORD": "s3cret",
-        "SERVICENOW_ENV": "dev",
-        "MCP_TOOL_PACKAGE": "full",
-    }
+    env = {**_TEST_ENV}
     for key, value in overrides.items():
         env[key.upper()] = str(value)
     with patch.dict("os.environ", env, clear=True):
@@ -89,7 +92,7 @@ class TestSetupSentry:
         assert call_kwargs["environment"] == "staging"
         assert call_kwargs["send_default_pii"] is True
         assert call_kwargs["integrations"] == []
-        assert call_kwargs["traces_sample_rate"] == 1.0
+        assert call_kwargs["traces_sample_rate"] == pytest.approx(1.0)
         assert call_kwargs["profiles_sample_rate"] is None
 
     def test_falls_back_to_servicenow_env(self) -> None:
@@ -364,18 +367,9 @@ class TestSetSentryContextIntegration:
 
     def test_server_sets_server_context(self) -> None:
         """create_mcp_server sets server context after setup_sentry."""
+        env = {**_TEST_ENV, "MCP_TOOL_PACKAGE": "none"}
         with (
-            patch.dict(
-                "os.environ",
-                {
-                    "SERVICENOW_INSTANCE_URL": "https://test.service-now.com",
-                    "SERVICENOW_USERNAME": "admin",
-                    "SERVICENOW_PASSWORD": "secret",
-                    "SERVICENOW_ENV": "dev",
-                    "MCP_TOOL_PACKAGE": "none",
-                },
-                clear=True,
-            ),
+            patch.dict("os.environ", env, clear=True),
             patch("servicenow_mcp.server.setup_sentry"),
             patch("servicenow_mcp.server.set_sentry_context") as mock_ctx,
         ):
@@ -410,7 +404,7 @@ class TestSetSentryContextIntegration:
             assert "correlation_id" in context_data
             assert context_data["args"] == {"table": "incident"}
 
-    async def test_raise_for_status_sets_http_context(self) -> None:
+    def test_raise_for_status_sets_http_context(self) -> None:
         """_raise_for_status sets HTTP context before raising."""
         import httpx
 
