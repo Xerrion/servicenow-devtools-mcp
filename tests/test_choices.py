@@ -1,13 +1,14 @@
 """Tests for ChoiceRegistry lazy-loaded choice list cache."""
 
 import asyncio
+from unittest.mock import patch
 
 import pytest
 import respx
 from httpx import Response
 
 from servicenow_mcp.auth import BasicAuthProvider
-from servicenow_mcp.choices import ChoiceRegistry
+from servicenow_mcp.choices import ChoiceRegistry, _group_choice_records, _merge_with_defaults
 from servicenow_mcp.config import Settings
 
 
@@ -278,3 +279,135 @@ class TestChoiceRegistryLabelNormalization:
         registry = ChoiceRegistry(settings, auth_provider)
         result = await registry.resolve("problem", "state", "root_cause_analysis")
         assert result == "4"
+
+
+class TestChoiceHelpers:
+    """Test the extracted pure helper functions."""
+
+    def test_group_choice_records_skips_falsy_name(self) -> None:
+        """Records with empty name should be skipped."""
+        records = [
+            {"name": "", "element": "state", "label": "Open", "value": "1"},
+            {"name": "incident", "element": "state", "label": "Closed", "value": "7"},
+        ]
+        grouped = _group_choice_records(records)
+        assert ("incident", "state") in grouped
+        assert grouped[("incident", "state")] == {"closed": "7"}
+        # The record with empty name should not appear anywhere
+        assert len(grouped) == 1
+
+    def test_group_choice_records_skips_falsy_element(self) -> None:
+        """Records with empty element should be skipped."""
+        records = [
+            {"name": "incident", "element": "", "label": "Open", "value": "1"},
+            {"name": "incident", "element": "state", "label": "Closed", "value": "7"},
+        ]
+        grouped = _group_choice_records(records)
+        assert grouped == {("incident", "state"): {"closed": "7"}}
+
+    def test_group_choice_records_skips_falsy_label(self) -> None:
+        """Records with empty label should be skipped."""
+        records = [
+            {"name": "incident", "element": "state", "label": "", "value": "1"},
+            {"name": "incident", "element": "state", "label": "Closed", "value": "7"},
+        ]
+        grouped = _group_choice_records(records)
+        assert grouped == {("incident", "state"): {"closed": "7"}}
+
+    def test_merge_with_defaults_includes_instance_only_choices(self) -> None:
+        """Instance-only choices not present in defaults should appear in merged output."""
+        defaults: dict[tuple[str, str], dict[str, str]] = {
+            ("incident", "state"): {"open": "1", "closed": "7"},
+        }
+        grouped: dict[tuple[str, str], dict[str, str]] = {
+            ("incident", "state"): {"open": "99"},
+            ("custom_table", "priority"): {"high": "1", "low": "3"},
+        }
+        merged = _merge_with_defaults(grouped, defaults)
+
+        # Default key should be present with instance override
+        assert merged[("incident", "state")]["open"] == "99"
+        assert merged[("incident", "state")]["closed"] == "7"
+        # Instance-only key should be included
+        assert ("custom_table", "priority") in merged
+        assert merged[("custom_table", "priority")] == {"high": "1", "low": "3"}
+
+
+class TestChoiceRegistryExceptionPaths:
+    """Test async exception handling and edge cases in ChoiceRegistry."""
+
+    @pytest.mark.asyncio()
+    @respx.mock
+    async def test_ensure_fetched_double_check_after_lock(
+        self, settings: Settings, auth_provider: BasicAuthProvider
+    ) -> None:
+        """Second concurrent caller should hit the double-check guard (line 170) after lock release."""
+        gate = asyncio.Event()
+
+        original_fetch = ChoiceRegistry._fetch_from_instance
+
+        async def slow_fetch(self_inner: ChoiceRegistry) -> None:
+            """Delay fetch so the second caller queues on the lock."""
+            await gate.wait()
+            await original_fetch(self_inner)
+
+        respx.get(f"{BASE_URL}/api/now/table/sys_choice").mock(
+            return_value=Response(
+                200,
+                json={"result": []},
+                headers={"X-Total-Count": "0"},
+            )
+        )
+
+        registry = ChoiceRegistry(settings, auth_provider)
+
+        with patch.object(ChoiceRegistry, "_fetch_from_instance", slow_fetch):
+            task1 = asyncio.create_task(registry.resolve("incident", "state", "open"))
+            task2 = asyncio.create_task(registry.resolve("incident", "state", "closed"))
+
+            # Let both tasks start and queue on the lock
+            await asyncio.sleep(0.05)
+
+            # Release the gate so the first fetch completes
+            gate.set()
+
+            results = await asyncio.gather(task1, task2)
+
+        # Both should resolve using defaults (empty instance data merged with defaults)
+        assert results[0] == "1"  # "open" from defaults
+        assert results[1] == "7"  # "closed" from defaults
+
+        # Fetch should only have been called once - the second task hit the double-check
+        assert registry._fetched is True
+
+    @pytest.mark.asyncio()
+    @respx.mock
+    async def test_ensure_fetched_falls_back_on_fetch_error(
+        self, settings: Settings, auth_provider: BasicAuthProvider
+    ) -> None:
+        """When _fetch_from_instance raises, the registry should fall back to OOTB defaults."""
+        respx.get(f"{BASE_URL}/api/now/table/sys_choice").mock(
+            return_value=Response(500, json={"error": {"message": "Internal Server Error"}})
+        )
+
+        registry = ChoiceRegistry(settings, auth_provider)
+        result = await registry.resolve("incident", "state", "open")
+
+        # Should fall back to default value
+        assert result == "1"
+        assert registry._fetched is True
+        # Cache should contain all default keys
+        assert ("incident", "state") in registry._cache
+        assert ("change_request", "state") in registry._cache
+
+    @pytest.mark.asyncio()
+    async def test_fetch_from_instance_empty_defaults(
+        self, settings: Settings, auth_provider: BasicAuthProvider
+    ) -> None:
+        """When _DEFAULTS is empty, _fetch_from_instance should set cache to {} and return early."""
+        registry = ChoiceRegistry(settings, auth_provider)
+
+        with patch.object(ChoiceRegistry, "_DEFAULTS", {}):
+            await registry._fetch_from_instance()
+
+        assert registry._cache == {}

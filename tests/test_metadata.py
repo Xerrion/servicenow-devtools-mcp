@@ -1,6 +1,7 @@
 """Tests for metadata tools (meta_list_artifacts, meta_get_artifact, meta_find_references, meta_what_writes)."""
 
 from typing import Any
+from unittest.mock import AsyncMock, patch
 from urllib.parse import parse_qs, urlparse
 
 import httpx
@@ -9,8 +10,10 @@ import respx
 
 from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.config import Settings
+from servicenow_mcp.errors import PolicyError
 from servicenow_mcp.mcp_state import attach_query_store
 from servicenow_mcp.state import QueryTokenStore
+from servicenow_mcp.tools.metadata import _search_via_code_search_api, _search_via_table_scan
 from tests.helpers import decode_response, get_tool_functions
 
 
@@ -507,3 +510,83 @@ class TestMetaWhatWrites:
 
         assert result["status"] == "success"
         assert result["data"]["writers"] == []
+
+
+class TestMetadataHelpers:
+    """Tests for the private helper functions _search_via_code_search_api and _search_via_table_scan."""
+
+    def test_search_via_code_search_api_skips_denied_tables(self) -> None:
+        """Results referencing denied tables are silently skipped."""
+        cs_result: dict[str, Any] = {
+            "search_results": [
+                {"className": "sys_script", "sys_id": "allowed1", "name": "Allowed BR"},
+                {"className": "sys_user_has_password", "sys_id": "denied1", "name": "Denied Record"},
+            ],
+        }
+
+        def _selective_check(table: str) -> None:
+            if table == "sys_user_has_password":
+                raise PolicyError(f"Access denied for table: {table}")
+
+        with patch("servicenow_mcp.tools.metadata.check_table_access", side_effect=_selective_check):
+            matches = _search_via_code_search_api(cs_result)
+
+        assert len(matches) == 1
+        assert matches[0]["table"] == "sys_script"
+        assert matches[0]["sys_id"] == "allowed1"
+
+    @pytest.mark.asyncio()
+    async def test_search_via_table_scan_skips_tables_on_query_error(self) -> None:
+        """Tables where query_records raises are silently skipped."""
+        mock_client = AsyncMock()
+
+        async def _selective_query(
+            table: str, query: str, fields: list[str] | None = None, limit: int = 100
+        ) -> dict[str, Any]:
+            if table == "sys_script":
+                return {
+                    "records": [{"sys_id": "rec1", "name": "Found BR", "sys_class_name": "sys_script"}],
+                    "count": 1,
+                }
+            raise Exception(f"HTTP error for table {table}")
+
+        mock_client.query_records = AsyncMock(side_effect=_selective_query)
+
+        matches = await _search_via_table_scan(mock_client, "GlideRecord", effective_limit=20)
+
+        assert len(matches) == 1
+        assert matches[0]["table"] == "sys_script"
+        assert matches[0]["sys_id"] == "rec1"
+
+    @pytest.mark.asyncio()
+    async def test_search_via_table_scan_skips_denied_tables_via_policy(self) -> None:
+        """Tables denied by check_table_access are skipped without calling query_records."""
+        mock_client = AsyncMock()
+        mock_client.query_records = AsyncMock(
+            return_value={
+                "records": [{"sys_id": "rec1", "name": "Found", "sys_class_name": "sys_script"}],
+                "count": 1,
+            }
+        )
+
+        denied_table = "sys_script_client"
+
+        def _selective_check(table: str) -> None:
+            if table == denied_table:
+                raise PolicyError(f"Access denied for table: {table}")
+
+        with patch("servicenow_mcp.tools.metadata.check_table_access", side_effect=_selective_check):
+            matches = await _search_via_table_scan(mock_client, "GlideRecord", effective_limit=20)
+
+        # All tables except the denied one should produce results
+        denied_count = sum(1 for t in SCRIPT_TABLES if t == denied_table)
+        expected_count = len(SCRIPT_TABLES) - denied_count
+        assert len(matches) == expected_count
+
+        # The denied table must not appear in matches
+        matched_tables = [m["table"] for m in matches]
+        assert denied_table not in matched_tables
+
+        # query_records should NOT have been called for the denied table
+        called_tables = [call.args[0] for call in mock_client.query_records.call_args_list]
+        assert denied_table not in called_tables

@@ -1,8 +1,13 @@
 """Tests for MCP server entry point."""
 
+import importlib
+from types import ModuleType
+from typing import Any
 from unittest.mock import patch
 
-from tests.helpers import get_tool_names
+from toon_format import decode as toon_decode
+
+from tests.helpers import get_tool_functions, get_tool_names
 
 
 class TestCreateMcpServer:
@@ -115,3 +120,57 @@ class TestCreateMcpServer:
 
         tool_names = get_tool_names(mcp_server)
         assert tool_names == ["list_tool_packages"]
+
+    def test_list_tool_packages_tool_returns_package_data(self) -> None:
+        """Calling list_tool_packages returns serialized package registry."""
+        from servicenow_mcp.server import create_mcp_server
+
+        env = {
+            "SERVICENOW_INSTANCE_URL": "https://test.service-now.com",
+            "SERVICENOW_USERNAME": "admin",
+            "SERVICENOW_PASSWORD": "s3cret",  # NOSONAR - intentional test-only fixture credential
+            "MCP_TOOL_PACKAGE": "none",
+        }
+        with patch.dict("os.environ", env, clear=True):
+            mcp_server = create_mcp_server()
+
+        tools = get_tool_functions(mcp_server)
+        raw = tools["list_tool_packages"]()
+        result = toon_decode(raw)
+
+        assert isinstance(result, dict)
+        assert "full" in result
+        assert "none" in result
+        assert "core_readonly" in result
+        assert result["none"] == []
+        assert "table" in result["core_readonly"]
+
+    def test_import_error_during_tool_loading_is_handled(self) -> None:
+        """Server still starts when a tool group module fails to import."""
+        from servicenow_mcp.server import create_mcp_server
+
+        original_import = importlib.import_module
+
+        def mock_import(name: str, *args: Any, **kwargs: Any) -> ModuleType:
+            if name == "servicenow_mcp.tools.table":
+                raise ImportError("fake import error")
+            return original_import(name, *args, **kwargs)
+
+        env = {
+            "SERVICENOW_INSTANCE_URL": "https://test.service-now.com",
+            "SERVICENOW_USERNAME": "admin",
+            "SERVICENOW_PASSWORD": "s3cret",  # NOSONAR - intentional test-only fixture credential
+            "MCP_TOOL_PACKAGE": "core_readonly",
+        }
+        with (
+            patch.dict("os.environ", env, clear=True),
+            patch("servicenow_mcp.server.importlib.import_module", side_effect=mock_import),
+        ):
+            mcp_server = create_mcp_server()
+
+        tool_names = get_tool_names(mcp_server)
+        # The table tools should not be registered due to the import failure
+        assert "table_describe" not in tool_names
+        # Other tool groups should still load successfully
+        assert "list_tool_packages" in tool_names
+        assert "record_get" in tool_names

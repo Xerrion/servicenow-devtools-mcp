@@ -557,3 +557,18 @@ class TestDebugFieldMutationStory:
 
         assert result["status"] == "success"
         assert result["data"]["mutations"] == []
+
+
+class TestDebugIntegrationHealthValidation:
+    """Tests for debug_integration_health input validation."""
+
+    @pytest.mark.asyncio()
+    async def test_invalid_kind_returns_error(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
+        """Unknown kind value is rejected before any HTTP call is made."""
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["debug_integration_health"](kind="invalid_kind")
+        result = decode_response(raw)
+
+        assert result["status"] == "error"
+        error_msg = result["error"]["message"] if isinstance(result["error"], dict) else result["error"]
+        assert "Unknown kind" in error_msg
