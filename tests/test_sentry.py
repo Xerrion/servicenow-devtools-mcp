@@ -1,6 +1,5 @@
 """Tests for the sentry module (Sentry error tracking)."""
 
-from collections.abc import Generator
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -23,15 +22,6 @@ _TEST_ENV: dict[str, str] = {
     "SERVICENOW_ENV": "dev",
     "MCP_TOOL_PACKAGE": "full",
 }
-
-
-@pytest.fixture(autouse=True)
-def _reset_sentry_state() -> Generator[None, None, None]:
-    """Reset sentry module state between tests."""
-    # Root conftest._disable_sentry_capture also resets _initialized;
-    # this fixture provides an additional explicit reset for sentry-specific tests.
-    yield
-    sentry_mod._initialized = False
 
 
 def _make_settings(**overrides: Any) -> Any:
