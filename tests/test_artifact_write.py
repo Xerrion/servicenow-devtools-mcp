@@ -41,7 +41,7 @@ def script_settings(tmp_path: Any) -> Settings:
     env = {
         "SERVICENOW_INSTANCE_URL": "https://test.service-now.com",
         "SERVICENOW_USERNAME": "admin",
-        "SERVICENOW_PASSWORD": "s3cret",
+        "SERVICENOW_PASSWORD": "s3cret",  # NOSONAR - test-only dummy credential
         "SERVICENOW_ENV": "dev",
         "MCP_TOOL_PACKAGE": "full",
         "SCRIPT_ALLOWED_ROOT": str(tmp_path),
@@ -116,7 +116,7 @@ class TestReadScriptFile:
     def test_rejects_relative_path(self) -> None:
         """Raises ValueError when given a relative path."""
         with pytest.raises(ValueError, match="absolute path"):
-            _read_script_file("relative/path/script.js", allowed_root="/tmp")
+            _read_script_file("relative/path/script.js", allowed_root="/nonexistent/root")
 
     def test_rejects_empty_allowed_root(self, tmp_path: Any) -> None:
         """Raises ValueError when allowed_root is empty."""
