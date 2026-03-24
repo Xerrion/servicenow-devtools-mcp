@@ -313,6 +313,68 @@ if gate:
     return gate  # Pre-formatted error envelope
 ```
 
+## ✏️ Artifact Write Tools
+
+Located in `tools/artifact_write.py`. Provides `artifact_create` and `artifact_update` tools with local script file support.
+
+### WRITABLE_ARTIFACT_TABLES (17 types)
+
+Superset of `metadata.py:ARTIFACT_TABLES` (7 types). All 17 artifact types:
+
+| Artifact Type | ServiceNow Table |
+|---|---|
+| `business_rule` | `sys_script` |
+| `script_include` | `sys_script_include` |
+| `ui_policy` | `sys_ui_policy` |
+| `ui_action` | `sys_ui_action` |
+| `client_script` | `sys_script_client` |
+| `scheduled_job` | `sysauto_script` |
+| `fix_script` | `sys_script_fix` |
+| `scripted_rest_resource` | `sys_ws_operation` |
+| `ui_script` | `sys_ui_script` |
+| `processor` | `sys_processor` |
+| `widget` | `sp_widget` |
+| `ui_page` | `sys_ui_page` |
+| `ui_macro` | `sys_ui_macro` |
+| `script_action` | `sysevent_script_action` |
+| `mid_script_include` | `ecc_agent_script_include` |
+| `scripted_rest_api` | `sys_web_service` |
+| `notification_script` | `sysevent_email_action` |
+
+### script_path Pattern
+
+Both tools accept an optional `script_path` parameter:
+
+- Path is resolved via `Path.resolve(strict=True)` to prevent symlink/traversal attacks
+- When `script_allowed_root` setting is configured, the resolved path must be under that root directory
+- File is read synchronously as UTF-8
+- Maximum size: 1 MB (`MAX_SCRIPT_FILE_BYTES = 1_048_576`)
+- Content is written to the artifact-specific script field via `SCRIPT_FIELD_MAP` (defaults to `"script"`)
+- If the target field already exists in the data/changes JSON, a warning is emitted but the file content wins
+- JSON payload keys are validated with `validate_identifier()` before submission
+
+### SCRIPT_FIELD_MAP
+
+Per-artifact field override for `script_path` content. Types not listed default to `"script"`:
+
+| Artifact Type | Script Field |
+|---|---|
+| `ui_policy` | `script_true` |
+| `scripted_rest_resource` | `operation_script` |
+| `widget` | `client_script` |
+| `ui_page` | `html` |
+| `ui_macro` | `xml` |
+| `notification_script` | `advanced_condition` |
+
+### Key Differences from record_write
+
+- No preview/apply token flow - direct create/update only
+- Uses `_resolve_writable_artifact_table()` instead of raw table names
+- JSON payload validated: type must be dict, all keys pass `validate_identifier()`
+- Path security: `script_allowed_root` setting + `resolve(strict=True)` prevents traversal
+- Standard tool registration signature (not domain)
+- Package membership: `full`, `developer`, `itil`
+
 ## 🔄 ChoiceRegistry
 
 - `ChoiceRegistry(settings, auth_provider)` - lazy-loaded from `sys_choice` table.
@@ -410,6 +472,7 @@ async def explain(client, element_id) -> dict:
 | `servicenow_env`          | `str`       | `"dev"`                                                | `SERVICENOW_ENV`          |
 | `max_row_limit`           | `int`       | `100` (range 1-10000)                                  | `MAX_ROW_LIMIT`           |
 | `large_table_names_csv`   | `str`       | `"syslog,sys_audit,sys_log_transaction,sys_email_log"` | `LARGE_TABLE_NAMES_CSV`   |
+| `script_allowed_root`     | `str`       | `""`                                                     | `SCRIPT_ALLOWED_ROOT`     |
 | `otel_enabled`            | `bool`      | `False`                                                | `OTEL_ENABLED`            |
 | `otel_service_name`       | `str`       | `"servicenow-mcp"`                                     | `OTEL_SERVICE_NAME`       |
 | `otel_exporter_endpoint`  | `str`       | `"http://localhost:4318"`                               | `OTEL_EXPORTER_OTLP_ENDPOINT` |
@@ -432,17 +495,17 @@ Note: `otel_exporter_endpoint` uses `validation_alias="otel_exporter_otlp_endpoi
 
 ## 📦 Packages & Tool Groups
 
-14 named packages with 19 tool groups total (20 registered modules, but `testing` is disabled in `full`).
+14 named packages with 20 tool groups total (21 registered modules, but `testing` is disabled in `full`).
 
 ### Preset Packages
 
 | Package              | Groups | Description                                     |
 | -------------------- | ------ | ----------------------------------------------- |
-| `full`                 | 19     | Default - all standard tool groups              |
+| `full`                 | 20     | Default - all standard tool groups              |
 | `core_readonly`        | 4      | Read-only core tools (table, record, attachment, metadata) |
 | `none`                 | 0      | No tools loaded                                 |
-| `itil`                 | 15     | ITIL process tools                              |
-| `developer`            | 12     | Development-focused tools                       |
+| `itil`                 | 16     | ITIL process tools                              |
+| `developer`            | 13     | Development-focused tools                       |
 | `readonly`             | 10     | Read-only operations                            |
 | `analyst`              | 8      | Analysis and reporting                          |
 | `incident_management`  | 9      | Incident lifecycle tools                        |

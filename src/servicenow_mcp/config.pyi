@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     servicenow_env: str
     max_row_limit: int
     large_table_names_csv: str
+    script_allowed_root: str
     sentry_dsn: str
     sentry_environment: str
     def __init__(
@@ -28,6 +29,7 @@ class Settings(BaseSettings):
         servicenow_env: str = ...,
         max_row_limit: int = ...,
         large_table_names_csv: str = ...,
+        script_allowed_root: str = ...,
         sentry_dsn: str = ...,
         sentry_environment: str = ...,
         _env_file: EnvFileValue = ...,
