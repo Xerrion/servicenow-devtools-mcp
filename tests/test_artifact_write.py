@@ -11,6 +11,7 @@ from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.config import Settings
 from servicenow_mcp.tools.artifact_write import (
     MAX_SCRIPT_FILE_BYTES,
+    SCRIPT_FIELD_MAP,
     TOOL_NAMES,
     WRITABLE_ARTIFACT_TABLES,
     _read_script_file,
@@ -69,6 +70,11 @@ class TestWritableArtifactTables:
         with pytest.raises(ValueError, match="Unknown artifact_type"):
             _resolve_writable_artifact_table("nonexistent_type")
 
+    def test_script_field_map_types_in_writable_tables(self) -> None:
+        """All types in SCRIPT_FIELD_MAP are also in WRITABLE_ARTIFACT_TABLES."""
+        for artifact_type in SCRIPT_FIELD_MAP:
+            assert artifact_type in WRITABLE_ARTIFACT_TABLES
+
 
 # -- _read_script_file ---------------------------------------------------------
 
@@ -84,9 +90,9 @@ class TestReadScriptFile:
         result = _read_script_file(str(script))
         assert result == "var x = 1;"
 
-    def test_rejects_relative_path(self) -> None:
-        """Raises ValueError when given a relative path."""
-        with pytest.raises(ValueError, match="absolute"):
+    def test_rejects_nonexistent_path(self) -> None:
+        """Raises FileNotFoundError when given a non-existent path."""
+        with pytest.raises(FileNotFoundError):
             _read_script_file("relative/path/script.js")
 
     def test_file_not_found(self, tmp_path: Any) -> None:
@@ -110,6 +116,41 @@ class TestReadScriptFile:
 
         with pytest.raises(UnicodeDecodeError):
             _read_script_file(str(bad_file))
+
+    def test_path_outside_allowed_root(self, tmp_path: Any) -> None:
+        """Raises PermissionError when the resolved path is outside allowed_root."""
+        allowed_dir = tmp_path / "allowed"
+        allowed_dir.mkdir()
+        outside_dir = tmp_path / "outside"
+        outside_dir.mkdir()
+        script = outside_dir / "evil.js"
+        script.write_text("alert(1);", encoding="utf-8")
+
+        with pytest.raises(PermissionError, match="outside the allowed root"):
+            _read_script_file(str(script), allowed_root=str(allowed_dir))
+
+    def test_path_within_allowed_root(self, tmp_path: Any) -> None:
+        """Succeeds when the resolved path is within allowed_root."""
+        script = tmp_path / "allowed_script.js"
+        script.write_text("var ok = true;", encoding="utf-8")
+
+        result = _read_script_file(str(script), allowed_root=str(tmp_path))
+        assert result == "var ok = true;"
+
+    def test_symlink_outside_allowed_root(self, tmp_path: Any) -> None:
+        """Raises PermissionError when a symlink resolves outside allowed_root."""
+        allowed_dir = tmp_path / "allowed"
+        allowed_dir.mkdir()
+        outside_dir = tmp_path / "outside"
+        outside_dir.mkdir()
+        real_file = outside_dir / "secret.js"
+        real_file.write_text("secret", encoding="utf-8")
+
+        symlink = allowed_dir / "link.js"
+        symlink.symlink_to(real_file)
+
+        with pytest.raises(PermissionError, match="outside the allowed root"):
+            _read_script_file(str(symlink), allowed_root=str(allowed_dir))
 
 
 # -- artifact_create -----------------------------------------------------------
@@ -159,7 +200,7 @@ class TestArtifactCreate:
         script_file = tmp_path / "my_script.js"
         script_file.write_text("function test() { return true; }", encoding="utf-8")
 
-        respx.post(f"{BASE_URL}/api/now/table/sys_script_include").mock(
+        route = respx.post(f"{BASE_URL}/api/now/table/sys_script_include").mock(
             return_value=httpx.Response(
                 201,
                 json={
@@ -182,6 +223,12 @@ class TestArtifactCreate:
 
         assert result["status"] == "success"
         assert result["data"]["sys_id"] == "new002"
+
+        # Verify outbound request body contains the script content
+        assert route.called
+        request_body = json.loads(route.calls[0].request.content)
+        assert request_body["script"] == "function test() { return true; }"
+        assert request_body["name"] == "FileScript"
 
     @pytest.mark.asyncio()
     @respx.mock
@@ -253,6 +300,31 @@ class TestArtifactCreate:
         assert result["status"] == "error"
         assert "unknown" in result["error"]["message"].lower()
 
+    @pytest.mark.asyncio()
+    async def test_non_dict_json_returns_error(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
+        """Returns error when data is a JSON array instead of object."""
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["artifact_create"](
+            artifact_type="script_include",
+            data=json.dumps(["not", "an", "object"]),
+        )
+        result = decode_response(raw)
+
+        assert result["status"] == "error"
+        assert "object" in result["error"]["message"].lower()
+
+    @pytest.mark.asyncio()
+    async def test_invalid_key_returns_error(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
+        """Returns error when data contains an invalid field name."""
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["artifact_create"](
+            artifact_type="script_include",
+            data=json.dumps({"INVALID-KEY!": "value"}),
+        )
+        result = decode_response(raw)
+
+        assert result["status"] == "error"
+
 
 # -- artifact_update -----------------------------------------------------------
 
@@ -301,7 +373,7 @@ class TestArtifactUpdate:
         script_file = tmp_path / "update_script.js"
         script_file.write_text("var updated = true;", encoding="utf-8")
 
-        respx.patch(f"{BASE_URL}/api/now/table/sys_script_include/{SYS_ID_ART001}").mock(
+        route = respx.patch(f"{BASE_URL}/api/now/table/sys_script_include/{SYS_ID_ART001}").mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -325,6 +397,12 @@ class TestArtifactUpdate:
 
         assert result["status"] == "success"
         assert result["data"]["sys_id"] == SYS_ID_ART001
+
+        # Verify outbound request body contains the script content
+        assert route.called
+        request_body = json.loads(route.calls[0].request.content)
+        assert request_body["script"] == "var updated = true;"
+        assert request_body["name"] == "FileUpdate"
 
     @pytest.mark.asyncio()
     @respx.mock
@@ -401,6 +479,131 @@ class TestArtifactUpdate:
 
         assert result["status"] == "error"
         assert "unknown" in result["error"]["message"].lower()
+
+    @pytest.mark.asyncio()
+    async def test_non_dict_json_returns_error(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
+        """Returns error when changes is a JSON array instead of object."""
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["artifact_update"](
+            artifact_type="script_include",
+            sys_id=SYS_ID_ART001,
+            changes=json.dumps(["not", "an", "object"]),
+        )
+        result = decode_response(raw)
+
+        assert result["status"] == "error"
+        assert "object" in result["error"]["message"].lower()
+
+    @pytest.mark.asyncio()
+    async def test_invalid_key_returns_error(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
+        """Returns error when changes contains an invalid field name."""
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["artifact_update"](
+            artifact_type="script_include",
+            sys_id=SYS_ID_ART001,
+            changes=json.dumps({"INVALID-KEY!": "value"}),
+        )
+        result = decode_response(raw)
+
+        assert result["status"] == "error"
+
+
+# -- SCRIPT_FIELD_MAP ----------------------------------------------------------
+
+
+class TestScriptFieldMap:
+    """Tests for SCRIPT_FIELD_MAP per-artifact script field routing."""
+
+    @pytest.mark.asyncio()
+    @respx.mock
+    async def test_ui_macro_writes_to_xml_field(
+        self, settings: Settings, auth_provider: BasicAuthProvider, tmp_path: Any
+    ) -> None:
+        """script_path content for ui_macro is written to the 'xml' field."""
+        script_file = tmp_path / "macro.xml"
+        script_file.write_text("<j:jelly><p>Hello</p></j:jelly>", encoding="utf-8")
+
+        route = respx.post(f"{BASE_URL}/api/now/table/sys_ui_macro").mock(
+            return_value=httpx.Response(
+                201,
+                json={"result": {"sys_id": "macro001", "name": "TestMacro", "xml": "<j:jelly><p>Hello</p></j:jelly>"}},
+            )
+        )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["artifact_create"](
+            artifact_type="ui_macro",
+            data=json.dumps({"name": "TestMacro"}),
+            script_path=str(script_file),
+        )
+        result = decode_response(raw)
+
+        assert result["status"] == "success"
+        assert route.called
+        request_body = json.loads(route.calls[0].request.content)
+        assert request_body["xml"] == "<j:jelly><p>Hello</p></j:jelly>"
+        assert "script" not in request_body
+
+    @pytest.mark.asyncio()
+    @respx.mock
+    async def test_ui_page_writes_to_html_field(
+        self, settings: Settings, auth_provider: BasicAuthProvider, tmp_path: Any
+    ) -> None:
+        """script_path content for ui_page is written to the 'html' field."""
+        script_file = tmp_path / "page.html"
+        script_file.write_text("<div>Hello</div>", encoding="utf-8")
+
+        route = respx.post(f"{BASE_URL}/api/now/table/sys_ui_page").mock(
+            return_value=httpx.Response(
+                201,
+                json={"result": {"sys_id": "page001", "name": "TestPage", "html": "<div>Hello</div>"}},
+            )
+        )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["artifact_create"](
+            artifact_type="ui_page",
+            data=json.dumps({"name": "TestPage"}),
+            script_path=str(script_file),
+        )
+        result = decode_response(raw)
+
+        assert result["status"] == "success"
+        assert route.called
+        request_body = json.loads(route.calls[0].request.content)
+        assert request_body["html"] == "<div>Hello</div>"
+        assert "script" not in request_body
+
+    @pytest.mark.asyncio()
+    @respx.mock
+    async def test_update_with_field_map(
+        self, settings: Settings, auth_provider: BasicAuthProvider, tmp_path: Any
+    ) -> None:
+        """artifact_update also uses SCRIPT_FIELD_MAP for the correct field."""
+        script_file = tmp_path / "macro_update.xml"
+        script_file.write_text("<updated/>", encoding="utf-8")
+
+        route = respx.patch(f"{BASE_URL}/api/now/table/sys_ui_macro/{SYS_ID_ART001}").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": {"sys_id": SYS_ID_ART001, "xml": "<updated/>"}},
+            )
+        )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["artifact_update"](
+            artifact_type="ui_macro",
+            sys_id=SYS_ID_ART001,
+            changes=json.dumps({"name": "UpdatedMacro"}),
+            script_path=str(script_file),
+        )
+        result = decode_response(raw)
+
+        assert result["status"] == "success"
+        assert route.called
+        request_body = json.loads(route.calls[0].request.content)
+        assert request_body["xml"] == "<updated/>"
+        assert "script" not in request_body
 
 
 # -- Tool registration ---------------------------------------------------------

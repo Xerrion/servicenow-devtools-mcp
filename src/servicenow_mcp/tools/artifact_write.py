@@ -11,7 +11,7 @@ from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.config import Settings
 from servicenow_mcp.decorators import tool_handler
 from servicenow_mcp.policy import check_table_access, mask_sensitive_fields, write_gate
-from servicenow_mcp.utils import format_response, validate_sys_id
+from servicenow_mcp.utils import format_response, validate_identifier, validate_sys_id
 
 
 logger = logging.getLogger(__name__)
@@ -41,6 +41,17 @@ WRITABLE_ARTIFACT_TABLES: dict[str, str] = {
 DEFAULT_SCRIPT_FIELD: str = "script"
 MAX_SCRIPT_FILE_BYTES: int = 1_048_576  # 1 MB
 
+# Per-artifact override for the script field name.
+# Types not listed here default to DEFAULT_SCRIPT_FIELD ("script").
+SCRIPT_FIELD_MAP: dict[str, str] = {
+    "ui_policy": "script_true",
+    "scripted_rest_resource": "operation_script",
+    "widget": "client_script",
+    "ui_page": "html",
+    "ui_macro": "xml",
+    "notification_script": "advanced_condition",
+}
+
 
 def _resolve_writable_artifact_table(artifact_type: str) -> str:
     """Resolve artifact_type to its ServiceNow table name.
@@ -55,32 +66,42 @@ def _resolve_writable_artifact_table(artifact_type: str) -> str:
     return table
 
 
-def _read_script_file(script_path: str) -> str:
+def _read_script_file(script_path: str, allowed_root: str = "") -> str:
     """Read a local script file and return its contents as a string.
 
     Args:
-        script_path: Absolute path to the script file.
+        script_path: Path to the script file.
+        allowed_root: When non-empty, the resolved script path must be under this root directory.
 
     Raises:
-        ValueError: If path is relative or file exceeds MAX_SCRIPT_FILE_BYTES.
+        PermissionError: If the resolved path is outside the allowed root.
+        ValueError: If the file exceeds MAX_SCRIPT_FILE_BYTES or the allowed root is inaccessible.
         FileNotFoundError: If the file does not exist or is not a regular file.
         UnicodeDecodeError: If the file is not valid UTF-8.
     """
-    path = Path(script_path)
+    try:
+        resolved = Path(script_path).resolve(strict=True)
+    except (OSError, ValueError) as exc:
+        raise FileNotFoundError(f"Script file not found or not accessible: {script_path!r}") from exc
 
-    if not path.is_absolute():
-        raise ValueError(f"script_path must be absolute, got relative path: {script_path!r}")
+    if allowed_root:
+        try:
+            root = Path(allowed_root).resolve(strict=True)
+        except (OSError, ValueError) as exc:
+            raise ValueError(f"Configured script_allowed_root is not accessible: {allowed_root!r}") from exc
+        if not resolved.is_relative_to(root):
+            raise PermissionError(f"Script path {str(resolved)!r} is outside the allowed root {str(root)!r}")
 
-    if not path.is_file():
-        raise FileNotFoundError(f"Script file not found: {script_path!r}")
+    if not resolved.is_file():
+        raise FileNotFoundError(f"Script path is not a regular file: {script_path!r}")
 
-    file_size = path.stat().st_size
+    file_size = resolved.stat().st_size
     if file_size > MAX_SCRIPT_FILE_BYTES:
         raise ValueError(
             f"Script file too large ({file_size} bytes). Maximum allowed size is {MAX_SCRIPT_FILE_BYTES} bytes (1 MB)."
         )
 
-    return path.read_text(encoding="utf-8")
+    return resolved.read_text(encoding="utf-8")
 
 
 TOOL_NAMES: list[str] = ["artifact_create", "artifact_update"]
@@ -103,7 +124,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         Args:
             artifact_type: The artifact type (e.g. 'business_rule', 'script_include', 'client_script').
             data: A JSON string of field-value pairs for the new artifact.
-            script_path: Optional absolute path to a local script file. When provided, the file content is read and set as the 'script' field.
+            script_path: Optional absolute path to a local script file. When provided, the file content is read and set as the artifact's script field.
         """
         table = _resolve_writable_artifact_table(artifact_type)
         check_table_access(table)
@@ -112,14 +133,27 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         if blocked:
             return blocked
 
-        data_dict: dict[str, str | int | bool | None] = json.loads(data)
+        parsed = json.loads(data)
+        if not isinstance(parsed, dict):
+            return format_response(
+                data=None,
+                correlation_id=correlation_id,
+                status="error",
+                error="'data' must be a JSON object, not " + type(parsed).__name__,
+            )
+        data_dict: dict[str, str | int | bool | None] = parsed
+
+        for key in data_dict:
+            validate_identifier(key)
+
         warnings: list[str] = []
 
         if script_path:
-            content = _read_script_file(script_path)
-            if DEFAULT_SCRIPT_FIELD in data_dict:
-                warnings.append(f"'{DEFAULT_SCRIPT_FIELD}' field in data was overridden by script_path content.")
-            data_dict[DEFAULT_SCRIPT_FIELD] = content
+            content = _read_script_file(script_path, settings.script_allowed_root)
+            script_field = SCRIPT_FIELD_MAP.get(artifact_type, DEFAULT_SCRIPT_FIELD)
+            if script_field in data_dict:
+                warnings.append(f"'{script_field}' field in data was overridden by script_path content.")
+            data_dict[script_field] = content
 
         async with ServiceNowClient(settings, auth_provider) as client:
             created = await client.create_record(table, data_dict)
@@ -151,7 +185,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             artifact_type: The artifact type (e.g. 'business_rule', 'script_include', 'client_script').
             sys_id: The sys_id of the artifact to update.
             changes: A JSON string of field-value pairs to update.
-            script_path: Optional absolute path to a local script file. When provided, the file content is read and set as the 'script' field.
+            script_path: Optional absolute path to a local script file. When provided, the file content is read and set as the artifact's script field.
         """
         table = _resolve_writable_artifact_table(artifact_type)
         check_table_access(table)
@@ -162,14 +196,27 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
 
         validate_sys_id(sys_id)
 
-        changes_dict: dict[str, str | int | bool | None] = json.loads(changes)
+        parsed = json.loads(changes)
+        if not isinstance(parsed, dict):
+            return format_response(
+                data=None,
+                correlation_id=correlation_id,
+                status="error",
+                error="'changes' must be a JSON object, not " + type(parsed).__name__,
+            )
+        changes_dict: dict[str, str | int | bool | None] = parsed
+
+        for key in changes_dict:
+            validate_identifier(key)
+
         warnings: list[str] = []
 
         if script_path:
-            content = _read_script_file(script_path)
-            if DEFAULT_SCRIPT_FIELD in changes_dict:
-                warnings.append(f"'{DEFAULT_SCRIPT_FIELD}' field in changes was overridden by script_path content.")
-            changes_dict[DEFAULT_SCRIPT_FIELD] = content
+            content = _read_script_file(script_path, settings.script_allowed_root)
+            script_field = SCRIPT_FIELD_MAP.get(artifact_type, DEFAULT_SCRIPT_FIELD)
+            if script_field in changes_dict:
+                warnings.append(f"'{script_field}' field in changes was overridden by script_path content.")
+            changes_dict[script_field] = content
 
         async with ServiceNowClient(settings, auth_provider) as client:
             updated = await client.update_record(table, sys_id, changes_dict)

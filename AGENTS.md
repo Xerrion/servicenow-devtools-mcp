@@ -345,16 +345,33 @@ Superset of `metadata.py:ARTIFACT_TABLES` (7 types). All 17 artifact types:
 
 Both tools accept an optional `script_path` parameter:
 
-- Must be an absolute file path
+- Path is resolved via `Path.resolve(strict=True)` to prevent symlink/traversal attacks
+- When `script_allowed_root` setting is configured, the resolved path must be under that root directory
 - File is read synchronously as UTF-8
 - Maximum size: 1 MB (`MAX_SCRIPT_FILE_BYTES = 1_048_576`)
-- Content is written to the `script` field (`DEFAULT_SCRIPT_FIELD = "script"`)
-- If the `script` field already exists in the data/changes JSON, a warning is emitted but the file content wins
+- Content is written to the artifact-specific script field via `SCRIPT_FIELD_MAP` (defaults to `"script"`)
+- If the target field already exists in the data/changes JSON, a warning is emitted but the file content wins
+- JSON payload keys are validated with `validate_identifier()` before submission
+
+### SCRIPT_FIELD_MAP
+
+Per-artifact field override for `script_path` content. Types not listed default to `"script"`:
+
+| Artifact Type | Script Field |
+|---|---|
+| `ui_policy` | `script_true` |
+| `scripted_rest_resource` | `operation_script` |
+| `widget` | `client_script` |
+| `ui_page` | `html` |
+| `ui_macro` | `xml` |
+| `notification_script` | `advanced_condition` |
 
 ### Key Differences from record_write
 
 - No preview/apply token flow - direct create/update only
 - Uses `_resolve_writable_artifact_table()` instead of raw table names
+- JSON payload validated: type must be dict, all keys pass `validate_identifier()`
+- Path security: `script_allowed_root` setting + `resolve(strict=True)` prevents traversal
 - Standard tool registration signature (not domain)
 - Package membership: `full`, `developer`, `itil`
 
@@ -455,6 +472,7 @@ async def explain(client, element_id) -> dict:
 | `servicenow_env`          | `str`       | `"dev"`                                                | `SERVICENOW_ENV`          |
 | `max_row_limit`           | `int`       | `100` (range 1-10000)                                  | `MAX_ROW_LIMIT`           |
 | `large_table_names_csv`   | `str`       | `"syslog,sys_audit,sys_log_transaction,sys_email_log"` | `LARGE_TABLE_NAMES_CSV`   |
+| `script_allowed_root`     | `str`       | `""`                                                     | `SCRIPT_ALLOWED_ROOT`     |
 | `otel_enabled`            | `bool`      | `False`                                                | `OTEL_ENABLED`            |
 | `otel_service_name`       | `str`       | `"servicenow-mcp"`                                     | `OTEL_SERVICE_NAME`       |
 | `otel_exporter_endpoint`  | `str`       | `"http://localhost:4318"`                               | `OTEL_EXPORTER_OTLP_ENDPOINT` |

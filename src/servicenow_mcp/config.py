@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     servicenow_env: str = "dev"
     max_row_limit: int = 100
     large_table_names_csv: str = _DEFAULT_LARGE_TABLES
+    script_allowed_root: str = ""
 
     sentry_dsn: str = ""
     sentry_environment: str = ""
