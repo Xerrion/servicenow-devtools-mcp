@@ -314,7 +314,7 @@ SENTRY_ENVIRONMENT=production
 - With package installed but no `SENTRY_DSN` set: no client initialized
 - With package installed and `SENTRY_DSN` set: full error capture active
 
-Performance monitoring is enabled in Sentry with `traces_sample_rate=1.0` (100% sampling) to capture full performance telemetry for this MCP server.
+Performance monitoring is enabled in Sentry with `traces_sample_rate=1.0` (100% sampling) to capture full performance telemetry for this MCP server. Since MCP servers are single-user stdio processes, this is unlikely to cause ingest overhead. For high-throughput deployments, consider reducing the sample rate in code.
 
 ---
 
