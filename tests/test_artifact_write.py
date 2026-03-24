@@ -14,6 +14,7 @@ from servicenow_mcp.tools.artifact_write import (
     SCRIPT_FIELD_MAP,
     TOOL_NAMES,
     WRITABLE_ARTIFACT_TABLES,
+    _parse_and_validate_payload,
     _read_script_file,
     _resolve_writable_artifact_table,
 )
@@ -151,6 +152,73 @@ class TestReadScriptFile:
 
         with pytest.raises(PermissionError, match="outside the allowed root"):
             _read_script_file(str(symlink), allowed_root=str(allowed_dir))
+
+    def test_inaccessible_allowed_root(self, tmp_path: Any) -> None:
+        """Raises ValueError when allowed_root does not exist."""
+        script = tmp_path / "script.js"
+        script.write_text("var x = 1;", encoding="utf-8")
+        bogus_root = str(tmp_path / "nonexistent_root")
+
+        with pytest.raises(ValueError, match="not accessible"):
+            _read_script_file(str(script), allowed_root=bogus_root)
+
+    def test_directory_path_rejected(self, tmp_path: Any) -> None:
+        """Raises FileNotFoundError when the path is a directory, not a file."""
+        a_dir = tmp_path / "subdir"
+        a_dir.mkdir()
+
+        with pytest.raises(FileNotFoundError, match="not a regular file"):
+            _read_script_file(str(a_dir))
+
+
+# -- _parse_and_validate_payload -----------------------------------------------
+
+
+class TestParseAndValidatePayload:
+    """Tests for the _parse_and_validate_payload helper."""
+
+    def test_valid_json_object(self) -> None:
+        """Returns (dict, warnings) for valid JSON object with no script_path."""
+        result = _parse_and_validate_payload('{"name": "Test"}', "data", "script_include", "", "", "corr-1")
+        assert isinstance(result, tuple)
+        payload, warnings = result
+        assert payload == {"name": "Test"}
+        assert warnings == []
+
+    def test_non_dict_returns_error_string(self) -> None:
+        """Returns formatted error string for non-dict JSON."""
+        result = _parse_and_validate_payload('["a", "b"]', "data", "script_include", "", "", "corr-1")
+        assert isinstance(result, str)
+
+    def test_invalid_key_raises(self) -> None:
+        """Raises ValueError for keys that fail validate_identifier."""
+        with pytest.raises(ValueError, match="Invalid identifier"):
+            _parse_and_validate_payload('{"INVALID-KEY!": "v"}', "data", "script_include", "", "", "corr-1")
+
+    def test_script_path_injects_content(self, tmp_path: Any) -> None:
+        """Injects script file content into payload via SCRIPT_FIELD_MAP."""
+        script = tmp_path / "inject.xml"
+        script.write_text("<hello/>", encoding="utf-8")
+
+        result = _parse_and_validate_payload('{"name": "M"}', "data", "ui_macro", str(script), "", "corr-1")
+        assert isinstance(result, tuple)
+        payload, warnings = result
+        assert payload["xml"] == "<hello/>"
+        assert warnings == []
+
+    def test_script_path_warns_on_override(self, tmp_path: Any) -> None:
+        """Emits warning when script_path overrides existing field."""
+        script = tmp_path / "override.js"
+        script.write_text("new", encoding="utf-8")
+
+        result = _parse_and_validate_payload(
+            '{"script": "old"}', "changes", "script_include", str(script), "", "corr-1"
+        )
+        assert isinstance(result, tuple)
+        payload, warnings = result
+        assert payload["script"] == "new"
+        assert len(warnings) == 1
+        assert "overridden" in warnings[0].lower()
 
 
 # -- artifact_create -----------------------------------------------------------

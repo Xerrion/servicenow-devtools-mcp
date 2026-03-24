@@ -107,6 +107,52 @@ def _read_script_file(script_path: str, allowed_root: str = "") -> str:
 TOOL_NAMES: list[str] = ["artifact_create", "artifact_update"]
 
 
+def _parse_and_validate_payload(
+    raw_json: str,
+    param_name: str,
+    artifact_type: str,
+    script_path: str,
+    allowed_root: str,
+    correlation_id: str,
+) -> tuple[dict[str, str | int | bool | None], list[str]] | str:
+    """Parse, validate, and enrich a JSON payload for artifact write operations.
+
+    Returns a ``(data_dict, warnings)`` tuple on success, or a formatted error
+    response string when validation fails.
+
+    Args:
+        raw_json: The raw JSON string from the caller.
+        param_name: Human-readable parameter name for error messages (e.g. 'data', 'changes').
+        artifact_type: The artifact type key used for SCRIPT_FIELD_MAP lookup.
+        script_path: Optional path to a local script file.
+        allowed_root: When non-empty, constrains script_path resolution.
+        correlation_id: Correlation ID for error envelopes.
+    """
+    parsed = json.loads(raw_json)
+    if not isinstance(parsed, dict):
+        return format_response(
+            data=None,
+            correlation_id=correlation_id,
+            status="error",
+            error=f"'{param_name}' must be a JSON object, not " + type(parsed).__name__,
+        )
+    payload: dict[str, str | int | bool | None] = parsed
+
+    for key in payload:
+        validate_identifier(key)
+
+    warnings: list[str] = []
+
+    if script_path:
+        content = _read_script_file(script_path, allowed_root)
+        script_field = SCRIPT_FIELD_MAP.get(artifact_type, DEFAULT_SCRIPT_FIELD)
+        if script_field in payload:
+            warnings.append(f"'{script_field}' field in {param_name} was overridden by script_path content.")
+        payload[script_field] = content
+
+    return payload, warnings
+
+
 def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthProvider) -> None:
     """Register artifact write tools on the MCP server."""
 
@@ -133,27 +179,12 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         if blocked:
             return blocked
 
-        parsed = json.loads(data)
-        if not isinstance(parsed, dict):
-            return format_response(
-                data=None,
-                correlation_id=correlation_id,
-                status="error",
-                error="'data' must be a JSON object, not " + type(parsed).__name__,
-            )
-        data_dict: dict[str, str | int | bool | None] = parsed
-
-        for key in data_dict:
-            validate_identifier(key)
-
-        warnings: list[str] = []
-
-        if script_path:
-            content = _read_script_file(script_path, settings.script_allowed_root)
-            script_field = SCRIPT_FIELD_MAP.get(artifact_type, DEFAULT_SCRIPT_FIELD)
-            if script_field in data_dict:
-                warnings.append(f"'{script_field}' field in data was overridden by script_path content.")
-            data_dict[script_field] = content
+        result = _parse_and_validate_payload(
+            data, "data", artifact_type, script_path, settings.script_allowed_root, correlation_id
+        )
+        if isinstance(result, str):
+            return result
+        data_dict, warnings = result
 
         async with ServiceNowClient(settings, auth_provider) as client:
             created = await client.create_record(table, data_dict)
@@ -196,27 +227,12 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
 
         validate_sys_id(sys_id)
 
-        parsed = json.loads(changes)
-        if not isinstance(parsed, dict):
-            return format_response(
-                data=None,
-                correlation_id=correlation_id,
-                status="error",
-                error="'changes' must be a JSON object, not " + type(parsed).__name__,
-            )
-        changes_dict: dict[str, str | int | bool | None] = parsed
-
-        for key in changes_dict:
-            validate_identifier(key)
-
-        warnings: list[str] = []
-
-        if script_path:
-            content = _read_script_file(script_path, settings.script_allowed_root)
-            script_field = SCRIPT_FIELD_MAP.get(artifact_type, DEFAULT_SCRIPT_FIELD)
-            if script_field in changes_dict:
-                warnings.append(f"'{script_field}' field in changes was overridden by script_path content.")
-            changes_dict[script_field] = content
+        result = _parse_and_validate_payload(
+            changes, "changes", artifact_type, script_path, settings.script_allowed_root, correlation_id
+        )
+        if isinstance(result, str):
+            return result
+        changes_dict, warnings = result
 
         async with ServiceNowClient(settings, auth_provider) as client:
             updated = await client.update_record(table, sys_id, changes_dict)
