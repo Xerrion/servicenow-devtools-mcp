@@ -74,15 +74,15 @@
 
   <!-- Tool count pill -->
   <g transform="translate(130, 150)">
-    <rect width="90" height="28" rx="14" fill="#00c9a7" opacity="0.15"/>
-    <rect width="90" height="28" rx="14" fill="none" stroke="#00c9a7" stroke-width="1" opacity="0.4"/>
-    <text x="45" y="18" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="13" fill="#00c9a7" text-anchor="middle" font-weight="600">
-      36 Tools
+    <rect width="100" height="28" rx="14" fill="#00c9a7" opacity="0.15"/>
+    <rect width="100" height="28" rx="14" fill="none" stroke="#00c9a7" stroke-width="1" opacity="0.4"/>
+    <text x="50" y="18" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="13" fill="#00c9a7" text-anchor="middle" font-weight="600">
+      90+ Tools
     </text>
   </g>
 
   <!-- Category pills -->
-  <g transform="translate(235, 150)">
+  <g transform="translate(245, 150)">
     <rect width="100" height="28" rx="14" fill="#00d4ff" opacity="0.1"/>
     <rect width="100" height="28" rx="14" fill="none" stroke="#00d4ff" stroke-width="1" opacity="0.3"/>
     <text x="50" y="18" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="12" fill="#00d4ff" text-anchor="middle">
@@ -90,7 +90,7 @@
     </text>
   </g>
 
-  <g transform="translate(350, 150)">
+  <g transform="translate(360, 150)">
     <rect width="70" height="28" rx="14" fill="#00d4ff" opacity="0.1"/>
     <rect width="70" height="28" rx="14" fill="none" stroke="#00d4ff" stroke-width="1" opacity="0.3"/>
     <text x="35" y="18" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="12" fill="#00d4ff" text-anchor="middle">
@@ -98,7 +98,7 @@
     </text>
   </g>
 
-  <g transform="translate(435, 150)">
+  <g transform="translate(445, 150)">
     <rect width="105" height="28" rx="14" fill="#00d4ff" opacity="0.1"/>
     <rect width="105" height="28" rx="14" fill="none" stroke="#00d4ff" stroke-width="1" opacity="0.3"/>
     <text x="52" y="18" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="12" fill="#00d4ff" text-anchor="middle">
@@ -106,11 +106,27 @@
     </text>
   </g>
 
-  <g transform="translate(555, 150)">
+  <g transform="translate(565, 150)">
     <rect width="60" height="28" rx="14" fill="#00d4ff" opacity="0.1"/>
     <rect width="60" height="28" rx="14" fill="none" stroke="#00d4ff" stroke-width="1" opacity="0.3"/>
     <text x="30" y="18" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="12" fill="#00d4ff" text-anchor="middle">
       Docs
+    </text>
+  </g>
+
+  <g transform="translate(640, 150)">
+    <rect width="60" height="28" rx="14" fill="#00d4ff" opacity="0.1"/>
+    <rect width="60" height="28" rx="14" fill="none" stroke="#00d4ff" stroke-width="1" opacity="0.3"/>
+    <text x="30" y="18" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="12" fill="#00d4ff" text-anchor="middle">
+      ITSM
+    </text>
+  </g>
+
+  <g transform="translate(715, 150)">
+    <rect width="70" height="28" rx="14" fill="#00d4ff" opacity="0.1"/>
+    <rect width="70" height="28" rx="14" fill="none" stroke="#00d4ff" stroke-width="1" opacity="0.3"/>
+    <text x="35" y="18" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="12" fill="#00d4ff" text-anchor="middle">
+      CMDB
     </text>
   </g>
 

@@ -1,7 +1,7 @@
 [project]
 name = "servicenow-devtools-mcp"
 version = "0.9.0"
-description = "A developer & debug-focused MCP server for ServiceNow — 32 tools for platform introspection, change intelligence, debugging, investigations, and documentation generation."
+description = "A developer & debug-focused MCP server for ServiceNow — platform introspection, change intelligence, debugging, investigations, and documentation generation."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.12"
@@ -33,9 +33,10 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/xerrion/servicenow-devtools-mcp"
-Repository = "https://github.com/xerrion/servicenow-devtools-mcp"
-Issues = "https://github.com/xerrion/servicenow-devtools-mcp/issues"
+Homepage = "https://github.com/Xerrion/servicenow-devtools-mcp"
+Repository = "https://github.com/Xerrion/servicenow-devtools-mcp"
+Issues = "https://github.com/Xerrion/servicenow-devtools-mcp/issues"
+Documentation = "https://github.com/Xerrion/servicenow-devtools-mcp/wiki"
 
 [project.scripts]
 servicenow-devtools-mcp = "servicenow_mcp.server:main"
