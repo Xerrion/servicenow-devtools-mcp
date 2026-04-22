@@ -631,21 +631,21 @@ class TestFlowActionDetail:
                 200,
                 json={
                     "result": {
-                        "sys_id": "ai_nodef",
+                        "sys_id": "bff4b2197387890d8565ff7bba7374fe",
                         "name": "Custom Instance",
                         "action_type": "",
                     }
                 },
             )
 
-        respx.get(f"{BASE_URL}/api/now/table/sys_hub_action_instance/ai_nodef").mock(side_effect=_nodef_side_effect)
+        respx.get(f"{BASE_URL}/api/now/table/sys_hub_action_instance/bff4b2197387890d8565ff7bba7374fe").mock(side_effect=_nodef_side_effect)
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["flow_action_detail"](action_instance_sys_id="ai_nodef")
+        raw = await tools["flow_action_detail"](action_instance_sys_id="bff4b2197387890d8565ff7bba7374fe")
         result = decode_response(raw)
 
         assert result["status"] == "success"
-        assert result["data"]["instance"]["sys_id"] == "ai_nodef"
+        assert result["data"]["instance"]["sys_id"] == "bff4b2197387890d8565ff7bba7374fe"
         assert result["data"]["type_definition"] is None
         assert result["data"]["steps"] == []
 
@@ -660,7 +660,7 @@ class TestFlowActionDetail:
                     200,
                     json={
                         "result": {
-                            "sys_id": "ai_nosteps",
+                            "sys_id": "048920ff3a5c5fbe81afd4f5ffd8b0f4",
                             "name": "Lookup Record",
                             "action_type": "Lookup Record",
                         }
@@ -670,22 +670,22 @@ class TestFlowActionDetail:
                 200,
                 json={
                     "result": {
-                        "sys_id": "ai_nosteps",
+                        "sys_id": "048920ff3a5c5fbe81afd4f5ffd8b0f4",
                         "name": "Lookup Record",
-                        "action_type": "atd_nosteps",
+                        "action_type": "21487c9e1a7c18c2b8f94fe2da220cae",
                     }
                 },
             )
 
-        respx.get(f"{BASE_URL}/api/now/table/sys_hub_action_instance/ai_nosteps").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_hub_action_instance/048920ff3a5c5fbe81afd4f5ffd8b0f4").mock(
             side_effect=_instance_side_effect
         )
-        respx.get(f"{BASE_URL}/api/now/table/sys_hub_action_type_definition/atd_nosteps").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_hub_action_type_definition/21487c9e1a7c18c2b8f94fe2da220cae").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "atd_nosteps",
+                        "sys_id": "21487c9e1a7c18c2b8f94fe2da220cae",
                         "name": "Lookup Record",
                         "description": "Looks up a record",
                     }
@@ -697,7 +697,7 @@ class TestFlowActionDetail:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["flow_action_detail"](action_instance_sys_id="ai_nosteps")
+        raw = await tools["flow_action_detail"](action_instance_sys_id="048920ff3a5c5fbe81afd4f5ffd8b0f4")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -934,12 +934,12 @@ class TestFlowExecutionDetail:
     @respx.mock
     async def test_flow_execution_detail_no_logs(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Context exists but no log entries."""
-        respx.get(f"{BASE_URL}/api/now/table/sys_flow_context/ctx_nologs").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_flow_context/ddbc98fc6f659935756886374856a903").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "ctx_nologs",
+                        "sys_id": "ddbc98fc6f659935756886374856a903",
                         "name": "Empty Execution",
                         "state": "IN_PROGRESS",
                         "started": "2026-02-20 10:00:00",
@@ -953,11 +953,11 @@ class TestFlowExecutionDetail:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["flow_execution_detail"](context_id="ctx_nologs")
+        raw = await tools["flow_execution_detail"](context_id="ddbc98fc6f659935756886374856a903")
         result = decode_response(raw)
 
         assert result["status"] == "success"
-        assert result["data"]["context"]["sys_id"] == "ctx_nologs"
+        assert result["data"]["context"]["sys_id"] == "ddbc98fc6f659935756886374856a903"
         assert result["data"]["log_count"] == 0
         assert result["data"]["logs"] == []
 
@@ -965,7 +965,7 @@ class TestFlowExecutionDetail:
     @respx.mock
     async def test_flow_execution_detail_not_found(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Context 404 returns error."""
-        respx.get(f"{BASE_URL}/api/now/table/sys_flow_context/ctx_404").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_flow_context/8aa2a5f2515585b27a0b1e3a9db73823").mock(
             return_value=httpx.Response(404, json={"error": {"message": "Record not found"}})
         )
         respx.get(f"{BASE_URL}/api/now/table/sys_flow_log").mock(
@@ -973,7 +973,7 @@ class TestFlowExecutionDetail:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["flow_execution_detail"](context_id="ctx_404")
+        raw = await tools["flow_execution_detail"](context_id="8aa2a5f2515585b27a0b1e3a9db73823")
         result = decode_response(raw)
 
         assert result["status"] == "error"
@@ -1813,16 +1813,16 @@ class TestFlowDesignerDictReferenceFields:
         self, settings: Settings, auth_provider: BasicAuthProvider
     ) -> None:
         """flow_action_detail handles action_type returned as a dict reference."""
-        dict_action_type = {"display_value": "action_type_001", "link": "https://test.service-now.com/api/..."}
+        dict_action_type = {"display_value": "13619c05f5ecfe7907f8a0677a47a1d2", "link": "https://test.service-now.com/api/..."}
 
-        respx.get(f"{BASE_URL}/api/now/table/sys_hub_action_instance/ai_dict_test").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_hub_action_instance/ee62d9d23f50afc16c59cd7bf652888b").mock(
             side_effect=[
                 # First call: raw (display_values=False) - returns dict reference
                 httpx.Response(
                     200,
                     json={
                         "result": {
-                            "sys_id": "ai_dict_test",
+                            "sys_id": "ee62d9d23f50afc16c59cd7bf652888b",
                             "name": "Send Email",
                             "action_type": dict_action_type,
                         }
@@ -1833,7 +1833,7 @@ class TestFlowDesignerDictReferenceFields:
                     200,
                     json={
                         "result": {
-                            "sys_id": "ai_dict_test",
+                            "sys_id": "ee62d9d23f50afc16c59cd7bf652888b",
                             "name": "Send Email",
                             "action_type": "Send Email Action",
                         }
@@ -1841,10 +1841,10 @@ class TestFlowDesignerDictReferenceFields:
                 ),
             ]
         )
-        respx.get(f"{BASE_URL}/api/now/table/sys_hub_action_type_definition/action_type_001").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_hub_action_type_definition/13619c05f5ecfe7907f8a0677a47a1d2").mock(
             return_value=httpx.Response(
                 200,
-                json={"result": {"sys_id": "action_type_001", "name": "Send Email Type"}},
+                json={"result": {"sys_id": "13619c05f5ecfe7907f8a0677a47a1d2", "name": "Send Email Type"}},
             )
         )
         respx.get(f"{BASE_URL}/api/now/table/sys_hub_step_instance").mock(
@@ -1852,7 +1852,7 @@ class TestFlowDesignerDictReferenceFields:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["flow_action_detail"](action_instance_sys_id="ai_dict_test")
+        raw = await tools["flow_action_detail"](action_instance_sys_id="ee62d9d23f50afc16c59cd7bf652888b")
         result = decode_response(raw)
 
         assert result["status"] == "success"
