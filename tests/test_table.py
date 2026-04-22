@@ -169,7 +169,7 @@ class TestTableQuery:
         )
 
         tools, query_store = _register_and_get_tools(settings, auth_provider)
-        token = query_store.create({"query": "active=true"})
+        token = query_store.create({"query": "active=true", "table": "incident"})
         raw = await tools["table_query"](table="incident", query_token=token)
         result = decode_response(raw)
 
@@ -190,7 +190,7 @@ class TestTableQuery:
         )
 
         tools, query_store = _register_and_get_tools(settings, auth_provider)
-        token = query_store.create({"query": "active=true"})
+        token = query_store.create({"query": "active=true", "table": "incident"})
         # Default max_row_limit is 100, request 500
         raw = await tools["table_query"](table="incident", query_token=token, limit=500)
         result = decode_response(raw)
@@ -208,7 +208,7 @@ class TestTableQuery:
         # Add syslog to large tables for this test
         settings.large_table_names_csv = "syslog,sys_audit"
         tools, query_store = _register_and_get_tools(settings, auth_provider)
-        token = query_store.create({"query": "level=error"})
+        token = query_store.create({"query": "level=error", "table": "syslog"})
         raw = await tools["table_query"](table="syslog", query_token=token)
         result = decode_response(raw)
 
@@ -220,7 +220,7 @@ class TestTableQuery:
         """Denied table returns error."""
         denied = next(iter(DENIED_TABLES))
         tools, query_store = _register_and_get_tools(settings, auth_provider)
-        token = query_store.create({"query": "active=true"})
+        token = query_store.create({"query": "active=true", "table": denied})
         raw = await tools["table_query"](table=denied, query_token=token)
         result = decode_response(raw)
 
@@ -248,7 +248,7 @@ class TestTableQuery:
         )
 
         tools, query_store = _register_and_get_tools(settings, auth_provider)
-        token = query_store.create({"query": "active=true"})
+        token = query_store.create({"query": "active=true", "table": "incident"})
         raw = await tools["table_query"](table="incident", query_token=token, display_values=True)
         result = decode_response(raw)
 
@@ -279,7 +279,7 @@ class TestTableAggregate:
         )
 
         tools, query_store = _register_and_get_tools(settings, auth_provider)
-        token = query_store.create({"query": "active=true"})
+        token = query_store.create({"query": "active=true", "table": "incident"})
         raw = await tools["table_aggregate"](table="incident", query_token=token)
         result = decode_response(raw)
 
@@ -291,7 +291,7 @@ class TestTableAggregate:
         """Denied table returns error."""
         denied = next(iter(DENIED_TABLES))
         tools, query_store = _register_and_get_tools(settings, auth_provider)
-        token = query_store.create({"query": "active=true"})
+        token = query_store.create({"query": "active=true", "table": denied})
         raw = await tools["table_aggregate"](table=denied, query_token=token)
         result = decode_response(raw)
 
@@ -344,7 +344,7 @@ class TestTableErrorPropagation:
         )
 
         tools, query_store = _register_and_get_tools(settings, auth_provider)
-        token = query_store.create({"query": "active=true"})
+        token = query_store.create({"query": "active=true", "table": "incident"})
         raw = await tools["table_query"](table="incident", query_token=token)
         result = decode_response(raw)
 
@@ -369,7 +369,7 @@ class TestTableErrorPropagation:
         )
 
         tools, query_store = _register_and_get_tools(settings, auth_provider)
-        token = query_store.create({"query": "active=true"})
+        token = query_store.create({"query": "active=true", "table": "incident"})
         raw = await tools["table_aggregate"](table="incident", query_token=token)
         result = decode_response(raw)
 
@@ -425,7 +425,7 @@ class TestBuildQuery:
     async def test_simple_equals(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Build a simple equals query."""
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["build_query"](conditions='[{"operator": "equals", "field": "active", "value": "true"}]')
+        raw = await tools["build_query"](table="incident", conditions='[{"operator": "equals", "field": "active", "value": "true"}]')
         result = decode_response(raw)
         assert result["status"] == "success"
         assert result["data"]["query"] == "active=true"
@@ -438,7 +438,7 @@ class TestBuildQuery:
         """Build a query with hours_ago time filter."""
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["build_query"](
-            conditions='[{"operator": "hours_ago", "field": "sys_created_on", "value": 24}]'
+            table="incident", conditions='[{"operator": "hours_ago", "field": "sys_created_on", "value": 24}]'
         )
         result = decode_response(raw)
         assert result["status"] == "success"
@@ -462,7 +462,7 @@ class TestBuildQuery:
                 {"operator": "like", "field": "source", "value": "incident"},
             ]
         )
-        raw = await tools["build_query"](conditions=conditions)
+        raw = await tools["build_query"](table="incident", conditions=conditions)
         result = decode_response(raw)
         assert result["status"] == "success"
         assert result["data"]["query"] == (
@@ -476,7 +476,7 @@ class TestBuildQuery:
     async def test_is_empty_no_value_needed(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Unary operators like is_empty don't need a value."""
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["build_query"](conditions='[{"operator": "is_empty", "field": "assigned_to"}]')
+        raw = await tools["build_query"](table="incident", conditions='[{"operator": "is_empty", "field": "assigned_to"}]')
         result = decode_response(raw)
         assert result["status"] == "success"
         assert result["data"]["query"] == "assigned_toISEMPTY"
@@ -488,7 +488,7 @@ class TestBuildQuery:
     async def test_invalid_operator_returns_error(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Unknown operator returns an error response."""
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["build_query"](conditions='[{"operator": "INVALID", "field": "active", "value": "true"}]')
+        raw = await tools["build_query"](table="incident", conditions='[{"operator": "INVALID", "field": "active", "value": "true"}]')
         result = decode_response(raw)
         assert result["status"] == "error"
         assert "Unknown operator" in result["error"]["message"]
@@ -497,7 +497,7 @@ class TestBuildQuery:
     async def test_invalid_json_returns_error(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Malformed JSON returns an error response."""
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["build_query"](conditions="not valid json")
+        raw = await tools["build_query"](table="incident", conditions="not valid json")
         result = decode_response(raw)
         assert result["status"] == "error"
         assert "Invalid JSON" in result["error"]["message"]
@@ -506,7 +506,7 @@ class TestBuildQuery:
     async def test_missing_field_returns_error(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Missing required 'field' key returns an error."""
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["build_query"](conditions='[{"operator": "equals", "value": "true"}]')
+        raw = await tools["build_query"](table="incident", conditions='[{"operator": "equals", "value": "true"}]')
         result = decode_response(raw)
         assert result["status"] == "error"
         assert "requires a 'field'" in result["error"]["message"]
@@ -517,7 +517,7 @@ class TestBuildQuery:
     ) -> None:
         """Binary operators require a value."""
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["build_query"](conditions='[{"operator": "equals", "field": "active"}]')
+        raw = await tools["build_query"](table="incident", conditions='[{"operator": "equals", "field": "active"}]')
         result = decode_response(raw)
         assert result["status"] == "error"
         assert "requires a 'value'" in result["error"]["message"]
@@ -526,7 +526,7 @@ class TestBuildQuery:
     async def test_not_array_returns_error(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Non-array JSON returns an error."""
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["build_query"](conditions='{"operator": "equals"}')
+        raw = await tools["build_query"](table="incident", conditions='{"operator": "equals"}')
         result = decode_response(raw)
         assert result["status"] == "error"
         assert "must be a JSON array" in result["error"]["message"]
@@ -535,7 +535,7 @@ class TestBuildQuery:
     async def test_empty_array_returns_empty_query(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Empty array returns empty query string."""
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["build_query"](conditions="[]")
+        raw = await tools["build_query"](table="incident", conditions="[]")
         result = decode_response(raw)
         assert result["status"] == "success"
         assert result["data"]["query"] == ""
@@ -546,7 +546,7 @@ class TestBuildQuery:
         """Test days_ago time filter."""
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["build_query"](
-            conditions='[{"operator": "days_ago", "field": "sys_created_on", "value": 30}]'
+            table="incident", conditions='[{"operator": "days_ago", "field": "sys_created_on", "value": 30}]'
         )
         result = decode_response(raw)
         assert result["status"] == "success"
@@ -558,7 +558,7 @@ class TestBuildQuery:
         """Test starts_with string operator."""
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["build_query"](
-            conditions='[{"operator": "starts_with", "field": "name", "value": "incident"}]'
+            table="incident", conditions='[{"operator": "starts_with", "field": "name", "value": "incident"}]'
         )
         result = decode_response(raw)
         assert result["status"] == "success"
@@ -575,7 +575,7 @@ class TestBuildQuery:
                 {"operator": "or_equals", "field": "state", "value": "2"},
             ]
         )
-        raw = await tools["build_query"](conditions=conditions)
+        raw = await tools["build_query"](table="incident", conditions=conditions)
         result = decode_response(raw)
         assert result["status"] == "success"
         assert result["data"]["query"] == "state=1^ORstate=2"
@@ -595,7 +595,7 @@ class TestBuildQuery:
                 },
             ]
         )
-        raw = await tools["build_query"](conditions=conditions)
+        raw = await tools["build_query"](table="incident", conditions=conditions)
         result = decode_response(raw)
         assert result["status"] == "success"
         assert result["data"]["query"] == "nameSTARTSWITHINC^ORnameSTARTSWITHREQ"
@@ -614,7 +614,7 @@ class TestBuildQuery:
                 },
             ]
         )
-        raw = await tools["build_query"](conditions=conditions)
+        raw = await tools["build_query"](table="incident", conditions=conditions)
         result = decode_response(raw)
         assert result["status"] == "success"
         assert result["data"]["query"] == "stateIN1,2,3"
@@ -633,7 +633,7 @@ class TestBuildQuery:
                 },
             ]
         )
-        raw = await tools["build_query"](conditions=conditions)
+        raw = await tools["build_query"](table="incident", conditions=conditions)
         result = decode_response(raw)
         assert result["status"] == "success"
         assert result["data"]["query"] == "priorityNOT IN4,5"
@@ -648,7 +648,7 @@ class TestBuildQuery:
                 {"operator": "in_list", "field": "state", "value": "1"},
             ]
         )
-        raw = await tools["build_query"](conditions=conditions)
+        raw = await tools["build_query"](table="incident", conditions=conditions)
         result = decode_response(raw)
         assert result["status"] == "error"
         assert "list of strings" in result["error"]["message"]
@@ -663,7 +663,7 @@ class TestBuildQuery:
                 {"operator": "order_by", "field": "sys_created_on"},
             ]
         )
-        raw = await tools["build_query"](conditions=conditions)
+        raw = await tools["build_query"](table="incident", conditions=conditions)
         result = decode_response(raw)
         assert result["status"] == "success"
         assert result["data"]["query"] == "active=true^ORDERBYsys_created_on"
@@ -683,7 +683,7 @@ class TestBuildQuery:
                 },
             ]
         )
-        raw = await tools["build_query"](conditions=conditions)
+        raw = await tools["build_query"](table="incident", conditions=conditions)
         result = decode_response(raw)
         assert result["status"] == "success"
         assert result["data"]["query"] == "active=true^ORDERBYDESCsys_created_on"
@@ -698,7 +698,7 @@ class TestBuildQuery:
                 {"operator": "equals", "field": "name", "value": "foo^bar"},
             ]
         )
-        raw = await tools["build_query"](conditions=conditions)
+        raw = await tools["build_query"](table="incident", conditions=conditions)
         result = decode_response(raw)
         assert result["status"] == "success"
         # The ^ in the value should be escaped to ^^
@@ -712,7 +712,7 @@ class TestBuildQuery:
         """Time operator without value key returns error (line 96)."""
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["build_query"](
-            conditions='[{"operator": "hours_ago", "field": "sys_created_on"}]',
+            table="incident", conditions='[{"operator": "hours_ago", "field": "sys_created_on"}]',
         )
         result = decode_response(raw)
         assert result["status"] == "error"
@@ -730,7 +730,7 @@ class TestBuildQuery:
             "servicenow_mcp.tools.table.ServiceNowQuery",
             side_effect=RuntimeError("boom"),
         ):
-            raw = await tools["build_query"](conditions='[{"operator": "equals", "field": "active", "value": "true"}]')
+            raw = await tools["build_query"](table="incident", conditions='[{"operator": "equals", "field": "active", "value": "true"}]')
         result = decode_response(raw)
         assert result["status"] == "error"
         assert "boom" in result["error"]["message"]
@@ -748,7 +748,7 @@ class TestBuildQuery:
         register_tools(mcp, settings, auth_provider)
         tools = get_tool_functions(mcp)
 
-        raw = await tools["build_query"](conditions='[{"operator": "equals", "field": "active", "value": "true"}]')
+        raw = await tools["build_query"](table="incident", conditions='[{"operator": "equals", "field": "active", "value": "true"}]')
         result = decode_response(raw)
         token = result["data"]["query_token"]
 
@@ -763,7 +763,7 @@ class TestBuildQuery:
         """Test ends_with string operator."""
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["build_query"](
-            conditions='[{"operator": "ends_with", "field": "email", "value": "@example.com"}]'
+            table="incident", conditions='[{"operator": "ends_with", "field": "email", "value": "@example.com"}]'
         )
         result = decode_response(raw)
         assert result["status"] == "success"
@@ -773,7 +773,7 @@ class TestBuildQuery:
     async def test_not_like(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Test not_like string operator."""
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["build_query"](conditions='[{"operator": "not_like", "field": "name", "value": "test"}]')
+        raw = await tools["build_query"](table="incident", conditions='[{"operator": "not_like", "field": "name", "value": "test"}]')
         result = decode_response(raw)
         assert result["status"] == "success"
         assert result["data"]["query"] == "nameNOT LIKEtest"
@@ -782,7 +782,7 @@ class TestBuildQuery:
     async def test_anything(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Test anything unary operator."""
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["build_query"](conditions='[{"operator": "anything", "field": "state"}]')
+        raw = await tools["build_query"](table="incident", conditions='[{"operator": "anything", "field": "state"}]')
         result = decode_response(raw)
         assert result["status"] == "success"
         assert result["data"]["query"] == "stateANYTHING"
@@ -791,7 +791,7 @@ class TestBuildQuery:
     async def test_empty_string(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Test empty_string unary operator."""
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["build_query"](conditions='[{"operator": "empty_string", "field": "description"}]')
+        raw = await tools["build_query"](table="incident", conditions='[{"operator": "empty_string", "field": "description"}]')
         result = decode_response(raw)
         assert result["status"] == "success"
         assert result["data"]["query"] == "descriptionEMPTYSTRING"
@@ -800,7 +800,7 @@ class TestBuildQuery:
     async def test_val_changes(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Test val_changes unary operator."""
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["build_query"](conditions='[{"operator": "val_changes", "field": "state"}]')
+        raw = await tools["build_query"](table="incident", conditions='[{"operator": "val_changes", "field": "state"}]')
         result = decode_response(raw)
         assert result["status"] == "success"
         assert result["data"]["query"] == "stateVALCHANGES"
@@ -810,7 +810,7 @@ class TestBuildQuery:
         """Test gt_field comparison operator."""
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["build_query"](
-            conditions='[{"operator": "gt_field", "field": "sys_updated_on", "other_field": "sys_created_on"}]'
+            table="incident", conditions='[{"operator": "gt_field", "field": "sys_updated_on", "other_field": "sys_created_on"}]'
         )
         result = decode_response(raw)
         assert result["status"] == "success"
@@ -821,7 +821,7 @@ class TestBuildQuery:
         """Test same_as field comparison operator."""
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["build_query"](
-            conditions='[{"operator": "same_as", "field": "assigned_to", "other_field": "opened_by"}]'
+            table="incident", conditions='[{"operator": "same_as", "field": "assigned_to", "other_field": "opened_by"}]'
         )
         result = decode_response(raw)
         assert result["status"] == "success"
@@ -834,7 +834,7 @@ class TestBuildQuery:
         """Field operators should accept 'value' as fallback for 'other_field'."""
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["build_query"](
-            conditions='[{"operator": "lt_field", "field": "priority", "value": "impact"}]'
+            table="incident", conditions='[{"operator": "lt_field", "field": "priority", "value": "impact"}]'
         )
         result = decode_response(raw)
         assert result["status"] == "success"
@@ -846,7 +846,7 @@ class TestBuildQuery:
     ) -> None:
         """Field operators without other_field or value return error."""
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["build_query"](conditions='[{"operator": "gt_field", "field": "priority"}]')
+        raw = await tools["build_query"](table="incident", conditions='[{"operator": "gt_field", "field": "priority"}]')
         result = decode_response(raw)
         assert result["status"] == "error"
 
@@ -855,7 +855,7 @@ class TestBuildQuery:
         """Test between range operator."""
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["build_query"](
-            conditions='[{"operator": "between", "field": "sys_created_on", "start": "2026-01-01", "end": "2026-12-31"}]'
+            table="incident", conditions='[{"operator": "between", "field": "sys_created_on", "start": "2026-01-01", "end": "2026-12-31"}]'
         )
         result = decode_response(raw)
         assert result["status"] == "success"
@@ -866,7 +866,7 @@ class TestBuildQuery:
         """between without end value returns error."""
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["build_query"](
-            conditions='[{"operator": "between", "field": "sys_created_on", "start": "2026-01-01"}]'
+            table="incident", conditions='[{"operator": "between", "field": "sys_created_on", "start": "2026-01-01"}]'
         )
         result = decode_response(raw)
         assert result["status"] == "error"
@@ -876,7 +876,7 @@ class TestBuildQuery:
         """Test datepart operator."""
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["build_query"](
-            conditions='[{"operator": "datepart", "field": "sys_created_on", "part": "dayofweek", "dp_operator": "=", "dp_value": "1"}]'
+            table="incident", conditions='[{"operator": "datepart", "field": "sys_created_on", "part": "dayofweek", "dp_operator": "=", "dp_value": "1"}]'
         )
         result = decode_response(raw)
         assert result["status"] == "success"
@@ -886,7 +886,7 @@ class TestBuildQuery:
     async def test_datepart_missing_part(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """datepart without required params returns error."""
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["build_query"](conditions='[{"operator": "datepart", "field": "sys_created_on"}]')
+        raw = await tools["build_query"](table="incident", conditions='[{"operator": "datepart", "field": "sys_created_on"}]')
         result = decode_response(raw)
         assert result["status"] == "error"
 
@@ -895,7 +895,7 @@ class TestBuildQuery:
         """Test on date operator."""
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["build_query"](
-            conditions='[{"operator": "on", "field": "sys_created_on", "value": "2026-01-15"}]'
+            table="incident", conditions='[{"operator": "on", "field": "sys_created_on", "value": "2026-01-15"}]'
         )
         result = decode_response(raw)
         assert result["status"] == "success"
@@ -906,7 +906,7 @@ class TestBuildQuery:
         """Test relative_gt date operator."""
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["build_query"](
-            conditions='[{"operator": "relative_gt", "field": "sys_created_on", "value": "@year@ago@1"}]'
+            table="incident", conditions='[{"operator": "relative_gt", "field": "sys_created_on", "value": "@year@ago@1"}]'
         )
         result = decode_response(raw)
         assert result["status"] == "success"
@@ -917,7 +917,7 @@ class TestBuildQuery:
         """Test more_than date operator."""
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["build_query"](
-            conditions='[{"operator": "more_than", "field": "sys_updated_on", "value": "@hour@ago@3"}]'
+            table="incident", conditions='[{"operator": "more_than", "field": "sys_updated_on", "value": "@hour@ago@3"}]'
         )
         result = decode_response(raw)
         assert result["status"] == "success"
@@ -927,7 +927,7 @@ class TestBuildQuery:
     async def test_changes_from(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Test changes_from change detection operator."""
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["build_query"](conditions='[{"operator": "changes_from", "field": "priority", "value": "3"}]')
+        raw = await tools["build_query"](table="incident", conditions='[{"operator": "changes_from", "field": "priority", "value": "3"}]')
         result = decode_response(raw)
         assert result["status"] == "success"
         assert result["data"]["query"] == "priorityCHANGESFROM3"
@@ -936,7 +936,7 @@ class TestBuildQuery:
     async def test_changes_to(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Test changes_to change detection operator."""
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["build_query"](conditions='[{"operator": "changes_to", "field": "state", "value": "6"}]')
+        raw = await tools["build_query"](table="incident", conditions='[{"operator": "changes_to", "field": "state", "value": "6"}]')
         result = decode_response(raw)
         assert result["status"] == "success"
         assert result["data"]["query"] == "stateCHANGESTO6"
@@ -946,7 +946,7 @@ class TestBuildQuery:
         """Test dynamic reference operator."""
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["build_query"](
-            conditions='[{"operator": "dynamic", "field": "cmdb_ci", "value": "javascript:getCIFilter()"}]'
+            table="incident", conditions='[{"operator": "dynamic", "field": "cmdb_ci", "value": "javascript:getCIFilter()"}]'
         )
         result = decode_response(raw)
         assert result["status"] == "success"
@@ -957,7 +957,7 @@ class TestBuildQuery:
         """Test in_hierarchy reference operator."""
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["build_query"](
-            conditions='[{"operator": "in_hierarchy", "field": "cmdb_ci", "value": "abc123"}]'
+            table="incident", conditions='[{"operator": "in_hierarchy", "field": "cmdb_ci", "value": "abc123"}]'
         )
         result = decode_response(raw)
         assert result["status"] == "success"
@@ -974,7 +974,7 @@ class TestBuildQuery:
                 {"operator": "equals", "field": "priority", "value": "1"},
             ]
         )
-        raw = await tools["build_query"](conditions=conditions)
+        raw = await tools["build_query"](table="incident", conditions=conditions)
         result = decode_response(raw)
         assert result["status"] == "success"
         assert "NQ" in result["data"]["query"]
@@ -995,7 +995,7 @@ class TestBuildQuery:
                 },
             ]
         )
-        raw = await tools["build_query"](conditions=conditions)
+        raw = await tools["build_query"](table="incident", conditions=conditions)
         result = decode_response(raw)
         assert result["status"] == "success"
         assert "RLQUERY" in result["data"]["query"]
@@ -1015,7 +1015,7 @@ class TestBuildQuery:
                 },
             ]
         )
-        raw = await tools["build_query"](conditions=conditions)
+        raw = await tools["build_query"](table="incident", conditions=conditions)
         result = decode_response(raw)
         assert result["status"] == "error"
 
@@ -1026,7 +1026,7 @@ class TestBuildQuery:
         """Time operator with non-integer value returns structured error."""
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["build_query"](
-            conditions='[{"operator": "hours_ago", "field": "sys_created_on", "value": "abc"}]',
+            table="incident", conditions='[{"operator": "hours_ago", "field": "sys_created_on", "value": "abc"}]',
         )
         result = decode_response(raw)
         assert result["status"] == "error"
@@ -1039,7 +1039,7 @@ class TestBuildQuery:
         """Non-string operator value returns type error."""
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["build_query"](
-            conditions='[{"operator": 123, "field": "state"}]',
+            table="incident", conditions='[{"operator": 123, "field": "state"}]',
         )
         result = decode_response(raw)
         assert result["status"] == "error"

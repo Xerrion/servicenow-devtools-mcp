@@ -165,14 +165,14 @@ class TestQueryTokenStore:
     def test_create_returns_token_string(self) -> None:
         """create() returns a UUID-style string token."""
         store = QueryTokenStore(ttl_seconds=300)
-        token = store.create({"query": "active=true"})
+        token = store.create({"query": "active=true", "table": "incident"})
         assert isinstance(token, str)
         assert len(token) > 0
 
     def test_get_returns_stored_payload(self) -> None:
         """get() returns the payload stored for a valid token."""
         store = QueryTokenStore(ttl_seconds=300)
-        payload = {"query": "active=true"}
+        payload = {"query": "active=true", "table": "incident"}
         token = store.create(payload)
         result = store.get(token)
         assert result is not None
@@ -192,7 +192,7 @@ class TestQueryTokenStore:
             side_effect=lambda: fake_time,
         ):
             store = QueryTokenStore(ttl_seconds=60)
-            token = store.create({"query": "active=true"})
+            token = store.create({"query": "active=true", "table": "incident"})
 
         # Advance time past TTL
         with patch("servicenow_mcp.state.time.monotonic", return_value=fake_time + 61):
@@ -203,7 +203,7 @@ class TestQueryTokenStore:
     def test_get_is_reusable_within_ttl(self) -> None:
         """get() succeeds multiple times for the same token (non-destructive)."""
         store = QueryTokenStore(ttl_seconds=300)
-        token = store.create({"query": "active=true"})
+        token = store.create({"query": "active=true", "table": "incident"})
 
         result1 = store.get(token)
         result2 = store.get(token)
@@ -224,7 +224,7 @@ class TestQueryTokenStore:
             side_effect=lambda: fake_time,
         ):
             store = QueryTokenStore(ttl_seconds=60)
-            token = store.create({"query": "active=true"})
+            token = store.create({"query": "active=true", "table": "incident"})
 
         # Advance time but stay within TTL
         with patch("servicenow_mcp.state.time.monotonic", return_value=fake_time + 59):
@@ -241,7 +241,7 @@ class TestQueryTokenStore:
             side_effect=lambda: fake_time,
         ):
             store = QueryTokenStore(ttl_seconds=60)
-            token = store.create({"query": "active=true"})
+            token = store.create({"query": "active=true", "table": "incident"})
 
         # Advance time to exactly TTL -- _is_expired uses >, so 60 == 60 is NOT expired
         with patch("servicenow_mcp.state.time.monotonic", return_value=fake_time + 60):
@@ -252,24 +252,24 @@ class TestQueryTokenStore:
     def test_store_max_size(self) -> None:
         """create() raises RuntimeError when max_size is reached and no entries are expired."""
         store = QueryTokenStore(ttl_seconds=300, max_size=3)
-        store.create({"query": "active=true"})
-        store.create({"query": "state=1"})
-        store.create({"query": "priority=1"})
+        store.create({"query": "active=true", "table": "incident"})
+        store.create({"query": "state=1", "table": "incident"})
+        store.create({"query": "priority=1", "table": "incident"})
 
         with pytest.raises(RuntimeError, match="store is full"):
-            store.create({"query": "impact=1"})
+            store.create({"query": "impact=1", "table": "incident"})
 
     def test_sweep_expired_on_create(self) -> None:
         """create() sweeps expired entries first, allowing new tokens when space is freed."""
         fake_time = 1000.0
         with patch("servicenow_mcp.state.time.monotonic", return_value=fake_time):
             store = QueryTokenStore(ttl_seconds=60, max_size=2)
-            store.create({"query": "active=true"})
-            store.create({"query": "state=1"})
+            store.create({"query": "active=true", "table": "incident"})
+            store.create({"query": "state=1", "table": "incident"})
 
         # Advance time past TTL -- expired entries should be swept on next create()
         with patch("servicenow_mcp.state.time.monotonic", return_value=fake_time + 61):
-            token = store.create({"query": "priority=1"})
+            token = store.create({"query": "priority=1", "table": "incident"})
             result = store.get(token)
 
         assert result is not None
@@ -280,9 +280,9 @@ class TestQueryTokenStore:
         fake_time = 1000.0
         with patch("servicenow_mcp.state.time.monotonic", return_value=fake_time):
             store = QueryTokenStore(ttl_seconds=60, max_size=10)
-            store.create({"query": "active=true"})
-            store.create({"query": "state=1"})
-            store.create({"query": "priority=1"})
+            store.create({"query": "active=true", "table": "incident"})
+            store.create({"query": "state=1", "table": "incident"})
+            store.create({"query": "priority=1", "table": "incident"})
 
         assert len(store) == 3
 
