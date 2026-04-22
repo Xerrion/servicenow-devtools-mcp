@@ -339,12 +339,12 @@ class TestWorkflowMap:
     @respx.mock
     async def test_empty_activities_and_transitions(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Returns version with empty activities and transitions lists."""
-        respx.get(f"{BASE_URL}/api/now/table/wf_workflow_version/wfv_empty").mock(
+        respx.get(f"{BASE_URL}/api/now/table/wf_workflow_version/7e5366f16c281ccf6eb5fab870d009b3").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "wfv_empty",
+                        "sys_id": "7e5366f16c281ccf6eb5fab870d009b3",
                         "name": "Empty Workflow",
                         "table": "incident",
                         "active": "true",
@@ -361,7 +361,7 @@ class TestWorkflowMap:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["workflow_map"](workflow_version_sys_id="wfv_empty")
+        raw = await tools["workflow_map"](workflow_version_sys_id="7e5366f16c281ccf6eb5fab870d009b3")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -372,10 +372,10 @@ class TestWorkflowMap:
     @respx.mock
     async def test_activities_sorted_by_x_position(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Activities are returned ordered by x position from the query."""
-        respx.get(f"{BASE_URL}/api/now/table/wf_workflow_version/wfv_sort").mock(
+        respx.get(f"{BASE_URL}/api/now/table/wf_workflow_version/2759e538b7ba0684c83e050d1a9f0977").mock(
             return_value=httpx.Response(
                 200,
-                json={"result": {"sys_id": "wfv_sort", "name": "Sort Test WF"}},
+                json={"result": {"sys_id": "2759e538b7ba0684c83e050d1a9f0977", "name": "Sort Test WF"}},
             )
         )
         # Activities returned pre-sorted by x (as ServiceNow would return them)
@@ -415,7 +415,7 @@ class TestWorkflowMap:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["workflow_map"](workflow_version_sys_id="wfv_sort")
+        raw = await tools["workflow_map"](workflow_version_sys_id="2759e538b7ba0684c83e050d1a9f0977")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -449,10 +449,10 @@ class TestWorkflowMap:
     @respx.mock
     async def test_map_groups_variables_by_activity(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Variables are grouped correctly per activity in the map."""
-        respx.get(f"{BASE_URL}/api/now/table/wf_workflow_version/wfv_vars").mock(
+        respx.get(f"{BASE_URL}/api/now/table/wf_workflow_version/f4e5800ef04e1ddae096cab27268a211").mock(
             return_value=httpx.Response(
                 200,
-                json={"result": {"sys_id": "wfv_vars", "name": "Vars Test WF"}},
+                json={"result": {"sys_id": "f4e5800ef04e1ddae096cab27268a211", "name": "Vars Test WF"}},
             )
         )
         respx.get(f"{BASE_URL}/api/now/table/wf_activity").mock(
@@ -510,7 +510,7 @@ class TestWorkflowMap:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["workflow_map"](workflow_version_sys_id="wfv_vars")
+        raw = await tools["workflow_map"](workflow_version_sys_id="f4e5800ef04e1ddae096cab27268a211")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -527,12 +527,12 @@ class TestWorkflowMap:
         self, settings: Settings, auth_provider: BasicAuthProvider
     ) -> None:
         """No sys_variable_value call when there are no activities."""
-        respx.get(f"{BASE_URL}/api/now/table/wf_workflow_version/wfv_none").mock(
+        respx.get(f"{BASE_URL}/api/now/table/wf_workflow_version/a7d9eb2e84eb49b6fcca92d84b48c1b4").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "wfv_none",
+                        "sys_id": "a7d9eb2e84eb49b6fcca92d84b48c1b4",
                         "name": "No Activities WF",
                     }
                 },
@@ -547,7 +547,7 @@ class TestWorkflowMap:
         # Do NOT mock sys_variable_value - if it's called, the test will fail with ConnectionError
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["workflow_map"](workflow_version_sys_id="wfv_none")
+        raw = await tools["workflow_map"](workflow_version_sys_id="a7d9eb2e84eb49b6fcca92d84b48c1b4")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -919,7 +919,7 @@ class TestWorkflowActivityDetail:
                 200,
                 json={
                     "result": {
-                        "sys_id": "act_nodef",
+                        "sys_id": "a40bb1d2559337415c49dfd982cf2fe2",
                         "name": "Custom Activity",
                         "activity_definition": "",
                         "x": "100",
@@ -928,17 +928,17 @@ class TestWorkflowActivityDetail:
                 },
             )
 
-        respx.get(f"{BASE_URL}/api/now/table/wf_activity/act_nodef").mock(side_effect=_nodef_side_effect)
+        respx.get(f"{BASE_URL}/api/now/table/wf_activity/a40bb1d2559337415c49dfd982cf2fe2").mock(side_effect=_nodef_side_effect)
         respx.get(f"{BASE_URL}/api/now/table/sys_variable_value").mock(
             return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["workflow_activity_detail"](activity_sys_id="act_nodef")
+        raw = await tools["workflow_activity_detail"](activity_sys_id="a40bb1d2559337415c49dfd982cf2fe2")
         result = decode_response(raw)
 
         assert result["status"] == "success"
-        assert result["data"]["activity"]["sys_id"] == "act_nodef"
+        assert result["data"]["activity"]["sys_id"] == "a40bb1d2559337415c49dfd982cf2fe2"
         assert result["data"]["definition"] is None
         assert result["data"]["variables"] == []
 
@@ -970,7 +970,7 @@ class TestWorkflowActivityDetail:
                 200,
                 json={
                     "result": {
-                        "sys_id": "act_vars",
+                        "sys_id": "20de94ee488dbd2b7154c3afbf85cd22",
                         "name": "Run Script",
                         "activity_definition": "def_script",
                         "x": "100",
@@ -979,7 +979,7 @@ class TestWorkflowActivityDetail:
                 },
             )
 
-        respx.get(f"{BASE_URL}/api/now/table/wf_activity/act_vars").mock(side_effect=_act_vars_side_effect)
+        respx.get(f"{BASE_URL}/api/now/table/wf_activity/20de94ee488dbd2b7154c3afbf85cd22").mock(side_effect=_act_vars_side_effect)
         respx.get(f"{BASE_URL}/api/now/table/wf_element_definition/def_script").mock(
             return_value=httpx.Response(
                 200,
@@ -1001,13 +1001,13 @@ class TestWorkflowActivityDetail:
                             "sys_id": "30a262ee0cddf15a17abb23e11148aa3",
                             "variable": "Script",
                             "value": "gs.log('hello');",
-                            "document_key": "act_vars",
+                            "document_key": "20de94ee488dbd2b7154c3afbf85cd22",
                         },
                         {
                             "sys_id": "2f0c71c73a82a38798e5249c3cfcecd6",
                             "variable": "Condition",
                             "value": "current.active == true",
-                            "document_key": "act_vars",
+                            "document_key": "20de94ee488dbd2b7154c3afbf85cd22",
                         },
                     ]
                 },
@@ -1016,7 +1016,7 @@ class TestWorkflowActivityDetail:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["workflow_activity_detail"](activity_sys_id="act_vars")
+        raw = await tools["workflow_activity_detail"](activity_sys_id="20de94ee488dbd2b7154c3afbf85cd22")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -1106,7 +1106,7 @@ class TestWorkflowVersionList:
                 json={
                     "result": [
                         {
-                            "sys_id": "wfv_inactive",
+                            "sys_id": "ff36fb9fb5cad6865cdbd6293b2a5ad1",
                             "name": "Old Workflow",
                             "table": "incident",
                             "active": "false",
@@ -1206,8 +1206,8 @@ class TestWorkflowDictReferenceFields:
         dict_activity_def = {"display_value": "f45ee39efdcca5805d1e7e2eaa97f27b", "link": "https://test.service-now.com/api/..."}
         dict_doc_key = {"display_value": "a37b4556fc38ce6b2a3fd1521b1291bc", "link": "https://test.service-now.com/api/..."}
 
-        respx.get(f"{BASE_URL}/api/now/table/wf_workflow_version/wfv_dict_test").mock(
-            return_value=httpx.Response(200, json={"result": {"sys_id": "wfv_dict_test", "name": "Test WF"}})
+        respx.get(f"{BASE_URL}/api/now/table/wf_workflow_version/789b9a03486e4434d8e435a024103c95").mock(
+            return_value=httpx.Response(200, json={"result": {"sys_id": "789b9a03486e4434d8e435a024103c95", "name": "Test WF"}})
         )
         respx.get(f"{BASE_URL}/api/now/table/wf_activity").mock(
             return_value=httpx.Response(
@@ -1254,7 +1254,7 @@ class TestWorkflowDictReferenceFields:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["workflow_map"](workflow_version_sys_id="wfv_dict_test")
+        raw = await tools["workflow_map"](workflow_version_sys_id="789b9a03486e4434d8e435a024103c95")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -1272,14 +1272,14 @@ class TestWorkflowDictReferenceFields:
         dict_definition = {"display_value": "act_def_001", "link": "https://test.service-now.com/api/..."}
 
         # Phase 1: raw activity with dict reference
-        respx.get(f"{BASE_URL}/api/now/table/wf_activity/act_dict_test").mock(
+        respx.get(f"{BASE_URL}/api/now/table/wf_activity/2eac3cfb70af19b72304086d2d97c52d").mock(
             side_effect=[
                 # First call: raw (display_values=False)
                 httpx.Response(
                     200,
                     json={
                         "result": {
-                            "sys_id": "act_dict_test",
+                            "sys_id": "2eac3cfb70af19b72304086d2d97c52d",
                             "name": "My Activity",
                             "activity_definition": dict_definition,
                         }
@@ -1290,7 +1290,7 @@ class TestWorkflowDictReferenceFields:
                     200,
                     json={
                         "result": {
-                            "sys_id": "act_dict_test",
+                            "sys_id": "2eac3cfb70af19b72304086d2d97c52d",
                             "name": "My Activity",
                             "activity_definition": "Run Script",
                         }
@@ -1309,7 +1309,7 @@ class TestWorkflowDictReferenceFields:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["workflow_activity_detail"](activity_sys_id="act_dict_test")
+        raw = await tools["workflow_activity_detail"](activity_sys_id="2eac3cfb70af19b72304086d2d97c52d")
         result = decode_response(raw)
 
         assert result["status"] == "success"

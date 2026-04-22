@@ -302,12 +302,12 @@ class TestFlowGet:
     @respx.mock
     async def test_flow_get_with_no_variables(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Flow exists but has no variables."""
-        respx.get(f"{BASE_URL}/api/now/table/sys_hub_flow/flow_novar").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_hub_flow/68fccdc772b24d949d4ec0381cb858eb").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "flow_novar",
+                        "sys_id": "68fccdc772b24d949d4ec0381cb858eb",
                         "name": "Simple Flow",
                         "status": "published",
                     }
@@ -319,11 +319,11 @@ class TestFlowGet:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["flow_get"](flow_sys_id="flow_novar")
+        raw = await tools["flow_get"](flow_sys_id="68fccdc772b24d949d4ec0381cb858eb")
         result = decode_response(raw)
 
         assert result["status"] == "success"
-        assert result["data"]["flow"]["sys_id"] == "flow_novar"
+        assert result["data"]["flow"]["sys_id"] == "68fccdc772b24d949d4ec0381cb858eb"
         assert result["data"]["variables"] == []
 
     @pytest.mark.asyncio()
@@ -388,7 +388,7 @@ class TestFlowMap:
     @respx.mock
     async def test_flow_map_success(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Uses latest_snapshot when child records are linked to the newest snapshot."""
-        self._mock_parent_flow_lookup("8eecae1b3a5230387ff5f06a91b9fbe9", latest_snapshot="snap_latest")
+        self._mock_parent_flow_lookup("8eecae1b3a5230387ff5f06a91b9fbe9", latest_snapshot="b6069c7ab2fac9d79864075defa6176c")
         action_route = respx.get(f"{BASE_URL}/api/now/table/sys_hub_action_instance").mock(
             return_value=httpx.Response(
                 200,
@@ -443,14 +443,14 @@ class TestFlowMap:
         assert len(result["data"]["logic_blocks"]) == 1
         assert result["data"]["actions"][0]["name"] == "Create Task"
         assert result["data"]["logic_blocks"][0]["name"] == "If Priority 1"
-        assert self._get_query_target(action_route) == "snap_latest"
-        assert self._get_query_target(logic_route) == "snap_latest"
+        assert self._get_query_target(action_route) == "b6069c7ab2fac9d79864075defa6176c"
+        assert self._get_query_target(logic_route) == "b6069c7ab2fac9d79864075defa6176c"
 
     @pytest.mark.asyncio()
     @respx.mock
     async def test_flow_map_only_actions(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Falls back to master_snapshot when latest_snapshot is missing."""
-        self._mock_parent_flow_lookup("flow_acts", master_snapshot="snap_master")
+        self._mock_parent_flow_lookup("06bed3558e7fd1e9359964cedb4dc271", master_snapshot="9b250a88678953224d007032837d3d92")
         action_route = respx.get(f"{BASE_URL}/api/now/table/sys_hub_action_instance").mock(
             return_value=httpx.Response(
                 200,
@@ -474,20 +474,20 @@ class TestFlowMap:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["flow_map"](flow_sys_id="flow_acts")
+        raw = await tools["flow_map"](flow_sys_id="06bed3558e7fd1e9359964cedb4dc271")
         result = decode_response(raw)
 
         assert result["status"] == "success"
         assert len(result["data"]["actions"]) == 1
         assert result["data"]["logic_blocks"] == []
-        assert self._get_query_target(action_route) == "snap_master"
-        assert self._get_query_target(logic_route) == "snap_master"
+        assert self._get_query_target(action_route) == "9b250a88678953224d007032837d3d92"
+        assert self._get_query_target(logic_route) == "9b250a88678953224d007032837d3d92"
 
     @pytest.mark.asyncio()
     @respx.mock
     async def test_flow_map_only_logic(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Flow with logic blocks but no actions."""
-        self._mock_parent_flow_lookup("flow_logic", latest_snapshot="snap_logic")
+        self._mock_parent_flow_lookup("f05a9e989019b2cd934dc2ba0c31a1d2", latest_snapshot="9095d45621112c8881812276e734f504")
         respx.get(f"{BASE_URL}/api/now/table/sys_hub_action_instance").mock(
             return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
         )
@@ -511,7 +511,7 @@ class TestFlowMap:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["flow_map"](flow_sys_id="flow_logic")
+        raw = await tools["flow_map"](flow_sys_id="f05a9e989019b2cd934dc2ba0c31a1d2")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -522,7 +522,7 @@ class TestFlowMap:
     @respx.mock
     async def test_flow_map_empty(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Falls back to the original flow sys_id when no snapshot references exist."""
-        self._mock_parent_flow_lookup("flow_empty")
+        self._mock_parent_flow_lookup("188a7d874a4b60bd7ef309c6f8872ba7")
         action_route = respx.get(f"{BASE_URL}/api/now/table/sys_hub_action_instance").mock(
             return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
         )
@@ -531,14 +531,14 @@ class TestFlowMap:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["flow_map"](flow_sys_id="flow_empty")
+        raw = await tools["flow_map"](flow_sys_id="188a7d874a4b60bd7ef309c6f8872ba7")
         result = decode_response(raw)
 
         assert result["status"] == "success"
         assert result["data"]["actions"] == []
         assert result["data"]["logic_blocks"] == []
-        assert self._get_query_target(action_route) == "flow_empty"
-        assert self._get_query_target(logic_route) == "flow_empty"
+        assert self._get_query_target(action_route) == "188a7d874a4b60bd7ef309c6f8872ba7"
+        assert self._get_query_target(logic_route) == "188a7d874a4b60bd7ef309c6f8872ba7"
 
 
 # ---------------------------------------------------------------------------
@@ -848,7 +848,7 @@ class TestFlowExecutionList:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["flow_execution_list"](flow_sys_id="flow_none")
+        raw = await tools["flow_execution_list"](flow_sys_id="6d90efaf0787be213a9f58202ec86f89")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -1039,7 +1039,7 @@ class TestFlowSnapshotList:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["flow_snapshot_list"](flow_sys_id="flow_none")
+        raw = await tools["flow_snapshot_list"](flow_sys_id="6d90efaf0787be213a9f58202ec86f89")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -1761,7 +1761,7 @@ class TestWorkflowMigrationAnalysis:
         self._mock_activities(
             [
                 {
-                    "sys_id": "act_rb",
+                    "sys_id": "fdc79c389c219498815dbde80a740ac4",
                     "name": "Rollback Step",
                     "activity_definition": "def_rb",
                     "activity_definition.name": "Rollback To",
@@ -1772,7 +1772,7 @@ class TestWorkflowMigrationAnalysis:
                     "notes": "",
                 },
                 {
-                    "sys_id": "act_tb",
+                    "sys_id": "bd3952ef766e436ed570bc8af337e0ab",
                     "name": "Turnback Step",
                     "activity_definition": "def_tb",
                     "activity_definition.name": "Turnback To",
@@ -1865,10 +1865,10 @@ class TestFlowDesignerDictReferenceFields:
         self, settings: Settings, auth_provider: BasicAuthProvider
     ) -> None:
         """workflow_migration_analysis handles from, to, document_key, and definition name as dicts."""
-        respx.get(f"{BASE_URL}/api/now/table/wf_workflow_version/wfv_dict_mig").mock(
+        respx.get(f"{BASE_URL}/api/now/table/wf_workflow_version/ed05ba708c14a19d2afe245830c0f1e5").mock(
             return_value=httpx.Response(
                 200,
-                json={"result": {"sys_id": "wfv_dict_mig", "name": "Migration WF", "table": "incident"}},
+                json={"result": {"sys_id": "ed05ba708c14a19d2afe245830c0f1e5", "name": "Migration WF", "table": "incident"}},
             )
         )
         respx.get(f"{BASE_URL}/api/now/table/wf_activity").mock(
@@ -1877,7 +1877,7 @@ class TestFlowDesignerDictReferenceFields:
                 json={
                     "result": [
                         {
-                            "sys_id": "act_a",
+                            "sys_id": "f8a6be5668c8de0f81a1b30a4cf8face",
                             "name": "Start",
                             "activity_definition": "def_begin",
                             "activity_definition.name": {
@@ -1891,7 +1891,7 @@ class TestFlowDesignerDictReferenceFields:
                             "notes": "",
                         },
                         {
-                            "sys_id": "act_b",
+                            "sys_id": "27ebb39863c212df73df6e9ce50b58a4",
                             "name": "End",
                             "activity_definition": "def_end",
                             "activity_definition.name": {
@@ -1916,9 +1916,9 @@ class TestFlowDesignerDictReferenceFields:
                     "result": [
                         {
                             "sys_id": "a5d23ceaba84465f5cebeb9a4c0c4836",
-                            "from": {"display_value": "act_a", "link": "https://test.service-now.com/api/..."},
+                            "from": {"display_value": "f8a6be5668c8de0f81a1b30a4cf8face", "link": "https://test.service-now.com/api/..."},
                             "from.name": "Start",
-                            "to": {"display_value": "act_b", "link": "https://test.service-now.com/api/..."},
+                            "to": {"display_value": "27ebb39863c212df73df6e9ce50b58a4", "link": "https://test.service-now.com/api/..."},
                             "to.name": "End",
                             "condition": "",
                         }
@@ -1936,7 +1936,7 @@ class TestFlowDesignerDictReferenceFields:
                             "sys_id": "var_dict",
                             "variable": "script",
                             "value": "gs.log('test');",
-                            "document_key": {"display_value": "act_a", "link": "https://test.service-now.com/api/..."},
+                            "document_key": {"display_value": "f8a6be5668c8de0f81a1b30a4cf8face", "link": "https://test.service-now.com/api/..."},
                         }
                     ]
                 },
@@ -1945,7 +1945,7 @@ class TestFlowDesignerDictReferenceFields:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["workflow_migration_analysis"](workflow_version_sys_id="wfv_dict_mig")
+        raw = await tools["workflow_migration_analysis"](workflow_version_sys_id="ed05ba708c14a19d2afe245830c0f1e5")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -1955,8 +1955,8 @@ class TestFlowDesignerDictReferenceFields:
         # Activity mapping should resolve dict reference fields to strings
         mapping = data["activity_mapping"]
         assert len(mapping) == 2
-        assert mapping[0]["activity_sys_id"] == "act_a"
-        assert mapping[1]["activity_sys_id"] == "act_b"
+        assert mapping[0]["activity_sys_id"] == "f8a6be5668c8de0f81a1b30a4cf8face"
+        assert mapping[1]["activity_sys_id"] == "27ebb39863c212df73df6e9ce50b58a4"
         # Definition names should be resolved from dicts
         assert mapping[0]["legacy_type"] == "Begin"
         assert mapping[1]["legacy_type"] == "End"
