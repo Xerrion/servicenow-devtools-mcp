@@ -107,13 +107,14 @@ class TestServiceNowClientGetRecord:
         from servicenow_mcp.client import ServiceNowClient
         from servicenow_mcp.errors import NotFoundError
 
-        respx.get(f"{BASE_URL}/api/now/table/incident/missing").mock(
+        missing_sys_id = "00000000000000000000000000000000"
+        respx.get(f"{BASE_URL}/api/now/table/incident/{missing_sys_id}").mock(
             return_value=httpx.Response(404, json={"error": {"message": "Not found"}})
         )
 
         async with ServiceNowClient(settings, auth_provider) as client:
             with pytest.raises(NotFoundError):
-                await client.get_record("incident", "missing")
+                await client.get_record("incident", missing_sys_id)
 
     @pytest.mark.asyncio()
     @respx.mock
@@ -664,7 +665,7 @@ class TestServiceNowClientGetEmail:
         """Fetches an email record by ID."""
         from servicenow_mcp.client import ServiceNowClient
 
-        respx.get(f"{BASE_URL}/api/now/5a6df720540c20d95d530d3fd6885511/email/285b9ff22fbce171a68a2b88194bf4c9").mock(
+        respx.get(f"{BASE_URL}/api/now/v1/email/285b9ff22fbce171a68a2b88194bf4c9").mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -689,7 +690,7 @@ class TestServiceNowClientGetEmail:
         """Passes sysparm_fields parameter."""
         from servicenow_mcp.client import ServiceNowClient
 
-        route = respx.get(f"{BASE_URL}/api/now/5a6df720540c20d95d530d3fd6885511/email/285b9ff22fbce171a68a2b88194bf4c9").mock(
+        route = respx.get(f"{BASE_URL}/api/now/v1/email/285b9ff22fbce171a68a2b88194bf4c9").mock(
             return_value=httpx.Response(
                 200,
                 json={"result": {"sys_id": "285b9ff22fbce171a68a2b88194bf4c9"}},
@@ -738,13 +739,14 @@ class TestServiceNowClientGetImportSetRecord:
         from servicenow_mcp.client import ServiceNowClient
         from servicenow_mcp.errors import NotFoundError
 
-        respx.get(f"{BASE_URL}/api/now/import/u_staging_table/missing").mock(
+        missing_sys_id = "00000000000000000000000000000000"
+        respx.get(f"{BASE_URL}/api/now/import/u_staging_table/{missing_sys_id}").mock(
             return_value=httpx.Response(404, json={"error": {"message": "Not found"}})
         )
 
         async with ServiceNowClient(settings, auth_provider) as client:
             with pytest.raises(NotFoundError):
-                await client.get_import_set_record("u_staging_table", "missing")
+                await client.get_import_set_record("u_staging_table", missing_sys_id)
 
 
 class TestServiceNowClientReportingAPIs:
@@ -1025,13 +1027,14 @@ class TestServiceNowClientCMDB:
         from servicenow_mcp.client import ServiceNowClient
         from servicenow_mcp.errors import NotFoundError
 
-        respx.get(f"{BASE_URL}/api/now/cmdb/instance/cmdb_ci_linux_server/missing").mock(
+        missing_sys_id = "00000000000000000000000000000000"
+        respx.get(f"{BASE_URL}/api/now/cmdb/instance/cmdb_ci_linux_server/{missing_sys_id}").mock(
             return_value=httpx.Response(404, json={"error": {"message": "Not found"}})
         )
 
         async with ServiceNowClient(settings, auth_provider) as client:
             with pytest.raises(NotFoundError):
-                await client.cmdb_get_instance("cmdb_ci_linux_server", "missing")
+                await client.cmdb_get_instance("cmdb_ci_linux_server", missing_sys_id)
 
     @pytest.mark.asyncio()
     @respx.mock

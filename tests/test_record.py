@@ -69,7 +69,7 @@ class TestRecordGet:
     @respx.mock
     async def test_masks_sensitive_fields(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Sensitive fields like password are masked in the response."""
-        respx.get(f"{BASE_URL}/api/now/table/sys_user/b3daa77b4c04a9551b8781d03191fe09").mock(
+        respx.get(f"{BASE_URL}/api/now/table/incident/b3daa77b4c04a9551b8781d03191fe09").mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -84,7 +84,7 @@ class TestRecordGet:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["record_get"](table="sys_user", sys_id="b3daa77b4c04a9551b8781d03191fe09")
+        raw = await tools["record_get"](table="incident", sys_id="b3daa77b4c04a9551b8781d03191fe09")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -152,7 +152,8 @@ class TestRecordErrorPropagation:
         self, settings: Settings, auth_provider: BasicAuthProvider
     ) -> None:
         """NotFoundError (404) from client is caught and returned in error envelope."""
-        respx.get(f"{BASE_URL}/api/now/table/incident/missing").mock(
+        missing_sys_id = "00000000000000000000000000000000"
+        respx.get(f"{BASE_URL}/api/now/table/incident/{missing_sys_id}").mock(
             return_value=httpx.Response(
                 404,
                 json={"error": {"message": "Record not found"}},
@@ -160,7 +161,7 @@ class TestRecordErrorPropagation:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["record_get"](table="incident", sys_id="missing")
+        raw = await tools["record_get"](table="incident", sys_id=missing_sys_id)
         result = decode_response(raw)
 
         assert result["status"] == "error"
@@ -253,12 +254,14 @@ class TestRelReferencesTo:
         """Paginated sys_dictionary fetches collect fields across all pages."""
         page_size = 1000
 
-        # Build two pages: first page has exactly page_size entries, second has 2
+        # Build two pages: first page has exactly page_size entries, second has 2.
+        # Using cmn_department as the target because sys_user is a denied table
+        # (MED-1 Phase 4) and rel_references_to performs check_table_access.
         page1_fields = [
             {
                 "name": f"table_p1_{i}",
                 "element": "ref_field",
-                "reference": "sys_user",
+                "reference": "cmn_department",
                 "column_label": f"Ref {i}",
             }
             for i in range(page_size)
@@ -267,13 +270,13 @@ class TestRelReferencesTo:
             {
                 "name": "task",
                 "element": "assigned_to",
-                "reference": "sys_user",
+                "reference": "cmn_department",
                 "column_label": "Assigned to",
             },
             {
                 "name": "task",
                 "element": "opened_by",
-                "reference": "sys_user",
+                "reference": "cmn_department",
                 "column_label": "Opened by",
             },
         ]
@@ -314,7 +317,7 @@ class TestRelReferencesTo:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["rel_references_to"](table="sys_user", sys_id="95c946bf622ef93b0a211cd0fd028dfd")
+        raw = await tools["rel_references_to"](table="cmn_department", sys_id="95c946bf622ef93b0a211cd0fd028dfd")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -344,28 +347,28 @@ class TestRelReferencesTo:
                         {
                             "name": denied,
                             "element": "user",
-                            "reference": "sys_user",
+                            "reference": "cmn_department",
                             "column_label": "User",
                         },
                         # var__m_ internal entry - should be skipped
                         {
                             "name": "var__m_some_table",
                             "element": "ref",
-                            "reference": "sys_user",
+                            "reference": "cmn_department",
                             "column_label": "Ref",
                         },
                         # sys_variable_value entry - should be skipped
                         {
                             "name": "sys_variable_value",
                             "element": "ref",
-                            "reference": "sys_user",
+                            "reference": "cmn_department",
                             "column_label": "Ref",
                         },
                         # Valid entry - should be processed
                         {
                             "name": "incident",
                             "element": "caller_id",
-                            "reference": "sys_user",
+                            "reference": "cmn_department",
                             "column_label": "Caller",
                         },
                     ]
@@ -384,7 +387,7 @@ class TestRelReferencesTo:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["rel_references_to"](table="sys_user", sys_id="b3daa77b4c04a9551b8781d03191fe09")
+        raw = await tools["rel_references_to"](table="cmn_department", sys_id="b3daa77b4c04a9551b8781d03191fe09")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -487,7 +490,7 @@ class TestRelReferencesFrom:
             # First call: lookup incident -> returns super_class pointing to task
             httpx.Response(
                 200,
-                json={"result": [{"super_class": {"value": "task_sys_id", "link": ""}}]},
+                json={"result": [{"super_class": {"value": "11111111111111111111111111111111", "link": ""}}]},
                 headers={"X-Total-Count": "1"},
             ),
             # Third call: lookup task -> no super_class
@@ -498,8 +501,8 @@ class TestRelReferencesFrom:
             ),
         ]
 
-        # Mock: resolve task_sys_id -> "task"
-        respx.get(f"{BASE_URL}/api/now/table/sys_db_object/task_sys_id").mock(
+        # Mock: resolve task super_class sys_id -> "task"
+        respx.get(f"{BASE_URL}/api/now/table/sys_db_object/11111111111111111111111111111111").mock(
             return_value=httpx.Response(
                 200,
                 json={"result": {"name": "task"}},
