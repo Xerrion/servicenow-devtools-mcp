@@ -45,6 +45,12 @@ FIELD_ACTIVITY_DEF_NAME = "activity_definition.name"
 # Known variable names that reliably contain script bodies in workflow activities.
 STRICT_SCRIPT_VARIABLE_NAMES: frozenset[str] = frozenset({"script", "run_script", "script_body"})
 CODE_AWARE_SCRIPT_VARIABLE_NAMES: frozenset[str] = frozenset({"condition"})
+
+# ``sys_variable_value`` is on ``DENIED_TABLES``. The migration-analysis
+# helper below legitimately needs to read it to surface embedded script
+# bodies; it does so via the client's privileged-read path with an
+# explicit, single-entry allowlist so any future caller mistake fails closed.
+_PRIVILEGED_VARIABLE_TABLES: frozenset[str] = frozenset({"sys_variable_value"})
 _SCRIPT_OBJECT_PATTERN: re.Pattern[str] = re.compile(
     r"\b(?:gs|current|workflow|answer|inputs|outputs)\s*\.|answer\s*=",
     re.IGNORECASE,
@@ -671,24 +677,28 @@ async def _extract_activity_scripts(
         groups variable records by activity sys_id, extracted_scripts contains
         script bodies found in those variables, and warnings lists any truncation notices.
     """
-    check_table_access("sys_variable_value")
+    # ``sys_variable_value`` is denied for general callers; this helper owns
+    # the decision to read it and routes through the privileged-read path
+    # with a narrow allowlist (see ``_PRIVILEGED_VARIABLE_TABLES``).
 
     vars_by_activity: dict[str, list[dict[str, Any]]] = {}
     if not activity_sys_ids:
         return vars_by_activity, [], []
 
     vars_query = ServiceNowQuery().equals("document", "wf_activity").in_list("document_key", activity_sys_ids).build()
-    vars_safety = enforce_query_safety("sys_variable_value", vars_query, INTERNAL_QUERY_LIMIT, settings)
-    vars_result = await client.query_records(
+    # Preserve prior clamp against ``max_row_limit`` now that we bypass
+    # ``enforce_query_safety`` for this table.
+    vars_limit = min(INTERNAL_QUERY_LIMIT, settings.max_row_limit)
+    vars_result = await client.get_records_privileged(
         "sys_variable_value",
-        vars_query,
-        fields=["sys_id", "variable", "value", "document_key"],
-        limit=vars_safety["limit"],
-        display_values=False,
+        allowed_tables=_PRIVILEGED_VARIABLE_TABLES,
+        query=vars_query,
+        fields="sys_id,variable,value,document_key",
+        limit=vars_limit,
     )
     warnings: list[str] = []
-    if len(vars_result["records"]) >= vars_safety["limit"]:
-        warnings.append(f"Activity variables may be truncated at {vars_safety['limit']} records")
+    if len(vars_result["records"]) >= vars_limit:
+        warnings.append(f"Activity variables may be truncated at {vars_limit} records")
     for v in vars_result["records"]:
         key = resolve_ref_value(v.get("document_key", ""))
         vars_by_activity.setdefault(key, []).append(mask_sensitive_fields(v))

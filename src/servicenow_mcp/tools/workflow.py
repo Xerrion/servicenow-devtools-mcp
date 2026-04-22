@@ -39,6 +39,13 @@ logger = logging.getLogger(__name__)
 SCRIPT_VARIABLE_NAMES: frozenset[str] = STRICT_SCRIPT_VARIABLE_NAMES | CODE_AWARE_SCRIPT_VARIABLE_NAMES
 
 
+# ``sys_variable_value`` is on ``DENIED_TABLES`` because it can hold secrets
+# pasted into workflow activity variables. Legitimate workflow introspection
+# needs to read it; we do so via the client's privileged-read path with an
+# explicit, single-entry allowlist so any future caller mistake fails closed.
+_PRIVILEGED_VARIABLE_TABLES: frozenset[str] = frozenset({"sys_variable_value"})
+
+
 def _mask_variable_value(variable: dict[str, Any], *, include_script_body: bool) -> dict[str, Any]:
     """Return the variable dict with its ``value`` masked when it names a script body."""
     masked = mask_sensitive_fields(variable)
@@ -100,16 +107,20 @@ async def _fetch_and_attach_variables(
         vars_query = (
             ServiceNowQuery().equals("document", "wf_activity").in_list("document_key", activity_sys_ids).build()
         )
-        vars_safety = enforce_query_safety("sys_variable_value", vars_query, INTERNAL_QUERY_LIMIT, settings)
-        vars_result = await client.query_records(
+        # ``sys_variable_value`` is denied for general callers; this helper
+        # owns the decision to read it and routes through the privileged
+        # path with a narrow allowlist. Preserve the prior clamp against
+        # ``max_row_limit`` so large instances stay bounded.
+        vars_limit = min(INTERNAL_QUERY_LIMIT, settings.max_row_limit)
+        vars_result = await client.get_records_privileged(
             "sys_variable_value",
-            vars_query,
-            fields=["sys_id", "variable", "value", "document_key"],
-            limit=vars_safety["limit"],
-            display_values=False,
+            allowed_tables=_PRIVILEGED_VARIABLE_TABLES,
+            query=vars_query,
+            fields="sys_id,variable,value,document_key",
+            limit=vars_limit,
         )
-        if len(vars_result["records"]) >= vars_safety["limit"]:
-            warnings.append(f"Activity variables may be truncated at {vars_safety['limit']} records")
+        if len(vars_result["records"]) >= vars_limit:
+            warnings.append(f"Activity variables may be truncated at {vars_limit} records")
         for v in vars_result["records"]:
             key = resolve_ref_value(v.get("document_key", ""))
             vars_by_activity.setdefault(key, []).append(
@@ -271,7 +282,8 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         check_table_access("wf_workflow_version")
         check_table_access("wf_activity")
         check_table_access("wf_transition")
-        check_table_access("sys_variable_value")
+        # ``sys_variable_value`` is handled by ``_fetch_and_attach_variables``
+        # via the privileged-read path (see ``_PRIVILEGED_VARIABLE_TABLES``).
 
         activity_query = ServiceNowQuery().equals("workflow_version", workflow_version_sys_id).order_by("x").build()
         transition_query = ServiceNowQuery().equals("from.workflow_version", workflow_version_sys_id).build()
@@ -483,12 +495,14 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         """
         validate_identifier(activity_sys_id)
         check_table_access("wf_activity")
-        check_table_access("sys_variable_value")
+        # ``sys_variable_value`` is denied for general callers; this tool
+        # routes it through the privileged-read path with a narrow allowlist
+        # (see ``_PRIVILEGED_VARIABLE_TABLES``).
 
         variables_query = (
             ServiceNowQuery().equals("document", "wf_activity").equals("document_key", activity_sys_id).build()
         )
-        vars_safety = enforce_query_safety("sys_variable_value", variables_query, 50, settings)
+        vars_limit = min(50, settings.max_row_limit)
 
         warnings: list[str] = []
 
@@ -500,16 +514,17 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             # Phase 2: critical fetches (display activity + variables)
             display_activity, variables_result = await asyncio.gather(
                 client.get_record("wf_activity", activity_sys_id, display_values=True),
-                client.query_records(
+                client.get_records_privileged(
                     "sys_variable_value",
-                    variables_query,
-                    fields=["sys_id", "variable", "value", "document_key"],
-                    limit=vars_safety["limit"],
+                    allowed_tables=_PRIVILEGED_VARIABLE_TABLES,
+                    query=variables_query,
+                    fields="sys_id,variable,value,document_key",
+                    limit=vars_limit,
                     display_values=True,
                 ),
             )
-            if len(variables_result["records"]) >= vars_safety["limit"]:
-                warnings.append(f"Activity variables may be truncated at {vars_safety['limit']} records")
+            if len(variables_result["records"]) >= vars_limit:
+                warnings.append(f"Activity variables may be truncated at {vars_limit} records")
 
             # Non-critical: element definition (may be inaccessible on some instances)
             definition_record, def_warnings = await _fetch_activity_definition(client, definition_sys_id)

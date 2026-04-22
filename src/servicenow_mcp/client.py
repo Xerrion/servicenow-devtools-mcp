@@ -238,6 +238,7 @@ class ServiceNowClient:
         fields: str = "",
         limit: int = 100,
         offset: int = 0,
+        display_values: bool = False,
     ) -> dict[str, Any]:
         """INTERNAL USE ONLY - bypass the DENIED_TABLES gate via an explicit allowlist.
 
@@ -263,6 +264,7 @@ class ServiceNowClient:
             fields: Comma-separated field list (empty for default).
             limit: Max rows to return.
             offset: Row offset for pagination.
+            display_values: If True, return display values (``sysparm_display_value=true``).
 
         Returns:
             ``{"records": [...], "count": int}`` with credential fields
@@ -283,6 +285,8 @@ class ServiceNowClient:
         }
         if fields:
             params["sysparm_fields"] = fields
+        if display_values:
+            params["sysparm_display_value"] = "true"
 
         response = await http.get(
             self._table_url(table),
