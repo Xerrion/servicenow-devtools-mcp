@@ -43,12 +43,12 @@ class TestCmdbList:
                 json={
                     "result": [
                         {
-                            "sys_id": "ci1",
+                            "sys_id": "d5f759f849bd82f4d43947407ffce511",
                             "name": "server-01",
                             "operational_status": "1",
                         },
                         {
-                            "sys_id": "ci2",
+                            "sys_id": "6f7aa3d044bfc90517430647fcbddac7",
                             "name": "server-02",
                             "operational_status": "1",
                         },
@@ -78,7 +78,7 @@ class TestCmdbList:
                 json={
                     "result": [
                         {
-                            "sys_id": "srv1",
+                            "sys_id": "5c2a24d29e9808883ba0a350e7dc48e5",
                             "name": "web-server-01",
                             "operational_status": "1",
                         },
@@ -111,7 +111,7 @@ class TestCmdbList:
                 json={
                     "result": [
                         {
-                            "sys_id": "ci1",
+                            "sys_id": "d5f759f849bd82f4d43947407ffce511",
                             "name": "server-01",
                             "operational_status": "1",
                         },
@@ -177,7 +177,7 @@ class TestCmdbGet:
                 json={
                     "result": [
                         {
-                            "sys_id": "ci1",
+                            "sys_id": "d5f759f849bd82f4d43947407ffce511",
                             "name": "server-01",
                             "operational_status": "1",
                         },
@@ -235,14 +235,14 @@ class TestCmdbRelationships:
                 json={
                     "result": [
                         {
-                            "sys_id": "rel1",
-                            "parent": {"value": "parent1"},
+                            "sys_id": "e25a989db0d225460c84b6adc8379e40",
+                            "parent": {"value": "411f59c16d07dfbc60fb633faa920142"},
                             "child": {"value": sys_id},
                         },
                         {
-                            "sys_id": "rel2",
+                            "sys_id": "8985c6e32965ad99e9b8530d98b8d41f",
                             "parent": {"value": sys_id},
-                            "child": {"value": "child1"},
+                            "child": {"value": "821c07a03badb405e8ccaea45217e56e"},
                         },
                     ]
                 },
@@ -270,8 +270,8 @@ class TestCmdbRelationships:
                 json={
                     "result": [
                         {
-                            "sys_id": "rel1",
-                            "parent": {"value": "parent1"},
+                            "sys_id": "e25a989db0d225460c84b6adc8379e40",
+                            "parent": {"value": "411f59c16d07dfbc60fb633faa920142"},
                             "child": {"value": sys_id},
                         },
                     ]
@@ -314,8 +314,8 @@ class TestCmdbRelationships:
                 json={
                     "result": [
                         {
-                            "sys_id": "rel1",
-                            "parent": {"value": "parent1"},
+                            "sys_id": "e25a989db0d225460c84b6adc8379e40",
+                            "parent": {"value": "411f59c16d07dfbc60fb633faa920142"},
                             "child": {"value": "resolved_sys_id"},
                         },
                     ]
@@ -365,9 +365,9 @@ class TestCmdbRelationships:
                 json={
                     "result": [
                         {
-                            "sys_id": "rel1",
+                            "sys_id": "e25a989db0d225460c84b6adc8379e40",
                             "parent": {"value": sys_id},
-                            "child": {"value": "child1"},
+                            "child": {"value": "821c07a03badb405e8ccaea45217e56e"},
                         },
                     ]
                 },

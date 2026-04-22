@@ -42,12 +42,12 @@ class TestChangeList:
                 json={
                     "result": [
                         {
-                            "sys_id": "id1",
+                            "sys_id": "4e89d81a2e6fb4be2578d245fd8511c1",
                             "number": "CHG0010001",
                             "short_description": "Test change 1",
                         },
                         {
-                            "sys_id": "id2",
+                            "sys_id": "867d5f8110f8aa79dd63d7440f217242",
                             "number": "CHG0010002",
                             "short_description": "Test change 2",
                         },
@@ -104,7 +104,7 @@ class TestChangeGet:
                 json={
                     "result": [
                         {
-                            "sys_id": "abc123",
+                            "sys_id": "6367c48dd193d56ea7b0baad25b19455",
                             "number": "CHG0010001",
                             "short_description": "Test change",
                         }
@@ -119,7 +119,7 @@ class TestChangeGet:
 
         assert data["status"] == "success"
         assert data["data"]["number"] == "CHG0010001"
-        assert data["data"]["sys_id"] == "abc123"
+        assert data["data"]["sys_id"] == "6367c48dd193d56ea7b0baad25b19455"
 
     @pytest.mark.asyncio()
     async def test_get_invalid_prefix(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
@@ -157,7 +157,7 @@ class TestChangeCreate:
                 201,
                 json={
                     "result": {
-                        "sys_id": "new001",
+                        "sys_id": "7902e27f95800a66bf6fcbfe1fa5e403",
                         "number": "CHG0010123",
                         "short_description": "New change",
                         "type": "normal",
@@ -185,13 +185,13 @@ class TestChangeCreate:
                 201,
                 json={
                     "result": {
-                        "sys_id": "new002",
+                        "sys_id": "f20eedc7e49805bc6b96e5c163161426",
                         "number": "CHG0010124",
                         "short_description": "Full change",
                         "type": "emergency",
                         "description": "Detailed desc",
                         "risk": "high",
-                        "assignment_group": "grp001",
+                        "assignment_group": "d82fd21c333207af2b8697ceb8a9345e",
                         "start_date": "2026-04-01 08:00:00",
                         "end_date": "2026-04-01 12:00:00",
                     }
@@ -205,7 +205,7 @@ class TestChangeCreate:
             description="Detailed desc",
             type="emergency",
             risk="high",
-            assignment_group="grp001",
+            assignment_group="d82fd21c333207af2b8697ceb8a9345e",
             start_date="2026-04-01 08:00:00",
             end_date="2026-04-01 12:00:00",
         )
@@ -219,7 +219,7 @@ class TestChangeCreate:
         request_body = json.loads(route.calls.last.request.content)
         assert request_body["description"] == "Detailed desc"
         assert request_body["risk"] == "high"
-        assert request_body["assignment_group"] == "grp001"
+        assert request_body["assignment_group"] == "d82fd21c333207af2b8697ceb8a9345e"
         assert request_body["start_date"] == "2026-04-01 08:00:00"
         assert request_body["end_date"] == "2026-04-01 12:00:00"
 
@@ -269,7 +269,7 @@ class TestChangeUpdate:
                 json={
                     "result": [
                         {
-                            "sys_id": "abc123",
+                            "sys_id": "6367c48dd193d56ea7b0baad25b19455",
                             "number": "CHG0010001",
                             "short_description": "Old",
                         }
@@ -277,12 +277,12 @@ class TestChangeUpdate:
                 },
             )
         )
-        respx.patch(f"{BASE_URL}/api/now/table/change_request/abc123").mock(
+        respx.patch(f"{BASE_URL}/api/now/table/change_request/6367c48dd193d56ea7b0baad25b19455").mock(
             return_value=Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "abc123",
+                        "sys_id": "6367c48dd193d56ea7b0baad25b19455",
                         "number": "CHG0010001",
                         "short_description": "Updated",
                     }
@@ -346,15 +346,15 @@ class TestChangeUpdate:
         respx.get(f"{BASE_URL}/api/now/table/change_request").mock(
             return_value=Response(
                 200,
-                json={"result": [{"sys_id": "abc123", "number": "CHG0010001"}]},
+                json={"result": [{"sys_id": "6367c48dd193d56ea7b0baad25b19455", "number": "CHG0010001"}]},
             )
         )
-        route = respx.patch(f"{BASE_URL}/api/now/table/change_request/abc123").mock(
+        route = respx.patch(f"{BASE_URL}/api/now/table/change_request/6367c48dd193d56ea7b0baad25b19455").mock(
             return_value=Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "abc123",
+                        "sys_id": "6367c48dd193d56ea7b0baad25b19455",
                         "number": "CHG0010001",
                         "short_description": "Updated",
                     }
@@ -369,7 +369,7 @@ class TestChangeUpdate:
             description="New detailed desc",
             type="emergency",
             risk="high",
-            assignment_group="grp001",
+            assignment_group="d82fd21c333207af2b8697ceb8a9345e",
             state="implement",
         )
         data = decode_response(result)
@@ -382,7 +382,7 @@ class TestChangeUpdate:
         assert request_body["description"] == "New detailed desc"
         assert request_body["type"] == "emergency"
         assert request_body["risk"] == "high"
-        assert request_body["assignment_group"] == "grp001"
+        assert request_body["assignment_group"] == "d82fd21c333207af2b8697ceb8a9345e"
         assert request_body["state"] == "-1"
 
     @pytest.mark.asyncio()
@@ -392,7 +392,7 @@ class TestChangeUpdate:
         respx.get(f"{BASE_URL}/api/now/table/change_request").mock(
             return_value=Response(
                 200,
-                json={"result": [{"sys_id": "abc123", "number": "CHG0010001"}]},
+                json={"result": [{"sys_id": "6367c48dd193d56ea7b0baad25b19455", "number": "CHG0010001"}]},
             )
         )
 
@@ -417,12 +417,12 @@ class TestChangeTasks:
                 json={
                     "result": [
                         {
-                            "sys_id": "task1",
+                            "sys_id": "d95216b77e0cd834ca43caef2322e8fd",
                             "number": "CTASK0010001",
                             "short_description": "Task 1",
                         },
                         {
-                            "sys_id": "task2",
+                            "sys_id": "7c83d7b877a6404c368370bdcfeee47a",
                             "number": "CTASK0010002",
                             "short_description": "Task 2",
                         },
@@ -478,15 +478,15 @@ class TestChangeAddComment:
         respx.get(f"{BASE_URL}/api/now/table/change_request").mock(
             return_value=Response(
                 200,
-                json={"result": [{"sys_id": "abc123", "number": "CHG0010001"}]},
+                json={"result": [{"sys_id": "6367c48dd193d56ea7b0baad25b19455", "number": "CHG0010001"}]},
             )
         )
-        respx.patch(f"{BASE_URL}/api/now/table/change_request/abc123").mock(
+        respx.patch(f"{BASE_URL}/api/now/table/change_request/6367c48dd193d56ea7b0baad25b19455").mock(
             return_value=Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "abc123",
+                        "sys_id": "6367c48dd193d56ea7b0baad25b19455",
                         "number": "CHG0010001",
                         "comments": "User comment added",
                     }
@@ -510,15 +510,15 @@ class TestChangeAddComment:
         respx.get(f"{BASE_URL}/api/now/table/change_request").mock(
             return_value=Response(
                 200,
-                json={"result": [{"sys_id": "abc123", "number": "CHG0010001"}]},
+                json={"result": [{"sys_id": "6367c48dd193d56ea7b0baad25b19455", "number": "CHG0010001"}]},
             )
         )
-        respx.patch(f"{BASE_URL}/api/now/table/change_request/abc123").mock(
+        respx.patch(f"{BASE_URL}/api/now/table/change_request/6367c48dd193d56ea7b0baad25b19455").mock(
             return_value=Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "abc123",
+                        "sys_id": "6367c48dd193d56ea7b0baad25b19455",
                         "number": "CHG0010001",
                         "work_notes": "Internal work note",
                     }

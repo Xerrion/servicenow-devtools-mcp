@@ -59,12 +59,12 @@ class TestIncidentList:
                 json={
                     "result": [
                         {
-                            "sys_id": "id1",
+                            "sys_id": "4e89d81a2e6fb4be2578d245fd8511c1",
                             "number": "INC0010001",
                             "short_description": "Test 1",
                         },
                         {
-                            "sys_id": "id2",
+                            "sys_id": "867d5f8110f8aa79dd63d7440f217242",
                             "number": "INC0010002",
                             "short_description": "Test 2",
                         },
@@ -121,7 +121,7 @@ class TestIncidentGet:
                 json={
                     "result": [
                         {
-                            "sys_id": "abc123",
+                            "sys_id": "6367c48dd193d56ea7b0baad25b19455",
                             "number": "INC0010001",
                             "short_description": "Test incident",
                         }
@@ -136,7 +136,7 @@ class TestIncidentGet:
 
         assert data["status"] == "success"
         assert data["data"]["number"] == "INC0010001"
-        assert data["data"]["sys_id"] == "abc123"
+        assert data["data"]["sys_id"] == "6367c48dd193d56ea7b0baad25b19455"
 
     @pytest.mark.asyncio()
     async def test_get_invalid_prefix(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
@@ -174,7 +174,7 @@ class TestIncidentCreate:
                 201,
                 json={
                     "result": {
-                        "sys_id": "new001",
+                        "sys_id": "7902e27f95800a66bf6fcbfe1fa5e403",
                         "number": "INC0010123",
                         "short_description": "New incident",
                         "state": "1",
@@ -255,7 +255,7 @@ class TestIncidentCreate:
                 201,
                 json={
                     "result": {
-                        "sys_id": "new002",
+                        "sys_id": "f20eedc7e49805bc6b96e5c163161426",
                         "number": "INC0010200",
                         "short_description": "Full incident",
                     }
@@ -301,7 +301,7 @@ class TestIncidentUpdate:
                 json={
                     "result": [
                         {
-                            "sys_id": "abc123",
+                            "sys_id": "6367c48dd193d56ea7b0baad25b19455",
                             "number": "INC0010001",
                             "short_description": "Old",
                         }
@@ -309,12 +309,12 @@ class TestIncidentUpdate:
                 },
             )
         )
-        respx.patch(f"{BASE_URL}/api/now/table/incident/abc123").mock(
+        respx.patch(f"{BASE_URL}/api/now/table/incident/6367c48dd193d56ea7b0baad25b19455").mock(
             return_value=Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "abc123",
+                        "sys_id": "6367c48dd193d56ea7b0baad25b19455",
                         "number": "INC0010001",
                         "short_description": "Updated",
                     }
@@ -375,7 +375,7 @@ class TestIncidentUpdate:
         respx.get(f"{BASE_URL}/api/now/table/incident").mock(
             return_value=Response(
                 200,
-                json={"result": [{"sys_id": "abc123", "number": "INC0010001"}]},
+                json={"result": [{"sys_id": "6367c48dd193d56ea7b0baad25b19455", "number": "INC0010001"}]},
             )
         )
 
@@ -393,15 +393,15 @@ class TestIncidentUpdate:
         respx.get(f"{BASE_URL}/api/now/table/incident").mock(
             return_value=Response(
                 200,
-                json={"result": [{"sys_id": "abc123", "number": "INC0010001"}]},
+                json={"result": [{"sys_id": "6367c48dd193d56ea7b0baad25b19455", "number": "INC0010001"}]},
             )
         )
-        route = respx.patch(f"{BASE_URL}/api/now/table/incident/abc123").mock(
+        route = respx.patch(f"{BASE_URL}/api/now/table/incident/6367c48dd193d56ea7b0baad25b19455").mock(
             return_value=Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "abc123",
+                        "sys_id": "6367c48dd193d56ea7b0baad25b19455",
                         "number": "INC0010001",
                         "short_description": "Updated",
                     }
@@ -453,7 +453,7 @@ class TestIncidentResolve:
                 json={
                     "result": [
                         {
-                            "sys_id": "abc123",
+                            "sys_id": "6367c48dd193d56ea7b0baad25b19455",
                             "number": "INC0010001",
                             "state": "2",
                         }
@@ -461,12 +461,12 @@ class TestIncidentResolve:
                 },
             )
         )
-        respx.patch(f"{BASE_URL}/api/now/table/incident/abc123").mock(
+        respx.patch(f"{BASE_URL}/api/now/table/incident/6367c48dd193d56ea7b0baad25b19455").mock(
             return_value=Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "abc123",
+                        "sys_id": "6367c48dd193d56ea7b0baad25b19455",
                         "number": "INC0010001",
                         "state": "6",
                         "close_code": "Solved (Permanently)",
@@ -574,7 +574,7 @@ class TestIncidentResolve:
                 json={
                     "result": [
                         {
-                            "sys_id": "abc123",
+                            "sys_id": "6367c48dd193d56ea7b0baad25b19455",
                             "number": "INC0010001",
                             "state": "2",
                         }
@@ -582,12 +582,12 @@ class TestIncidentResolve:
                 },
             )
         )
-        respx.patch(f"{BASE_URL}/api/now/table/incident/abc123").mock(
+        respx.patch(f"{BASE_URL}/api/now/table/incident/6367c48dd193d56ea7b0baad25b19455").mock(
             return_value=Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "abc123",
+                        "sys_id": "6367c48dd193d56ea7b0baad25b19455",
                         "number": "INC0010001",
                         "state": "6",
                         "close_code": "Solved (Permanently)",
@@ -619,15 +619,15 @@ class TestIncidentAddComment:
         respx.get(f"{BASE_URL}/api/now/table/incident").mock(
             return_value=Response(
                 200,
-                json={"result": [{"sys_id": "abc123", "number": "INC0010001"}]},
+                json={"result": [{"sys_id": "6367c48dd193d56ea7b0baad25b19455", "number": "INC0010001"}]},
             )
         )
-        respx.patch(f"{BASE_URL}/api/now/table/incident/abc123").mock(
+        respx.patch(f"{BASE_URL}/api/now/table/incident/6367c48dd193d56ea7b0baad25b19455").mock(
             return_value=Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "abc123",
+                        "sys_id": "6367c48dd193d56ea7b0baad25b19455",
                         "number": "INC0010001",
                         "comments": "User comment added",
                     }
@@ -651,15 +651,15 @@ class TestIncidentAddComment:
         respx.get(f"{BASE_URL}/api/now/table/incident").mock(
             return_value=Response(
                 200,
-                json={"result": [{"sys_id": "abc123", "number": "INC0010001"}]},
+                json={"result": [{"sys_id": "6367c48dd193d56ea7b0baad25b19455", "number": "INC0010001"}]},
             )
         )
-        respx.patch(f"{BASE_URL}/api/now/table/incident/abc123").mock(
+        respx.patch(f"{BASE_URL}/api/now/table/incident/6367c48dd193d56ea7b0baad25b19455").mock(
             return_value=Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "abc123",
+                        "sys_id": "6367c48dd193d56ea7b0baad25b19455",
                         "number": "INC0010001",
                         "work_notes": "Internal work note",
                     }

@@ -42,12 +42,12 @@ class TestKnowledgeSearch:
                 json={
                     "result": [
                         {
-                            "sys_id": "kb1",
+                            "sys_id": "7c619f62967fb08716b0990029693c5f",
                             "number": "KB0010001",
                             "short_description": "How to reset password",
                         },
                         {
-                            "sys_id": "kb2",
+                            "sys_id": "b558b88d797966be4a15e865ac316489",
                             "number": "KB0010002",
                             "short_description": "Password policy guide",
                         },
@@ -105,7 +105,7 @@ class TestKnowledgeGet:
                 json={
                     "result": [
                         {
-                            "sys_id": "kb123",
+                            "sys_id": "6130004ffc6243feb8a9d8cec33c263b",
                             "number": "KB0010001",
                             "short_description": "Test article",
                         }
@@ -238,8 +238,8 @@ class TestKnowledgeCreate:
                         "short_description": "New article",
                         "text": "Content",
                         "workflow_state": "draft",
-                        "kb_knowledge_base": "base123",
-                        "kb_category": "cat456",
+                        "kb_knowledge_base": "84e801a553d572fa894b3d74e1a0f240",
+                        "kb_category": "9ac848b24a0fbf6b8156d31c0431deea",
                     }
                 },
             )
@@ -249,21 +249,21 @@ class TestKnowledgeCreate:
         result = await tools["knowledge_create"](
             short_description="New article",
             text="Content",
-            kb_knowledge_base="base123",
-            kb_category="cat456",
+            kb_knowledge_base="84e801a553d572fa894b3d74e1a0f240",
+            kb_category="9ac848b24a0fbf6b8156d31c0431deea",
         )
         data = decode_response(result)
 
         assert data["status"] == "success"
-        assert data["data"]["kb_knowledge_base"] == "base123"
-        assert data["data"]["kb_category"] == "cat456"
+        assert data["data"]["kb_knowledge_base"] == "84e801a553d572fa894b3d74e1a0f240"
+        assert data["data"]["kb_category"] == "9ac848b24a0fbf6b8156d31c0431deea"
 
         # Verify the POST body included both optional fields
         import json
 
         request_body = json.loads(respx.calls.last.request.content)
-        assert request_body["kb_knowledge_base"] == "base123"
-        assert request_body["kb_category"] == "cat456"
+        assert request_body["kb_knowledge_base"] == "84e801a553d572fa894b3d74e1a0f240"
+        assert request_body["kb_category"] == "9ac848b24a0fbf6b8156d31c0431deea"
 
     @pytest.mark.asyncio()
     async def test_create_production_blocked(
@@ -288,15 +288,15 @@ class TestKnowledgeUpdate:
         respx.get(f"{BASE_URL}/api/now/table/kb_knowledge").mock(
             return_value=Response(
                 200,
-                json={"result": [{"sys_id": "kb123", "number": "KB0010001"}]},
+                json={"result": [{"sys_id": "6130004ffc6243feb8a9d8cec33c263b", "number": "KB0010001"}]},
             )
         )
-        respx.patch(f"{BASE_URL}/api/now/table/kb_knowledge/kb123").mock(
+        respx.patch(f"{BASE_URL}/api/now/table/kb_knowledge/6130004ffc6243feb8a9d8cec33c263b").mock(
             return_value=Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "kb123",
+                        "sys_id": "6130004ffc6243feb8a9d8cec33c263b",
                         "number": "KB0010001",
                         "short_description": "Updated title",
                     }
@@ -379,7 +379,7 @@ class TestKnowledgeUpdate:
         respx.get(f"{BASE_URL}/api/now/table/kb_knowledge").mock(
             return_value=Response(
                 200,
-                json={"result": [{"sys_id": "kb123", "number": "KB0010001"}]},
+                json={"result": [{"sys_id": "6130004ffc6243feb8a9d8cec33c263b", "number": "KB0010001"}]},
             )
         )
 
@@ -411,19 +411,19 @@ class TestKnowledgeUpdate:
         respx.get(f"{BASE_URL}/api/now/table/kb_knowledge").mock(
             return_value=Response(
                 200,
-                json={"result": [{"sys_id": "kb123", "number": "KB0010001"}]},
+                json={"result": [{"sys_id": "6130004ffc6243feb8a9d8cec33c263b", "number": "KB0010001"}]},
             )
         )
-        respx.patch(f"{BASE_URL}/api/now/table/kb_knowledge/kb123").mock(
+        respx.patch(f"{BASE_URL}/api/now/table/kb_knowledge/6130004ffc6243feb8a9d8cec33c263b").mock(
             return_value=Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "kb123",
+                        "sys_id": "6130004ffc6243feb8a9d8cec33c263b",
                         "number": "KB0010001",
                         "workflow_state": "published",
-                        "kb_knowledge_base": "base789",
-                        "kb_category": "cat012",
+                        "kb_knowledge_base": "587292a058efc3bab6512dd94cecb291",
+                        "kb_category": "f424021bde94bfa660418bee7c99fdeb",
                     }
                 },
             )
@@ -433,23 +433,23 @@ class TestKnowledgeUpdate:
         result = await tools["knowledge_update"](
             number_or_sys_id="KB0010001",
             workflow_state="published",
-            kb_knowledge_base="base789",
-            kb_category="cat012",
+            kb_knowledge_base="587292a058efc3bab6512dd94cecb291",
+            kb_category="f424021bde94bfa660418bee7c99fdeb",
         )
         data = decode_response(result)
 
         assert data["status"] == "success"
         assert data["data"]["workflow_state"] == "published"
-        assert data["data"]["kb_knowledge_base"] == "base789"
-        assert data["data"]["kb_category"] == "cat012"
+        assert data["data"]["kb_knowledge_base"] == "587292a058efc3bab6512dd94cecb291"
+        assert data["data"]["kb_category"] == "f424021bde94bfa660418bee7c99fdeb"
 
         # Verify the PATCH body included all three optional fields
         import json
 
         request_body = json.loads(respx.calls.last.request.content)
         assert request_body["workflow_state"] == "published"
-        assert request_body["kb_knowledge_base"] == "base789"
-        assert request_body["kb_category"] == "cat012"
+        assert request_body["kb_knowledge_base"] == "587292a058efc3bab6512dd94cecb291"
+        assert request_body["kb_category"] == "f424021bde94bfa660418bee7c99fdeb"
 
 
 class TestKnowledgeFeedback:
@@ -462,7 +462,7 @@ class TestKnowledgeFeedback:
         respx.get(f"{BASE_URL}/api/now/table/kb_knowledge").mock(
             return_value=Response(
                 200,
-                json={"result": [{"sys_id": "kb123", "number": "KB0010001"}]},
+                json={"result": [{"sys_id": "6130004ffc6243feb8a9d8cec33c263b", "number": "KB0010001"}]},
             )
         )
         respx.post(f"{BASE_URL}/api/now/table/kb_feedback").mock(
@@ -470,8 +470,8 @@ class TestKnowledgeFeedback:
                 201,
                 json={
                     "result": {
-                        "sys_id": "fb001",
-                        "article": "kb123",
+                        "sys_id": "1fc91770103833a7b6221b1a79c3e4c9",
+                        "article": "6130004ffc6243feb8a9d8cec33c263b",
                         "rating": "5",
                     }
                 },
@@ -483,7 +483,7 @@ class TestKnowledgeFeedback:
         data = decode_response(result)
 
         assert data["status"] == "success"
-        assert data["data"]["article"] == "kb123"
+        assert data["data"]["article"] == "6130004ffc6243feb8a9d8cec33c263b"
         assert data["data"]["rating"] == "5"
 
     @pytest.mark.asyncio()
@@ -493,7 +493,7 @@ class TestKnowledgeFeedback:
         respx.get(f"{BASE_URL}/api/now/table/kb_knowledge").mock(
             return_value=Response(
                 200,
-                json={"result": [{"sys_id": "kb123", "number": "KB0010001"}]},
+                json={"result": [{"sys_id": "6130004ffc6243feb8a9d8cec33c263b", "number": "KB0010001"}]},
             )
         )
         respx.post(f"{BASE_URL}/api/now/table/kb_feedback").mock(
@@ -501,8 +501,8 @@ class TestKnowledgeFeedback:
                 201,
                 json={
                     "result": {
-                        "sys_id": "fb002",
-                        "article": "kb123",
+                        "sys_id": "a7a140263c8ad16a53bb98c1359610a1",
+                        "article": "6130004ffc6243feb8a9d8cec33c263b",
                         "comments": "Very helpful",
                     }
                 },
@@ -514,7 +514,7 @@ class TestKnowledgeFeedback:
         data = decode_response(result)
 
         assert data["status"] == "success"
-        assert data["data"]["article"] == "kb123"
+        assert data["data"]["article"] == "6130004ffc6243feb8a9d8cec33c263b"
         assert data["data"]["comments"] == "Very helpful"
 
     @pytest.mark.asyncio()
@@ -524,7 +524,7 @@ class TestKnowledgeFeedback:
         respx.get(f"{BASE_URL}/api/now/table/kb_knowledge").mock(
             return_value=Response(
                 200,
-                json={"result": [{"sys_id": "kb123", "number": "KB0010001"}]},
+                json={"result": [{"sys_id": "6130004ffc6243feb8a9d8cec33c263b", "number": "KB0010001"}]},
             )
         )
         respx.post(f"{BASE_URL}/api/now/table/kb_feedback").mock(
@@ -532,8 +532,8 @@ class TestKnowledgeFeedback:
                 201,
                 json={
                     "result": {
-                        "sys_id": "fb003",
-                        "article": "kb123",
+                        "sys_id": "1c19684601aea2164d28b87d816c0144",
+                        "article": "6130004ffc6243feb8a9d8cec33c263b",
                         "rating": "4",
                         "comments": "Good article",
                     }
@@ -619,7 +619,7 @@ class TestKnowledgeFeedback:
                 201,
                 json={
                     "result": {
-                        "sys_id": "fb010",
+                        "sys_id": "1554b2d3b27083dd0079295310f73361",
                         "article": "abc123def456abc123def456abc12345",
                         "rating": "3",
                     }

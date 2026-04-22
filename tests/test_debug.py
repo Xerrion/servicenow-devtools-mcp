@@ -46,14 +46,14 @@ class TestDebugTrace:
                 json={
                     "result": [
                         {
-                            "sys_id": "a1",
+                            "sys_id": "f29bc91bbdab169fc0c0a326965953d1",
                             "user": "admin",
                             "fieldname": "state",
                             "oldvalue": "1",
                             "newvalue": "2",
                             "sys_created_on": "2026-02-20 09:00:00",
                             "tablename": "incident",
-                            "documentkey": "inc001",
+                            "documentkey": "6d55028a7049dbf2f4275991d6fc81cf",
                         },
                     ]
                 },
@@ -67,7 +67,7 @@ class TestDebugTrace:
                 json={
                     "result": [
                         {
-                            "sys_id": "l1",
+                            "sys_id": "39a89dd158c8e9747943b00f84be79fc",
                             "message": "BR: Auto-assign triggered",
                             "source": "sys_script",
                             "level": "0",
@@ -85,7 +85,7 @@ class TestDebugTrace:
                 json={
                     "result": [
                         {
-                            "sys_id": "j1",
+                            "sys_id": "67921242516c48ac712807f98c98ee13",
                             "element": "comments",
                             "value": "Working on this issue",
                             "sys_created_on": "2026-02-20 09:01:00",
@@ -98,7 +98,7 @@ class TestDebugTrace:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["debug_trace"](record_sys_id="inc001", table="incident", minutes=60)
+        raw = await tools["debug_trace"](record_sys_id="6d55028a7049dbf2f4275991d6fc81cf", table="incident", minutes=60)
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -122,7 +122,7 @@ class TestDebugTrace:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["debug_trace"](record_sys_id="inc999", table="incident")
+        raw = await tools["debug_trace"](record_sys_id="2edef9aa2e99060fd11a80ae6eed85b5", table="incident")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -143,7 +143,7 @@ class TestDebugTrace:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["debug_trace"](record_sys_id="inc001", table="incident", minutes=30)
+        raw = await tools["debug_trace"](record_sys_id="6d55028a7049dbf2f4275991d6fc81cf", table="incident", minutes=30)
         result = decode_response(raw)
         assert result["status"] == "success"
 
@@ -184,12 +184,12 @@ class TestDebugFlowExecution:
     async def test_returns_flow_steps(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Returns flow execution steps from sys_flow_context and sys_flow_log."""
         # Mock flow context
-        respx.get(f"{BASE_URL}/api/now/table/sys_flow_context/ctx001").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_flow_context/18dbe9bd70e88bd7d141d13c8a46e7d7").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "ctx001",
+                        "sys_id": "18dbe9bd70e88bd7d141d13c8a46e7d7",
                         "name": "Auto-assign flow",
                         "state": "Completed",
                         "started": "2026-02-20 08:00:00",
@@ -205,15 +205,15 @@ class TestDebugFlowExecution:
                 json={
                     "result": [
                         {
-                            "sys_id": "fl1",
+                            "sys_id": "f8e82113421aa92b5fdb30a353b6e82c",
                             "step_label": "Lookup Record",
                             "state": "Completed",
                             "sys_created_on": "2026-02-20 08:00:01",
-                            "output_data": '{"record": "inc001"}',
+                            "output_data": '{"record": "6d55028a7049dbf2f4275991d6fc81cf"}',
                             "error_message": "",
                         },
                         {
-                            "sys_id": "fl2",
+                            "sys_id": "228c49472381812a668368a02dc4e3e0",
                             "step_label": "Update Record",
                             "state": "Completed",
                             "sys_created_on": "2026-02-20 08:00:03",
@@ -227,7 +227,7 @@ class TestDebugFlowExecution:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["debug_flow_execution"](context_id="ctx001")
+        raw = await tools["debug_flow_execution"](context_id="18dbe9bd70e88bd7d141d13c8a46e7d7")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -238,12 +238,12 @@ class TestDebugFlowExecution:
     @respx.mock
     async def test_handles_flow_with_errors(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Returns error info when flow steps have errors."""
-        respx.get(f"{BASE_URL}/api/now/table/sys_flow_context/ctx002").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_flow_context/ffff7ed3a8c7ffe871d910c0eb40322e").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "ctx002",
+                        "sys_id": "ffff7ed3a8c7ffe871d910c0eb40322e",
                         "name": "Failed flow",
                         "state": "Error",
                     }
@@ -256,7 +256,7 @@ class TestDebugFlowExecution:
                 json={
                     "result": [
                         {
-                            "sys_id": "fl1",
+                            "sys_id": "f8e82113421aa92b5fdb30a353b6e82c",
                             "step_label": "Script Step",
                             "state": "Error",
                             "sys_created_on": "2026-02-20 08:00:01",
@@ -270,7 +270,7 @@ class TestDebugFlowExecution:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["debug_flow_execution"](context_id="ctx002")
+        raw = await tools["debug_flow_execution"](context_id="ffff7ed3a8c7ffe871d910c0eb40322e")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -290,7 +290,7 @@ class TestDebugEmailTrace:
                 json={
                     "result": [
                         {
-                            "sys_id": "e1",
+                            "sys_id": "84896d3e067884621c0f54334b8d8409",
                             "type": "received",
                             "subject": "RE: INC0001",
                             "recipients": "admin@example.com",
@@ -299,7 +299,7 @@ class TestDebugEmailTrace:
                             "body_text": "Thanks for the update",
                         },
                         {
-                            "sys_id": "e2",
+                            "sys_id": "dc1885915a8902bc29de6d834477a26d",
                             "type": "send",
                             "subject": "INC0001 created",
                             "recipients": "user@example.com",
@@ -314,7 +314,7 @@ class TestDebugEmailTrace:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["debug_email_trace"](record_sys_id="inc001")
+        raw = await tools["debug_email_trace"](record_sys_id="6d55028a7049dbf2f4275991d6fc81cf")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -329,7 +329,7 @@ class TestDebugEmailTrace:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["debug_email_trace"](record_sys_id="inc999")
+        raw = await tools["debug_email_trace"](record_sys_id="2edef9aa2e99060fd11a80ae6eed85b5")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -349,7 +349,7 @@ class TestDebugIntegrationHealth:
                 json={
                     "result": [
                         {
-                            "sys_id": "ecc1",
+                            "sys_id": "c104970cbb6160c996f3cf0d5e7c1955",
                             "name": "SOAP",
                             "queue": "input",
                             "state": "error",
@@ -380,7 +380,7 @@ class TestDebugIntegrationHealth:
                 json={
                     "result": [
                         {
-                            "sys_id": "rt1",
+                            "sys_id": "50782307d71bd69a8c3a269bf7346646",
                             "rest_message": "ServiceNow API",
                             "http_method": "POST",
                             "http_status": "500",
@@ -423,12 +423,12 @@ class TestDebugImportsetRun:
     async def test_returns_import_set_results(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Returns import set run results."""
         # Mock import set header
-        respx.get(f"{BASE_URL}/api/now/table/sys_import_set/imp001").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_import_set/3c8ef400f0d355f096cee5204dbd2819").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "imp001",
+                        "sys_id": "3c8ef400f0d355f096cee5204dbd2819",
                         "table_name": "u_staging",
                         "state": "loaded",
                         "mode": "asynchronous",
@@ -444,13 +444,13 @@ class TestDebugImportsetRun:
                 json={
                     "result": [
                         {
-                            "sys_id": "r1",
+                            "sys_id": "5573e39b6600496d40f493d00ec76584",
                             "sys_import_state": "inserted",
-                            "sys_target_sys_id": "t1",
+                            "sys_target_sys_id": "e5353879bd69bfddcb465dad176ff52d",
                             "sys_import_state_comment": "",
                         },
                         {
-                            "sys_id": "r2",
+                            "sys_id": "a50126cc2d6c726de0ca203c3b659f65",
                             "sys_import_state": "error",
                             "sys_target_sys_id": "",
                             "sys_import_state_comment": "Transform error: field mapping failed",
@@ -462,11 +462,11 @@ class TestDebugImportsetRun:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["debug_importset_run"](import_set_sys_id="imp001")
+        raw = await tools["debug_importset_run"](import_set_sys_id="3c8ef400f0d355f096cee5204dbd2819")
         result = decode_response(raw)
 
         assert result["status"] == "success"
-        assert result["data"]["import_set"]["sys_id"] == "imp001"
+        assert result["data"]["import_set"]["sys_id"] == "3c8ef400f0d355f096cee5204dbd2819"
         assert result["data"]["summary"]["total"] == 2
         assert result["data"]["summary"]["inserted"] == 1
         assert result["data"]["summary"]["error"] == 1
@@ -475,12 +475,12 @@ class TestDebugImportsetRun:
     @respx.mock
     async def test_handles_empty_import_set(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Handles import set with no rows."""
-        respx.get(f"{BASE_URL}/api/now/table/sys_import_set/imp002").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_import_set/dfff4e2300bbee9303bb3413aa5d6933").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "imp002",
+                        "sys_id": "dfff4e2300bbee9303bb3413aa5d6933",
                         "table_name": "u_staging",
                         "state": "loaded",
                     }
@@ -492,7 +492,7 @@ class TestDebugImportsetRun:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["debug_importset_run"](import_set_sys_id="imp002")
+        raw = await tools["debug_importset_run"](import_set_sys_id="dfff4e2300bbee9303bb3413aa5d6933")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -512,7 +512,7 @@ class TestDebugFieldMutationStory:
                 json={
                     "result": [
                         {
-                            "sys_id": "a1",
+                            "sys_id": "f29bc91bbdab169fc0c0a326965953d1",
                             "user": "admin",
                             "fieldname": "state",
                             "oldvalue": "1",
@@ -520,7 +520,7 @@ class TestDebugFieldMutationStory:
                             "sys_created_on": "2026-02-19 10:00:00",
                         },
                         {
-                            "sys_id": "a2",
+                            "sys_id": "b9f85daa6f83cf02ce5c31913d1f64d3",
                             "user": "jdoe",
                             "fieldname": "state",
                             "oldvalue": "2",
@@ -534,7 +534,7 @@ class TestDebugFieldMutationStory:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["debug_field_mutation_story"](table="incident", sys_id="inc001", field="state")
+        raw = await tools["debug_field_mutation_story"](table="incident", sys_id="6d55028a7049dbf2f4275991d6fc81cf", field="state")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -552,7 +552,7 @@ class TestDebugFieldMutationStory:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["debug_field_mutation_story"](table="incident", sys_id="inc001", field="state")
+        raw = await tools["debug_field_mutation_story"](table="incident", sys_id="6d55028a7049dbf2f4275991d6fc81cf", field="state")
         result = decode_response(raw)
 
         assert result["status"] == "success"

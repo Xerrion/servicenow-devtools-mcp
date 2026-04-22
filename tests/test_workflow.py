@@ -73,12 +73,12 @@ class TestWorkflowContexts:
                 json={
                     "result": [
                         {
-                            "sys_id": "wfc001",
+                            "sys_id": "0b194673d7cf75a9b42d71790986d412",
                             "name": "Incident Workflow",
                             "state": "Executing",
                             "started": "2026-02-20 09:00:00",
                             "ended": "",
-                            "workflow_version": "wfv001",
+                            "workflow_version": "e35fec24db6d035c7a6fa33e76847858",
                             "table": "incident",
                             "result": "",
                             "running_duration": "00:05:00",
@@ -95,14 +95,14 @@ class TestWorkflowContexts:
                 json={
                     "result": [
                         {
-                            "sys_id": "fc001",
+                            "sys_id": "b45e2ae965e607a079b6677d64ba7c83",
                             "name": "Auto-assign Flow",
                             "state": "Completed",
                             "started": "2026-02-20 09:00:00",
                             "ended": "2026-02-20 09:00:05",
-                            "flow_version": "fv001",
+                            "flow_version": "fc9fb9c558787ac4d0406eeb7e1814ac",
                             "source_table": "incident",
-                            "source_record": "inc001",
+                            "source_record": "6d55028a7049dbf2f4275991d6fc81cf",
                         },
                     ]
                 },
@@ -111,7 +111,7 @@ class TestWorkflowContexts:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["workflow_contexts"](record_sys_id="inc001")
+        raw = await tools["workflow_contexts"](record_sys_id="6d55028a7049dbf2f4275991d6fc81cf")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -132,7 +132,7 @@ class TestWorkflowContexts:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["workflow_contexts"](record_sys_id="inc999")
+        raw = await tools["workflow_contexts"](record_sys_id="2edef9aa2e99060fd11a80ae6eed85b5")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -149,12 +149,12 @@ class TestWorkflowContexts:
                 json={
                     "result": [
                         {
-                            "sys_id": "wfc002",
+                            "sys_id": "36ddcab7c62bc858d677d1883197e5c3",
                             "name": "Finished WF",
                             "state": "Finished",
                             "started": "2026-02-20 08:00:00",
                             "ended": "2026-02-20 08:05:00",
-                            "workflow_version": "wfv002",
+                            "workflow_version": "5780f78f6d55b5bf954f58a084659629",
                             "table": "incident",
                             "result": "success",
                             "running_duration": "00:05:00",
@@ -170,7 +170,7 @@ class TestWorkflowContexts:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["workflow_contexts"](record_sys_id="inc001", state="finished")
+        raw = await tools["workflow_contexts"](record_sys_id="6d55028a7049dbf2f4275991d6fc81cf", state="finished")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -192,7 +192,7 @@ class TestWorkflowContexts:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["workflow_contexts"](record_sys_id="inc001", table="incident")
+        raw = await tools["workflow_contexts"](record_sys_id="6d55028a7049dbf2f4275991d6fc81cf", table="incident")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -214,7 +214,7 @@ class TestWorkflowContexts:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["workflow_contexts"](record_sys_id="inc001")
+        raw = await tools["workflow_contexts"](record_sys_id="6d55028a7049dbf2f4275991d6fc81cf")
         result = decode_response(raw)
 
         assert result["status"] == "error"
@@ -234,13 +234,13 @@ class TestWorkflowMap:
     @respx.mock
     async def test_returns_full_map(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Returns version, activities, and transitions."""
-        respx.get(f"{BASE_URL}/api/now/table/wf_workflow_version/wfv001").mock(
+        respx.get(f"{BASE_URL}/api/now/table/wf_workflow_version/e35fec24db6d035c7a6fa33e76847858").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "wfv001",
-                        "name": "Incident Workflow v2",
+                        "sys_id": "e35fec24db6d035c7a6fa33e76847858",
+                        "name": "Incident Workflow a1047eab1035d58682a53557e0b2a75e",
                         "table": "incident",
                         "active": "true",
                         "published": "true",
@@ -254,9 +254,9 @@ class TestWorkflowMap:
                 json={
                     "result": [
                         {
-                            "sys_id": "act001",
+                            "sys_id": "a37b4556fc38ce6b2a3fd1521b1291bc",
                             "name": "Begin",
-                            "activity_definition": "def001",
+                            "activity_definition": "f45ee39efdcca5805d1e7e2eaa97f27b",
                             "activity_definition.name": "Begin",
                             "activity_definition.category": "Core",
                             "x": "50",
@@ -268,9 +268,9 @@ class TestWorkflowMap:
                             "stage": "",
                         },
                         {
-                            "sys_id": "act002",
+                            "sys_id": "6ae7ca85d4792cabe5bafd3b8d148725",
                             "name": "Approval",
-                            "activity_definition": "def002",
+                            "activity_definition": "b7c009d7ad464b132e5a45f7f541ac3e",
                             "activity_definition.name": "Approval - User",
                             "activity_definition.category": "Approvals",
                             "x": "200",
@@ -292,10 +292,10 @@ class TestWorkflowMap:
                 json={
                     "result": [
                         {
-                            "sys_id": "tr001",
-                            "from": "act001",
+                            "sys_id": "82b655b7980ce1431a5665bd5e3fc4fb",
+                            "from": "a37b4556fc38ce6b2a3fd1521b1291bc",
                             "from.name": "Begin",
-                            "to": "act002",
+                            "to": "6ae7ca85d4792cabe5bafd3b8d148725",
                             "to.name": "Approval",
                             "condition": "",
                         },
@@ -310,10 +310,10 @@ class TestWorkflowMap:
                 json={
                     "result": [
                         {
-                            "sys_id": "sv001",
+                            "sys_id": "eaa2e11f5972c0fd8e423f1c6234180d",
                             "variable": "var_def_001",
                             "value": "some_script_body",
-                            "document_key": "act002",
+                            "document_key": "6ae7ca85d4792cabe5bafd3b8d148725",
                         },
                     ]
                 },
@@ -322,11 +322,11 @@ class TestWorkflowMap:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["workflow_map"](workflow_version_sys_id="wfv001")
+        raw = await tools["workflow_map"](workflow_version_sys_id="e35fec24db6d035c7a6fa33e76847858")
         result = decode_response(raw)
 
         assert result["status"] == "success"
-        assert result["data"]["version"]["name"] == "Incident Workflow v2"
+        assert result["data"]["version"]["name"] == "Incident Workflow a1047eab1035d58682a53557e0b2a75e"
         assert len(result["data"]["activities"]) == 2
         assert len(result["data"]["transitions"]) == 1
         assert result["data"]["transitions"][0]["from.name"] == "Begin"
@@ -385,19 +385,19 @@ class TestWorkflowMap:
                 json={
                     "result": [
                         {
-                            "sys_id": "a1",
+                            "sys_id": "f29bc91bbdab169fc0c0a326965953d1",
                             "name": "First",
                             "x": "10",
                             "y": "50",
                         },
                         {
-                            "sys_id": "a2",
+                            "sys_id": "b9f85daa6f83cf02ce5c31913d1f64d3",
                             "name": "Second",
                             "x": "200",
                             "y": "50",
                         },
                         {
-                            "sys_id": "a3",
+                            "sys_id": "252bc06763afb3b6c2a0802f7346700a",
                             "name": "Third",
                             "x": "400",
                             "y": "50",
@@ -427,7 +427,7 @@ class TestWorkflowMap:
     @respx.mock
     async def test_error_on_missing_version(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Returns success with a warning when the workflow version is not found (graceful degradation)."""
-        respx.get(f"{BASE_URL}/api/now/table/wf_workflow_version/bad_id").mock(
+        respx.get(f"{BASE_URL}/api/now/table/wf_workflow_version/35a1af58a3b00bde3d8af97f82562ac2").mock(
             return_value=httpx.Response(404, json={"error": {"message": "Not found"}})
         )
         respx.get(f"{BASE_URL}/api/now/table/wf_activity").mock(
@@ -438,7 +438,7 @@ class TestWorkflowMap:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["workflow_map"](workflow_version_sys_id="bad_id")
+        raw = await tools["workflow_map"](workflow_version_sys_id="35a1af58a3b00bde3d8af97f82562ac2")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -461,13 +461,13 @@ class TestWorkflowMap:
                 json={
                     "result": [
                         {
-                            "sys_id": "a1",
+                            "sys_id": "f29bc91bbdab169fc0c0a326965953d1",
                             "name": "Script 1",
                             "x": "10",
                             "y": "50",
                         },
                         {
-                            "sys_id": "a2",
+                            "sys_id": "b9f85daa6f83cf02ce5c31913d1f64d3",
                             "name": "Script 2",
                             "x": "200",
                             "y": "50",
@@ -486,22 +486,22 @@ class TestWorkflowMap:
                 json={
                     "result": [
                         {
-                            "sys_id": "sv1",
-                            "variable": "var1",
+                            "sys_id": "30a262ee0cddf15a17abb23e11148aa3",
+                            "variable": "a1dd4114c98069523cdf1d90ff3a4322",
                             "value": "script_a1",
-                            "document_key": "a1",
+                            "document_key": "f29bc91bbdab169fc0c0a326965953d1",
                         },
                         {
-                            "sys_id": "sv2",
-                            "variable": "var2",
+                            "sys_id": "2f0c71c73a82a38798e5249c3cfcecd6",
+                            "variable": "9b63072850833c63c5200f2c35b3edc4",
                             "value": "script_a2",
-                            "document_key": "a2",
+                            "document_key": "b9f85daa6f83cf02ce5c31913d1f64d3",
                         },
                         {
-                            "sys_id": "sv3",
-                            "variable": "var3",
+                            "sys_id": "8c958ae3b81b07ee490d75b7677f1b23",
+                            "variable": "216971a1b9ae32b8e314c5908f4e6f32",
                             "value": "condition_a1",
-                            "document_key": "a1",
+                            "document_key": "f29bc91bbdab169fc0c0a326965953d1",
                         },
                     ]
                 },
@@ -516,8 +516,8 @@ class TestWorkflowMap:
         assert result["status"] == "success"
         activities = result["data"]["activities"]
         # a1 should have 2 variables, a2 should have 1
-        a1 = next(a for a in activities if a["sys_id"] == "a1")
-        a2 = next(a for a in activities if a["sys_id"] == "a2")
+        a1 = next(a for a in activities if a["sys_id"] == "f29bc91bbdab169fc0c0a326965953d1")
+        a2 = next(a for a in activities if a["sys_id"] == "b9f85daa6f83cf02ce5c31913d1f64d3")
         assert len(a1["variables"]) == 2
         assert len(a2["variables"]) == 1
 
@@ -568,12 +568,12 @@ class TestWorkflowStatus:
         self, settings: Settings, auth_provider: BasicAuthProvider
     ) -> None:
         """Returns context record alongside executing and history lists."""
-        respx.get(f"{BASE_URL}/api/now/table/wf_context/ctx001").mock(
+        respx.get(f"{BASE_URL}/api/now/table/wf_context/18dbe9bd70e88bd7d141d13c8a46e7d7").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "ctx001",
+                        "sys_id": "18dbe9bd70e88bd7d141d13c8a46e7d7",
                         "name": "Incident WF",
                         "state": "Executing",
                         "started": "2026-02-20 09:00:00",
@@ -588,8 +588,8 @@ class TestWorkflowStatus:
                 json={
                     "result": [
                         {
-                            "sys_id": "ex001",
-                            "activity": "act001",
+                            "sys_id": "594e89ed796189a6c8478cdb53c74590",
+                            "activity": "a37b4556fc38ce6b2a3fd1521b1291bc",
                             "activity.name": "Approval",
                             "activity.activity_definition.name": "Approval - User",
                             "state": "executing",
@@ -610,8 +610,8 @@ class TestWorkflowStatus:
                 json={
                     "result": [
                         {
-                            "sys_id": "hist001",
-                            "activity": "act000",
+                            "sys_id": "8163f692da15397336fa06c365f6d8d5",
+                            "activity": "1038802d0f0b75fbcd213663da9b65e4",
                             "activity.name": "Begin",
                             "activity.activity_definition.name": "Begin",
                             "state": "finished",
@@ -628,7 +628,7 @@ class TestWorkflowStatus:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["workflow_status"](context_sys_id="ctx001")
+        raw = await tools["workflow_status"](context_sys_id="18dbe9bd70e88bd7d141d13c8a46e7d7")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -665,8 +665,8 @@ class TestWorkflowStatus:
                 json={
                     "result": [
                         {
-                            "sys_id": "h1",
-                            "activity": "a1",
+                            "sys_id": "ac4ae97285c19b13201deb9b192d9213",
+                            "activity": "f29bc91bbdab169fc0c0a326965953d1",
                             "activity.name": "Begin",
                             "state": "finished",
                             "started": "2026-02-20 08:00:00",
@@ -711,24 +711,24 @@ class TestWorkflowStatus:
                 json={
                     "result": [
                         {
-                            "sys_id": "ex1",
-                            "activity": "a1",
+                            "sys_id": "d2044f50319b6b469429ec5351129c8e",
+                            "activity": "f29bc91bbdab169fc0c0a326965953d1",
                             "activity.name": "Task A",
                             "state": "executing",
                             "started": "2026-02-20 09:00:00",
                             "fault_description": "",
                         },
                         {
-                            "sys_id": "ex2",
-                            "activity": "a2",
+                            "sys_id": "f28239a0fde944f345b70dcb6b6a24a2",
+                            "activity": "b9f85daa6f83cf02ce5c31913d1f64d3",
                             "activity.name": "Task B",
                             "state": "executing",
                             "started": "2026-02-20 09:00:00",
                             "fault_description": "",
                         },
                         {
-                            "sys_id": "ex3",
-                            "activity": "a3",
+                            "sys_id": "9f7f3ade76b193090f617a43abc94ead",
+                            "activity": "252bc06763afb3b6c2a0802f7346700a",
                             "activity.name": "Task C",
                             "state": "executing",
                             "started": "2026-02-20 09:00:01",
@@ -775,8 +775,8 @@ class TestWorkflowStatus:
                 json={
                     "result": [
                         {
-                            "sys_id": "h1",
-                            "activity": "a1",
+                            "sys_id": "ac4ae97285c19b13201deb9b192d9213",
+                            "activity": "f29bc91bbdab169fc0c0a326965953d1",
                             "activity.name": "Run Script",
                             "state": "faulted",
                             "started": "2026-02-20 09:00:00",
@@ -786,8 +786,8 @@ class TestWorkflowStatus:
                             "activity_index": "1",
                         },
                         {
-                            "sys_id": "h2",
-                            "activity": "a2",
+                            "sys_id": "bf1c365741a4bfb5fee5c3150335ab4f",
+                            "activity": "b9f85daa6f83cf02ce5c31913d1f64d3",
                             "activity.name": "Notification",
                             "state": "faulted",
                             "started": "2026-02-20 09:00:03",
@@ -816,11 +816,11 @@ class TestWorkflowStatus:
     @respx.mock
     async def test_error_on_missing_context(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Returns error envelope when wf_context is not found."""
-        respx.get(f"{BASE_URL}/api/now/table/wf_context/ctx404").mock(
+        respx.get(f"{BASE_URL}/api/now/table/wf_context/05b6177456ea350bf56f9bc663468a10").mock(
             return_value=httpx.Response(404, json={"error": {"message": "Record not found"}})
         )
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["workflow_status"](context_sys_id="ctx404")
+        raw = await tools["workflow_status"](context_sys_id="05b6177456ea350bf56f9bc663468a10")
         result = decode_response(raw)
 
         assert result["status"] == "error"
@@ -847,15 +847,15 @@ class TestWorkflowActivityDetail:
         def _act001_side_effect(request: httpx.Request) -> httpx.Response:
             result = (
                 {
-                    "sys_id": "act001",
+                    "sys_id": "a37b4556fc38ce6b2a3fd1521b1291bc",
                     "name": "Approval",
-                    "activity_definition": "def001",
+                    "activity_definition": "f45ee39efdcca5805d1e7e2eaa97f27b",
                     "x": "200",
                     "y": "100",
                 }
                 if "sysparm_display_value" not in str(request.url)
                 else {
-                    "sys_id": "act001",
+                    "sys_id": "a37b4556fc38ce6b2a3fd1521b1291bc",
                     "name": "Approval",
                     "activity_definition": "Approval - User",
                     "x": "200",
@@ -864,14 +864,14 @@ class TestWorkflowActivityDetail:
             )
             return httpx.Response(200, json={"result": result})
 
-        respx.get(f"{BASE_URL}/api/now/table/wf_activity/act001").mock(side_effect=_act001_side_effect)
+        respx.get(f"{BASE_URL}/api/now/table/wf_activity/a37b4556fc38ce6b2a3fd1521b1291bc").mock(side_effect=_act001_side_effect)
         # Phase 2: element definition with display values
-        respx.get(f"{BASE_URL}/api/now/table/wf_element_definition/def001").mock(
+        respx.get(f"{BASE_URL}/api/now/table/wf_element_definition/f45ee39efdcca5805d1e7e2eaa97f27b").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "def001",
+                        "sys_id": "f45ee39efdcca5805d1e7e2eaa97f27b",
                         "name": "Approval - User",
                         "category": "Approvals",
                         "description": "Generates a user approval request",
@@ -886,10 +886,10 @@ class TestWorkflowActivityDetail:
                 json={
                     "result": [
                         {
-                            "sys_id": "var001",
+                            "sys_id": "47a920e21ce3b82c733a27e71b6e24b7",
                             "variable": "Script",
                             "value": "current.state = 2;",
-                            "document_key": "act001",
+                            "document_key": "a37b4556fc38ce6b2a3fd1521b1291bc",
                         },
                     ]
                 },
@@ -898,11 +898,11 @@ class TestWorkflowActivityDetail:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["workflow_activity_detail"](activity_sys_id="act001")
+        raw = await tools["workflow_activity_detail"](activity_sys_id="a37b4556fc38ce6b2a3fd1521b1291bc")
         result = decode_response(raw)
 
         assert result["status"] == "success"
-        assert result["data"]["activity"]["sys_id"] == "act001"
+        assert result["data"]["activity"]["sys_id"] == "a37b4556fc38ce6b2a3fd1521b1291bc"
         assert result["data"]["definition"]["name"] == "Approval - User"
         assert result["data"]["definition"]["category"] == "Approvals"
         assert len(result["data"]["variables"]) == 1
@@ -946,12 +946,12 @@ class TestWorkflowActivityDetail:
     @respx.mock
     async def test_error_on_missing_activity(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Returns error when the activity record is not found."""
-        respx.get(f"{BASE_URL}/api/now/table/wf_activity/bad_id").mock(
+        respx.get(f"{BASE_URL}/api/now/table/wf_activity/35a1af58a3b00bde3d8af97f82562ac2").mock(
             return_value=httpx.Response(404, json={"error": {"message": "Not found"}})
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["workflow_activity_detail"](activity_sys_id="bad_id")
+        raw = await tools["workflow_activity_detail"](activity_sys_id="35a1af58a3b00bde3d8af97f82562ac2")
         result = decode_response(raw)
 
         assert result["status"] == "error"
@@ -998,13 +998,13 @@ class TestWorkflowActivityDetail:
                 json={
                     "result": [
                         {
-                            "sys_id": "sv1",
+                            "sys_id": "30a262ee0cddf15a17abb23e11148aa3",
                             "variable": "Script",
                             "value": "gs.log('hello');",
                             "document_key": "act_vars",
                         },
                         {
-                            "sys_id": "sv2",
+                            "sys_id": "2f0c71c73a82a38798e5249c3cfcecd6",
                             "variable": "Condition",
                             "value": "current.active == true",
                             "document_key": "act_vars",
@@ -1044,26 +1044,26 @@ class TestWorkflowVersionList:
                 json={
                     "result": [
                         {
-                            "sys_id": "wfv001",
-                            "name": "Incident Workflow v1",
+                            "sys_id": "e35fec24db6d035c7a6fa33e76847858",
+                            "name": "Incident Workflow 5a6df720540c20d95d530d3fd6885511",
                             "table": "incident",
                             "description": "Handles incident lifecycle",
                             "active": "true",
                             "published": "true",
                             "checked_out": "",
                             "checked_out_by": "",
-                            "workflow": "wf001",
+                            "workflow": "7d252727b60e4ff223a6aa6f13e46417",
                         },
                         {
-                            "sys_id": "wfv002",
-                            "name": "Incident Workflow v2",
+                            "sys_id": "5780f78f6d55b5bf954f58a084659629",
+                            "name": "Incident Workflow a1047eab1035d58682a53557e0b2a75e",
                             "table": "incident",
                             "description": "Updated incident lifecycle",
                             "active": "true",
                             "published": "true",
                             "checked_out": "",
                             "checked_out_by": "",
-                            "workflow": "wf001",
+                            "workflow": "7d252727b60e4ff223a6aa6f13e46417",
                         },
                     ]
                 },
@@ -1142,7 +1142,7 @@ class TestWorkflowVersionList:
                 json={
                     "result": [
                         {
-                            "sys_id": "wfv003",
+                            "sys_id": "6732202e50cf54c4edbc514a820a4e2e",
                             "name": "Problem Workflow",
                             "table": "problem",
                             "description": "Problem management",
@@ -1203,8 +1203,8 @@ class TestWorkflowDictReferenceFields:
         activity_definition and document_key are the ones that may come back
         as dicts when display_value query params are used.
         """
-        dict_activity_def = {"display_value": "def001", "link": "https://test.service-now.com/api/..."}
-        dict_doc_key = {"display_value": "act001", "link": "https://test.service-now.com/api/..."}
+        dict_activity_def = {"display_value": "f45ee39efdcca5805d1e7e2eaa97f27b", "link": "https://test.service-now.com/api/..."}
+        dict_doc_key = {"display_value": "a37b4556fc38ce6b2a3fd1521b1291bc", "link": "https://test.service-now.com/api/..."}
 
         respx.get(f"{BASE_URL}/api/now/table/wf_workflow_version/wfv_dict_test").mock(
             return_value=httpx.Response(200, json={"result": {"sys_id": "wfv_dict_test", "name": "Test WF"}})
@@ -1215,7 +1215,7 @@ class TestWorkflowDictReferenceFields:
                 json={
                     "result": [
                         {
-                            "sys_id": "act001",
+                            "sys_id": "a37b4556fc38ce6b2a3fd1521b1291bc",
                             "name": "Script Step",
                             "activity_definition": dict_activity_def,
                             "activity_definition.name": "Run Script",
@@ -1242,7 +1242,7 @@ class TestWorkflowDictReferenceFields:
                 json={
                     "result": [
                         {
-                            "sys_id": "var001",
+                            "sys_id": "47a920e21ce3b82c733a27e71b6e24b7",
                             "variable": "script",
                             "value": "gs.log('hello');",
                             "document_key": dict_doc_key,

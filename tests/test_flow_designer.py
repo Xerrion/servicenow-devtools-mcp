@@ -80,7 +80,7 @@ class TestFlowList:
                 json={
                     "result": [
                         {
-                            "sys_id": "flow001",
+                            "sys_id": "8eecae1b3a5230387ff5f06a91b9fbe9",
                             "name": "Auto Assignment Flow",
                             "status": "published",
                             "type": "flow",
@@ -249,12 +249,12 @@ class TestFlowGet:
     @respx.mock
     async def test_flow_get_success(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Returns flow record with its variables."""
-        respx.get(f"{BASE_URL}/api/now/table/sys_hub_flow/flow001").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_hub_flow/8eecae1b3a5230387ff5f06a91b9fbe9").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "flow001",
+                        "sys_id": "8eecae1b3a5230387ff5f06a91b9fbe9",
                         "name": "Auto Assignment Flow",
                         "status": "published",
                         "type": "flow",
@@ -270,14 +270,14 @@ class TestFlowGet:
                 json={
                     "result": [
                         {
-                            "sys_id": "var001",
+                            "sys_id": "47a920e21ce3b82c733a27e71b6e24b7",
                             "name": "assignment_group",
                             "type": "reference",
                             "mandatory": "true",
                             "default_value": "",
                         },
                         {
-                            "sys_id": "var002",
+                            "sys_id": "f26728a87efd1d5a8256284c435cc0c4",
                             "name": "priority",
                             "type": "integer",
                             "mandatory": "false",
@@ -290,7 +290,7 @@ class TestFlowGet:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["flow_get"](flow_sys_id="flow001")
+        raw = await tools["flow_get"](flow_sys_id="8eecae1b3a5230387ff5f06a91b9fbe9")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -330,7 +330,7 @@ class TestFlowGet:
     @respx.mock
     async def test_flow_get_not_found(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """404 response returns error."""
-        respx.get(f"{BASE_URL}/api/now/table/sys_hub_flow/notfound").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_hub_flow/a83d4bf9070ae6eb080b4cc7b2703e17").mock(
             return_value=httpx.Response(404, json={"error": {"message": "Record not found"}})
         )
         # Variable query may or may not fire depending on gather; mock it to avoid ConnectionError
@@ -339,7 +339,7 @@ class TestFlowGet:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["flow_get"](flow_sys_id="notfound")
+        raw = await tools["flow_get"](flow_sys_id="a83d4bf9070ae6eb080b4cc7b2703e17")
         result = decode_response(raw)
 
         assert result["status"] == "error"
@@ -388,24 +388,24 @@ class TestFlowMap:
     @respx.mock
     async def test_flow_map_success(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Uses latest_snapshot when child records are linked to the newest snapshot."""
-        self._mock_parent_flow_lookup("flow001", latest_snapshot="snap_latest")
+        self._mock_parent_flow_lookup("8eecae1b3a5230387ff5f06a91b9fbe9", latest_snapshot="snap_latest")
         action_route = respx.get(f"{BASE_URL}/api/now/table/sys_hub_action_instance").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": [
                         {
-                            "sys_id": "ai001",
+                            "sys_id": "636f282a5dd34466ab9e91c1706b1998",
                             "name": "Create Task",
-                            "action_type": "at001",
+                            "action_type": "de31c068fa3d1adb0687dc4d7bbf0648",
                             "order": "1",
                             "position": "0",
                             "sys_created_on": "2026-01-15 08:00:00",
                         },
                         {
-                            "sys_id": "ai002",
+                            "sys_id": "9903d5f9dbdac520c4e23b8550661763",
                             "name": "Send Email",
-                            "action_type": "at002",
+                            "action_type": "c0d996b6aee4ec53e6b3e2f86a64dd3e",
                             "order": "2",
                             "position": "1",
                             "sys_created_on": "2026-01-15 08:01:00",
@@ -421,7 +421,7 @@ class TestFlowMap:
                 json={
                     "result": [
                         {
-                            "sys_id": "fl001",
+                            "sys_id": "390c28e84854396993c1dcc315dfe48c",
                             "name": "If Priority 1",
                             "type": "if",
                             "order": "1",
@@ -435,7 +435,7 @@ class TestFlowMap:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["flow_map"](flow_sys_id="flow001")
+        raw = await tools["flow_map"](flow_sys_id="8eecae1b3a5230387ff5f06a91b9fbe9")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -457,9 +457,9 @@ class TestFlowMap:
                 json={
                     "result": [
                         {
-                            "sys_id": "ai010",
+                            "sys_id": "3ff4a88b3dd61ff2b18f015f0ad2e484",
                             "name": "Update Record",
-                            "action_type": "at010",
+                            "action_type": "7f15696e98f35a0906ca2804a9a177aa",
                             "order": "1",
                             "position": "0",
                             "sys_created_on": "2026-01-20 09:00:00",
@@ -497,7 +497,7 @@ class TestFlowMap:
                 json={
                     "result": [
                         {
-                            "sys_id": "fl010",
+                            "sys_id": "8a912c42d911682d7f9b9625d3cb2246",
                             "name": "For Each Record",
                             "type": "for_each",
                             "order": "1",
@@ -560,7 +560,7 @@ class TestFlowActionDetail:
                     200,
                     json={
                         "result": {
-                            "sys_id": "ai001",
+                            "sys_id": "636f282a5dd34466ab9e91c1706b1998",
                             "name": "Create Task",
                             "action_type": "Create Record",
                         }
@@ -570,20 +570,20 @@ class TestFlowActionDetail:
                 200,
                 json={
                     "result": {
-                        "sys_id": "ai001",
+                        "sys_id": "636f282a5dd34466ab9e91c1706b1998",
                         "name": "Create Task",
-                        "action_type": "atd001",
+                        "action_type": "8f60c39c7a0b23a9865bf30e8363153f",
                     }
                 },
             )
 
-        respx.get(f"{BASE_URL}/api/now/table/sys_hub_action_instance/ai001").mock(side_effect=_instance_side_effect)
-        respx.get(f"{BASE_URL}/api/now/table/sys_hub_action_type_definition/atd001").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_hub_action_instance/636f282a5dd34466ab9e91c1706b1998").mock(side_effect=_instance_side_effect)
+        respx.get(f"{BASE_URL}/api/now/table/sys_hub_action_type_definition/8f60c39c7a0b23a9865bf30e8363153f").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "atd001",
+                        "sys_id": "8f60c39c7a0b23a9865bf30e8363153f",
                         "name": "Create Record",
                         "description": "Creates a new record",
                         "access": "public",
@@ -597,7 +597,7 @@ class TestFlowActionDetail:
                 json={
                     "result": [
                         {
-                            "sys_id": "step001",
+                            "sys_id": "d07a54fe040684bbd267d6e61a2e11e0",
                             "name": "Set Fields",
                             "step_type": "set_values",
                             "order": "1",
@@ -610,11 +610,11 @@ class TestFlowActionDetail:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["flow_action_detail"](action_instance_sys_id="ai001")
+        raw = await tools["flow_action_detail"](action_instance_sys_id="636f282a5dd34466ab9e91c1706b1998")
         result = decode_response(raw)
 
         assert result["status"] == "success"
-        assert result["data"]["instance"]["sys_id"] == "ai001"
+        assert result["data"]["instance"]["sys_id"] == "636f282a5dd34466ab9e91c1706b1998"
         assert result["data"]["type_definition"]["name"] == "Create Record"
         assert len(result["data"]["steps"]) == 1
         assert result["data"]["steps"][0]["name"] == "Set Fields"
@@ -723,10 +723,10 @@ class TestFlowExecutionList:
                 json={
                     "result": [
                         {
-                            "sys_id": "ctx001",
+                            "sys_id": "18dbe9bd70e88bd7d141d13c8a46e7d7",
                             "name": "Exec 1",
-                            "flow": "flow001",
-                            "source_record": "inc001",
+                            "flow": "8eecae1b3a5230387ff5f06a91b9fbe9",
+                            "source_record": "6d55028a7049dbf2f4275991d6fc81cf",
                             "source_table": "incident",
                             "state": "COMPLETE",
                             "started": "2026-02-20 09:00:00",
@@ -740,7 +740,7 @@ class TestFlowExecutionList:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["flow_execution_list"](flow_sys_id="flow001")
+        raw = await tools["flow_execution_list"](flow_sys_id="8eecae1b3a5230387ff5f06a91b9fbe9")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -757,10 +757,10 @@ class TestFlowExecutionList:
                 json={
                     "result": [
                         {
-                            "sys_id": "ctx002",
+                            "sys_id": "ffff7ed3a8c7ffe871d910c0eb40322e",
                             "name": "Exec 2",
-                            "flow": "flow002",
-                            "source_record": "inc999",
+                            "flow": "fdf7325b5fa9fb3a675311af2efbe71c",
+                            "source_record": "2edef9aa2e99060fd11a80ae6eed85b5",
                             "source_table": "incident",
                             "state": "IN_PROGRESS",
                             "started": "2026-02-20 10:00:00",
@@ -774,7 +774,7 @@ class TestFlowExecutionList:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["flow_execution_list"](source_record="inc999")
+        raw = await tools["flow_execution_list"](source_record="2edef9aa2e99060fd11a80ae6eed85b5")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -782,7 +782,7 @@ class TestFlowExecutionList:
         assert exec_route.calls.last is not None
         last_request = exec_route.calls.last.request
         qs = parse_qs(urlparse(str(last_request.url)).query)
-        assert "source_record=inc999" in qs["sysparm_query"][0]
+        assert "source_record=2edef9aa2e99060fd11a80ae6eed85b5" in qs["sysparm_query"][0]
 
     @pytest.mark.asyncio()
     @respx.mock
@@ -793,7 +793,7 @@ class TestFlowExecutionList:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["flow_execution_list"](flow_sys_id="flow001", state="ERROR")
+        raw = await tools["flow_execution_list"](flow_sys_id="8eecae1b3a5230387ff5f06a91b9fbe9", state="ERROR")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -814,7 +814,7 @@ class TestFlowExecutionList:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["flow_execution_list"](flow_sys_id="flow001", source_record="inc001", state="COMPLETE")
+        raw = await tools["flow_execution_list"](flow_sys_id="8eecae1b3a5230387ff5f06a91b9fbe9", source_record="6d55028a7049dbf2f4275991d6fc81cf", state="COMPLETE")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -822,8 +822,8 @@ class TestFlowExecutionList:
         last_request = exec_route.calls.last.request
         qs = parse_qs(urlparse(str(last_request.url)).query)
         query_str = qs["sysparm_query"][0]
-        assert "flow=flow001" in query_str
-        assert "source_record=inc001" in query_str
+        assert "flow=8eecae1b3a5230387ff5f06a91b9fbe9" in query_str
+        assert "source_record=6d55028a7049dbf2f4275991d6fc81cf" in query_str
         assert "state=COMPLETE" in query_str
 
     @pytest.mark.asyncio()
@@ -867,19 +867,19 @@ class TestFlowExecutionDetail:
     @respx.mock
     async def test_flow_execution_detail_success(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Returns context record and ordered log entries."""
-        respx.get(f"{BASE_URL}/api/now/table/sys_flow_context/ctx001").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_flow_context/18dbe9bd70e88bd7d141d13c8a46e7d7").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "ctx001",
+                        "sys_id": "18dbe9bd70e88bd7d141d13c8a46e7d7",
                         "name": "Auto Assignment Execution",
                         "state": "COMPLETE",
                         "started": "2026-02-20 09:00:00",
                         "ended": "2026-02-20 09:00:05",
-                        "flow": "flow001",
+                        "flow": "8eecae1b3a5230387ff5f06a91b9fbe9",
                         "source_table": "incident",
-                        "source_record": "inc001",
+                        "source_record": "6d55028a7049dbf2f4275991d6fc81cf",
                     }
                 },
             )
@@ -890,7 +890,7 @@ class TestFlowExecutionDetail:
                 json={
                     "result": [
                         {
-                            "sys_id": "log001",
+                            "sys_id": "c7437b6f8d9c00ea14eab197e745aacd",
                             "action": "Create Task",
                             "operation": "execute",
                             "level": "info",
@@ -902,7 +902,7 @@ class TestFlowExecutionDetail:
                             "duration": "0:00:01",
                         },
                         {
-                            "sys_id": "log002",
+                            "sys_id": "d2b4eb18597b547b72c70b31bf26b49e",
                             "action": "Send Email",
                             "operation": "execute",
                             "level": "info",
@@ -920,7 +920,7 @@ class TestFlowExecutionDetail:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["flow_execution_detail"](context_id="ctx001")
+        raw = await tools["flow_execution_detail"](context_id="18dbe9bd70e88bd7d141d13c8a46e7d7")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -999,18 +999,18 @@ class TestFlowSnapshotList:
                 json={
                     "result": [
                         {
-                            "sys_id": "snap001",
+                            "sys_id": "7ee71fe03706c9bcb43380fbe0d2d71e",
                             "name": "Version 2.0",
-                            "parent_flow": "flow001",
+                            "parent_flow": "8eecae1b3a5230387ff5f06a91b9fbe9",
                             "version": "2.0",
                             "status": "published",
                             "sys_created_on": "2026-02-20 10:00:00",
                             "sys_updated_on": "2026-02-20 10:00:00",
                         },
                         {
-                            "sys_id": "snap002",
+                            "sys_id": "f6181240cc65ea9f4a1391d16567586c",
                             "name": "Version 1.0",
-                            "parent_flow": "flow001",
+                            "parent_flow": "8eecae1b3a5230387ff5f06a91b9fbe9",
                             "version": "1.0",
                             "status": "published",
                             "sys_created_on": "2026-01-15 08:00:00",
@@ -1023,7 +1023,7 @@ class TestFlowSnapshotList:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["flow_snapshot_list"](flow_sys_id="flow001")
+        raw = await tools["flow_snapshot_list"](flow_sys_id="8eecae1b3a5230387ff5f06a91b9fbe9")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -1054,7 +1054,7 @@ class TestFlowSnapshotList:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["flow_snapshot_list"](flow_sys_id="flow001")
+        raw = await tools["flow_snapshot_list"](flow_sys_id="8eecae1b3a5230387ff5f06a91b9fbe9")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -1071,7 +1071,7 @@ class TestFlowSnapshotList:
             return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
         )
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["flow_snapshot_list"](flow_sys_id="abc123", limit=5)
+        raw = await tools["flow_snapshot_list"](flow_sys_id="6367c48dd193d56ea7b0baad25b19455", limit=5)
         result = decode_response(raw)
         assert result["status"] == "success"
         req = respx.calls[0].request
@@ -1086,7 +1086,7 @@ class TestFlowSnapshotList:
 class TestWorkflowMigrationAnalysis:
     """Tests for the workflow_migration_analysis tool."""
 
-    def _mock_version(self, sys_id: str = "wfv001", name: str = "Incident WF v1") -> None:
+    def _mock_version(self, sys_id: str = "e35fec24db6d035c7a6fa33e76847858", name: str = "Incident WF 5a6df720540c20d95d530d3fd6885511") -> None:
         """Mock a wf_workflow_version GET."""
         respx.get(f"{BASE_URL}/api/now/table/wf_workflow_version/{sys_id}").mock(
             return_value=httpx.Response(
@@ -1142,7 +1142,7 @@ class TestWorkflowMigrationAnalysis:
         self._mock_activities(
             [
                 {
-                    "sys_id": "act001",
+                    "sys_id": "a37b4556fc38ce6b2a3fd1521b1291bc",
                     "name": "Begin",
                     "activity_definition": "def_begin",
                     "activity_definition.name": "Begin",
@@ -1153,7 +1153,7 @@ class TestWorkflowMigrationAnalysis:
                     "notes": "",
                 },
                 {
-                    "sys_id": "act002",
+                    "sys_id": "6ae7ca85d4792cabe5bafd3b8d148725",
                     "name": "Run Script",
                     "activity_definition": "def_rs",
                     "activity_definition.name": "Run Script",
@@ -1164,7 +1164,7 @@ class TestWorkflowMigrationAnalysis:
                     "notes": "",
                 },
                 {
-                    "sys_id": "act003",
+                    "sys_id": "2ece7051da817573c5081f76dd089a30",
                     "name": "End",
                     "activity_definition": "def_end",
                     "activity_definition.name": "End",
@@ -1179,18 +1179,18 @@ class TestWorkflowMigrationAnalysis:
         self._mock_transitions(
             [
                 {
-                    "sys_id": "tr001",
-                    "from": "act001",
+                    "sys_id": "82b655b7980ce1431a5665bd5e3fc4fb",
+                    "from": "a37b4556fc38ce6b2a3fd1521b1291bc",
                     "from.name": "Begin",
-                    "to": "act002",
+                    "to": "6ae7ca85d4792cabe5bafd3b8d148725",
                     "to.name": "Run Script",
                     "condition": "",
                 },
                 {
-                    "sys_id": "tr002",
-                    "from": "act002",
+                    "sys_id": "5b2d0cf104fe83a192898b0e1874244f",
+                    "from": "6ae7ca85d4792cabe5bafd3b8d148725",
                     "from.name": "Run Script",
-                    "to": "act003",
+                    "to": "2ece7051da817573c5081f76dd089a30",
                     "to.name": "End",
                     "condition": "",
                 },
@@ -1199,7 +1199,7 @@ class TestWorkflowMigrationAnalysis:
         self._mock_variables([])
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["workflow_migration_analysis"](workflow_version_sys_id="wfv001")
+        raw = await tools["workflow_migration_analysis"](workflow_version_sys_id="e35fec24db6d035c7a6fa33e76847858")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -1227,7 +1227,7 @@ class TestWorkflowMigrationAnalysis:
         self._mock_activities(
             [
                 {
-                    "sys_id": "act001",
+                    "sys_id": "a37b4556fc38ce6b2a3fd1521b1291bc",
                     "name": "Begin",
                     "activity_definition": "def_begin",
                     "activity_definition.name": "Begin",
@@ -1238,7 +1238,7 @@ class TestWorkflowMigrationAnalysis:
                     "notes": "",
                 },
                 {
-                    "sys_id": "act002",
+                    "sys_id": "6ae7ca85d4792cabe5bafd3b8d148725",
                     "name": "Approval",
                     "activity_definition": "def_approval",
                     "activity_definition.name": "Approval - User",
@@ -1249,7 +1249,7 @@ class TestWorkflowMigrationAnalysis:
                     "notes": "",
                 },
                 {
-                    "sys_id": "act003",
+                    "sys_id": "2ece7051da817573c5081f76dd089a30",
                     "name": "Set Values",
                     "activity_definition": "def_sv",
                     "activity_definition.name": "Set Values",
@@ -1264,26 +1264,26 @@ class TestWorkflowMigrationAnalysis:
         self._mock_transitions(
             [
                 {
-                    "sys_id": "tr001",
-                    "from": "act001",
+                    "sys_id": "82b655b7980ce1431a5665bd5e3fc4fb",
+                    "from": "a37b4556fc38ce6b2a3fd1521b1291bc",
                     "from.name": "Begin",
-                    "to": "act002",
+                    "to": "6ae7ca85d4792cabe5bafd3b8d148725",
                     "to.name": "Approval",
                     "condition": "",
                 },
                 {
-                    "sys_id": "tr002",
-                    "from": "act002",
+                    "sys_id": "5b2d0cf104fe83a192898b0e1874244f",
+                    "from": "6ae7ca85d4792cabe5bafd3b8d148725",
                     "from.name": "Approval",
-                    "to": "act003",
+                    "to": "2ece7051da817573c5081f76dd089a30",
                     "to.name": "Set Values",
                     "condition": "",
                 },
                 {
-                    "sys_id": "tr003",
-                    "from": "act003",
+                    "sys_id": "fdb792aa92ea3fcdd5ae0cacec93485b",
+                    "from": "2ece7051da817573c5081f76dd089a30",
                     "from.name": "Set Values",
-                    "to": "act002",
+                    "to": "6ae7ca85d4792cabe5bafd3b8d148725",
                     "to.name": "Approval",
                     "condition": "rejected",
                 },
@@ -1292,7 +1292,7 @@ class TestWorkflowMigrationAnalysis:
         self._mock_variables([])
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["workflow_migration_analysis"](workflow_version_sys_id="wfv001")
+        raw = await tools["workflow_migration_analysis"](workflow_version_sys_id="e35fec24db6d035c7a6fa33e76847858")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -1314,7 +1314,7 @@ class TestWorkflowMigrationAnalysis:
         self._mock_activities(
             [
                 {
-                    "sys_id": "act001",
+                    "sys_id": "a37b4556fc38ce6b2a3fd1521b1291bc",
                     "name": "Run Script",
                     "activity_definition": "def_rs",
                     "activity_definition.name": "Run Script",
@@ -1332,16 +1332,16 @@ class TestWorkflowMigrationAnalysis:
         self._mock_variables(
             [
                 {
-                    "sys_id": "sv001",
+                    "sys_id": "eaa2e11f5972c0fd8e423f1c6234180d",
                     "variable": "script",
                     "value": script_body,
-                    "document_key": "act001",
+                    "document_key": "a37b4556fc38ce6b2a3fd1521b1291bc",
                 },
             ]
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["workflow_migration_analysis"](workflow_version_sys_id="wfv001")
+        raw = await tools["workflow_migration_analysis"](workflow_version_sys_id="e35fec24db6d035c7a6fa33e76847858")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -1370,7 +1370,7 @@ class TestWorkflowMigrationAnalysis:
         self._mock_activities(
             [
                 {
-                    "sys_id": "act001",
+                    "sys_id": "a37b4556fc38ce6b2a3fd1521b1291bc",
                     "name": "Notification Body",
                     "activity_definition": "def_notif",
                     "activity_definition.name": "Notification",
@@ -1386,16 +1386,16 @@ class TestWorkflowMigrationAnalysis:
         self._mock_variables(
             [
                 {
-                    "sys_id": "sv001",
+                    "sys_id": "eaa2e11f5972c0fd8e423f1c6234180d",
                     "variable": "message_template",
                     "value": "Hello team,\nPlease review this request.\nThanks.",
-                    "document_key": "act001",
+                    "document_key": "a37b4556fc38ce6b2a3fd1521b1291bc",
                 },
             ]
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["workflow_migration_analysis"](workflow_version_sys_id="wfv001")
+        raw = await tools["workflow_migration_analysis"](workflow_version_sys_id="e35fec24db6d035c7a6fa33e76847858")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -1416,7 +1416,7 @@ class TestWorkflowMigrationAnalysis:
         self._mock_activities(
             [
                 {
-                    "sys_id": "act001",
+                    "sys_id": "a37b4556fc38ce6b2a3fd1521b1291bc",
                     "name": "Notification Body",
                     "activity_definition": "def_notif",
                     "activity_definition.name": "Notification",
@@ -1432,16 +1432,16 @@ class TestWorkflowMigrationAnalysis:
         self._mock_variables(
             [
                 {
-                    "sys_id": "sv001",
+                    "sys_id": "eaa2e11f5972c0fd8e423f1c6234180d",
                     "variable": "message_template",
                     "value": "If the requester asks for help, return this article to the customer.",
-                    "document_key": "act001",
+                    "document_key": "a37b4556fc38ce6b2a3fd1521b1291bc",
                 },
             ]
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["workflow_migration_analysis"](workflow_version_sys_id="wfv001")
+        raw = await tools["workflow_migration_analysis"](workflow_version_sys_id="e35fec24db6d035c7a6fa33e76847858")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -1461,7 +1461,7 @@ class TestWorkflowMigrationAnalysis:
         self._mock_activities(
             [
                 {
-                    "sys_id": "act001",
+                    "sys_id": "a37b4556fc38ce6b2a3fd1521b1291bc",
                     "name": "Begin",
                     "activity_definition": "def_begin",
                     "activity_definition.name": "Begin",
@@ -1472,7 +1472,7 @@ class TestWorkflowMigrationAnalysis:
                     "notes": "",
                 },
                 {
-                    "sys_id": "act002",
+                    "sys_id": "6ae7ca85d4792cabe5bafd3b8d148725",
                     "name": "Approval Step",
                     "activity_definition": "def_approval",
                     "activity_definition.name": "Approval - User",
@@ -1483,7 +1483,7 @@ class TestWorkflowMigrationAnalysis:
                     "notes": "",
                 },
                 {
-                    "sys_id": "act003",
+                    "sys_id": "2ece7051da817573c5081f76dd089a30",
                     "name": "Notify User",
                     "activity_definition": "def_notif",
                     "activity_definition.name": "Notification",
@@ -1499,7 +1499,7 @@ class TestWorkflowMigrationAnalysis:
         self._mock_variables([])
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["workflow_migration_analysis"](workflow_version_sys_id="wfv001")
+        raw = await tools["workflow_migration_analysis"](workflow_version_sys_id="e35fec24db6d035c7a6fa33e76847858")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -1518,7 +1518,7 @@ class TestWorkflowMigrationAnalysis:
         self._mock_activities(
             [
                 {
-                    "sys_id": "act001",
+                    "sys_id": "a37b4556fc38ce6b2a3fd1521b1291bc",
                     "name": "Custom Widget",
                     "activity_definition": "def_custom",
                     "activity_definition.name": "Custom Widget Type",
@@ -1534,7 +1534,7 @@ class TestWorkflowMigrationAnalysis:
         self._mock_variables([])
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["workflow_migration_analysis"](workflow_version_sys_id="wfv001")
+        raw = await tools["workflow_migration_analysis"](workflow_version_sys_id="e35fec24db6d035c7a6fa33e76847858")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -1562,7 +1562,7 @@ class TestWorkflowMigrationAnalysis:
         self._mock_activities(
             [
                 {
-                    "sys_id": "act001",
+                    "sys_id": "a37b4556fc38ce6b2a3fd1521b1291bc",
                     "name": "Begin",
                     "activity_definition": "def_begin",
                     "activity_definition.name": "Begin",
@@ -1573,7 +1573,7 @@ class TestWorkflowMigrationAnalysis:
                     "notes": "",
                 },
                 {
-                    "sys_id": "act002",
+                    "sys_id": "6ae7ca85d4792cabe5bafd3b8d148725",
                     "name": "Rollback Step",
                     "activity_definition": "def_rb",
                     "activity_definition.name": "Rollback To",
@@ -1584,7 +1584,7 @@ class TestWorkflowMigrationAnalysis:
                     "notes": "",
                 },
                 {
-                    "sys_id": "act003",
+                    "sys_id": "2ece7051da817573c5081f76dd089a30",
                     "name": "Approval",
                     "activity_definition": "def_approval",
                     "activity_definition.name": "Approval - User",
@@ -1599,26 +1599,26 @@ class TestWorkflowMigrationAnalysis:
         self._mock_transitions(
             [
                 {
-                    "sys_id": "tr001",
-                    "from": "act001",
+                    "sys_id": "82b655b7980ce1431a5665bd5e3fc4fb",
+                    "from": "a37b4556fc38ce6b2a3fd1521b1291bc",
                     "from.name": "Begin",
-                    "to": "act002",
+                    "to": "6ae7ca85d4792cabe5bafd3b8d148725",
                     "to.name": "Rollback Step",
                     "condition": "",
                 },
                 {
-                    "sys_id": "tr002",
-                    "from": "act002",
+                    "sys_id": "5b2d0cf104fe83a192898b0e1874244f",
+                    "from": "6ae7ca85d4792cabe5bafd3b8d148725",
                     "from.name": "Rollback Step",
-                    "to": "act003",
+                    "to": "2ece7051da817573c5081f76dd089a30",
                     "to.name": "Approval",
                     "condition": "",
                 },
                 {
-                    "sys_id": "tr003",
-                    "from": "act003",
+                    "sys_id": "fdb792aa92ea3fcdd5ae0cacec93485b",
+                    "from": "2ece7051da817573c5081f76dd089a30",
                     "from.name": "Approval",
-                    "to": "act002",
+                    "to": "6ae7ca85d4792cabe5bafd3b8d148725",
                     "to.name": "Rollback Step",
                     "condition": "rejected",
                 },
@@ -1627,7 +1627,7 @@ class TestWorkflowMigrationAnalysis:
         self._mock_variables([])
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["workflow_migration_analysis"](workflow_version_sys_id="wfv001")
+        raw = await tools["workflow_migration_analysis"](workflow_version_sys_id="e35fec24db6d035c7a6fa33e76847858")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -1649,7 +1649,7 @@ class TestWorkflowMigrationAnalysis:
         self._mock_activities(
             [
                 {
-                    "sys_id": "act001",
+                    "sys_id": "a37b4556fc38ce6b2a3fd1521b1291bc",
                     "name": "Known Activity",
                     "activity_definition": "def_if",
                     "activity_definition.name": "If",
@@ -1660,7 +1660,7 @@ class TestWorkflowMigrationAnalysis:
                     "notes": "",
                 },
                 {
-                    "sys_id": "act002",
+                    "sys_id": "6ae7ca85d4792cabe5bafd3b8d148725",
                     "name": "Mystery Activity",
                     "activity_definition": "def_mystery",
                     "activity_definition.name": "Mystery Type",
@@ -1676,18 +1676,18 @@ class TestWorkflowMigrationAnalysis:
         self._mock_transitions(
             [
                 {
-                    "sys_id": "tr001",
-                    "from": "act001",
+                    "sys_id": "82b655b7980ce1431a5665bd5e3fc4fb",
+                    "from": "a37b4556fc38ce6b2a3fd1521b1291bc",
                     "from.name": "Known Activity",
-                    "to": "act002",
+                    "to": "6ae7ca85d4792cabe5bafd3b8d148725",
                     "to.name": "Mystery Activity",
                     "condition": "",
                 },
                 {
-                    "sys_id": "tr002",
-                    "from": "act002",
+                    "sys_id": "5b2d0cf104fe83a192898b0e1874244f",
+                    "from": "6ae7ca85d4792cabe5bafd3b8d148725",
                     "from.name": "Mystery Activity",
-                    "to": "act001",
+                    "to": "a37b4556fc38ce6b2a3fd1521b1291bc",
                     "to.name": "Known Activity",
                     "condition": "",
                 },
@@ -1696,16 +1696,16 @@ class TestWorkflowMigrationAnalysis:
         self._mock_variables(
             [
                 {
-                    "sys_id": "sv001",
+                    "sys_id": "eaa2e11f5972c0fd8e423f1c6234180d",
                     "variable": "script",
                     "value": script_body,
-                    "document_key": "act001",
+                    "document_key": "a37b4556fc38ce6b2a3fd1521b1291bc",
                 },
             ]
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["workflow_migration_analysis"](workflow_version_sys_id="wfv001")
+        raw = await tools["workflow_migration_analysis"](workflow_version_sys_id="e35fec24db6d035c7a6fa33e76847858")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -1736,7 +1736,7 @@ class TestWorkflowMigrationAnalysis:
         # No activities means no sys_variable_value query is made
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["workflow_migration_analysis"](workflow_version_sys_id="wfv001")
+        raw = await tools["workflow_migration_analysis"](workflow_version_sys_id="e35fec24db6d035c7a6fa33e76847858")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -1788,7 +1788,7 @@ class TestWorkflowMigrationAnalysis:
         self._mock_variables([])
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["workflow_migration_analysis"](workflow_version_sys_id="wfv001")
+        raw = await tools["workflow_migration_analysis"](workflow_version_sys_id="e35fec24db6d035c7a6fa33e76847858")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -1915,7 +1915,7 @@ class TestFlowDesignerDictReferenceFields:
                 json={
                     "result": [
                         {
-                            "sys_id": "trans001",
+                            "sys_id": "a5d23ceaba84465f5cebeb9a4c0c4836",
                             "from": {"display_value": "act_a", "link": "https://test.service-now.com/api/..."},
                             "from.name": "Start",
                             "to": {"display_value": "act_b", "link": "https://test.service-now.com/api/..."},
