@@ -5,8 +5,8 @@ from typing import Any
 import pytest
 import respx
 from httpx import Response
-from toon_format import decode as toon_decode
 
+from servicenow_mcp._vendor.toon_format import decode as toon_decode
 from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.config import Settings
 from servicenow_mcp.tools.domains import cmdb

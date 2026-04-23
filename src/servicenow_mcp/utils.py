@@ -7,8 +7,7 @@ import uuid
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any, override
 
-from toon_format import encode as toon_encode
-
+from servicenow_mcp._vendor.toon_format import encode as toon_encode
 from servicenow_mcp.errors import ForbiddenError, PolicyError
 from servicenow_mcp.sentry import capture_exception as sentry_capture
 

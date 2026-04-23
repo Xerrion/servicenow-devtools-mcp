@@ -6,8 +6,8 @@ from typing import Any
 from unittest.mock import patch
 
 import pytest
-from toon_format import decode as toon_decode
 
+from servicenow_mcp._vendor.toon_format import decode as toon_decode
 from tests.helpers import get_tool_functions, get_tool_names
 
 

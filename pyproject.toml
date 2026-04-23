@@ -28,7 +28,6 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "uvicorn>=0.30.0",
     "starlette>=0.38.0",
-    "toon-format",
     "sentry-sdk>=2.55.0",
 ]
 
@@ -71,6 +70,7 @@ dev = [
 line-length = 120
 target-version = "py312"
 src = ["src", "tests"]
+extend-exclude = ["src/servicenow_mcp/_vendor"]
 
 [tool.ruff.lint]
 select = [
@@ -142,6 +142,11 @@ warn_return_any = false
 warn_unused_configs = true
 disallow_untyped_defs = true
 ignore_missing_imports = true
+exclude = ["src/servicenow_mcp/_vendor/"]
+
+[[tool.mypy.overrides]]
+module = "servicenow_mcp._vendor.*"
+ignore_errors = true
 
 [[tool.mypy.overrides]]
 module = "servicenow_mcp.server"
@@ -149,6 +154,7 @@ disable_error_code = ["call-arg"]
 
 [tool.basedpyright]
 pythonVersion = "3.12"
+exclude = ["src/servicenow_mcp/_vendor"]
 reportAny = false
 reportExplicitAny = false
 reportUnusedCallResult = false
@@ -159,6 +165,3 @@ reportUnknownArgumentType = false
 reportUnknownVariableType = false
 reportUnknownLambdaType = false
 reportImplicitStringConcatenation = false
-
-[tool.uv.sources]
-toon-format = { git = "https://github.com/toon-format/toon-python.git" }

@@ -3,8 +3,8 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from toon_format import decode as toon_decode
 
+from servicenow_mcp._vendor.toon_format import decode as toon_decode
 from servicenow_mcp.tools.domains._helpers import (
     fetch_record_by_number,
     lookup_record_by_number,
