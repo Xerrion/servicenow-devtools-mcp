@@ -107,14 +107,25 @@ def get_attachment_size_bytes(metadata: dict[str, Any]) -> int:
     return size_bytes
 
 
-def build_attachment_download_payload(metadata: dict[str, Any], content: bytes) -> dict[str, Any]:
-    """Build a stable attachment download response payload."""
+def build_attachment_metadata_payload(metadata: dict[str, Any], size_bytes: int) -> dict[str, Any]:
+    """Build a metadata-only attachment response payload (no ``content_base64``).
+
+    ``size_bytes`` is the authoritative size in bytes. When the caller has
+    already downloaded the content, pass ``len(content)``; when only metadata
+    was fetched, pass ``get_attachment_size_bytes(metadata)``.
+    """
     return {
         "sys_id": get_attachment_sys_id(metadata),
         "table_name": get_attachment_table_name(metadata),
         "table_sys_id": get_attachment_table_sys_id(metadata),
         "file_name": get_attachment_field(metadata, "file_name"),
         "content_type": resolve_ref_value(metadata.get("content_type", "")),
-        "size_bytes": len(content),
-        "content_base64": encode_content_base64(content),
+        "size_bytes": size_bytes,
     }
+
+
+def build_attachment_download_payload(metadata: dict[str, Any], content: bytes) -> dict[str, Any]:
+    """Build a full attachment download response payload including base64 content."""
+    payload = build_attachment_metadata_payload(metadata, len(content))
+    payload["content_base64"] = encode_content_base64(content)
+    return payload
