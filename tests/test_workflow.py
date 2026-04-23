@@ -1342,3 +1342,76 @@ class TestWorkflowDictReferenceFields:
         assert result["status"] == "success"
         assert result["data"]["definition"] is not None
         assert result["data"]["definition"]["name"] == "Run Script Definition"
+
+
+# ---------------------------------------------------------------------------
+# PolicyError propagation - allowlist misconfiguration must fail loud
+# ---------------------------------------------------------------------------
+
+
+class TestPrivilegedReadFailsLoud:
+    """A misconfigured privileged-read allowlist must raise, not warn.
+
+    ``_fetch_and_attach_variables`` wraps its read in a narrow except so
+    transient HTTP failures degrade to a warning. ``PolicyError`` is
+    deliberately NOT caught - an empty or wrong allowlist is a programmer
+    bug and must propagate to the tool-call boundary where it surfaces as
+    an error envelope rather than a silently successful response.
+    """
+
+    @pytest.mark.asyncio()
+    async def test_policy_error_propagates_from_helper(
+        self, settings: Settings, auth_provider: BasicAuthProvider, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Monkeypatch the allowlist to empty; ``PolicyError`` must escape."""
+        from servicenow_mcp.client import ServiceNowClient
+        from servicenow_mcp.errors import PolicyError
+        from servicenow_mcp.tools import workflow as workflow_module
+
+        monkeypatch.setattr(workflow_module, "_PRIVILEGED_VARIABLE_TABLES", frozenset())
+
+        activity_records = [{"sys_id": "a37b4556fc38ce6b2a3fd1521b1291bc"}]
+        async with ServiceNowClient(settings, auth_provider) as client:
+            with pytest.raises(PolicyError, match="not in the caller's"):
+                await workflow_module._fetch_and_attach_variables(
+                    client, activity_records, settings, include_script_body=False
+                )
+
+    @pytest.mark.asyncio()
+    @respx.mock
+    async def test_policy_error_surfaces_as_tool_error(
+        self, settings: Settings, auth_provider: BasicAuthProvider, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """At the tool-call boundary, ``PolicyError`` becomes status='error' - not a warning."""
+        from servicenow_mcp.tools import workflow as workflow_module
+
+        monkeypatch.setattr(workflow_module, "_PRIVILEGED_VARIABLE_TABLES", frozenset())
+
+        # Stub the two tables that ``workflow_map`` reads before it reaches
+        # the privileged path; we need the call to progress far enough to
+        # invoke ``_fetch_and_attach_variables``.
+        respx.get(f"{BASE_URL}/api/now/table/wf_workflow_version/e35fec24db6d035c7a6fa33e76847858").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": {"sys_id": "e35fec24db6d035c7a6fa33e76847858", "name": "WF"}},
+            )
+        )
+        respx.get(f"{BASE_URL}/api/now/table/wf_activity").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": [{"sys_id": "a37b4556fc38ce6b2a3fd1521b1291bc", "name": "Begin"}]},
+                headers={"X-Total-Count": "1"},
+            )
+        )
+        respx.get(f"{BASE_URL}/api/now/table/wf_transition").mock(
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
+        )
+
+        tools = _register_and_get_tools(settings, auth_provider)
+        raw = await tools["workflow_map"](workflow_version_sys_id="e35fec24db6d035c7a6fa33e76847858")
+        result = decode_response(raw)
+
+        assert result["status"] == "error"
+        # ``format_response`` serialises exception messages as ``{"message": ...}``.
+        error_text = result["error"]["message"] if isinstance(result["error"], dict) else result["error"]
+        assert "not in the caller's" in error_text

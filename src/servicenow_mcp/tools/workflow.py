@@ -4,12 +4,14 @@ import asyncio
 import logging
 from typing import Any
 
+import httpx
 from mcp.server.fastmcp import FastMCP
 
 from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.config import Settings
 from servicenow_mcp.decorators import tool_handler
+from servicenow_mcp.errors import PolicyError, ServiceNowMCPError
 from servicenow_mcp.policy import (
     INTERNAL_QUERY_LIMIT,
     SCRIPT_BODY_MASK,
@@ -126,7 +128,14 @@ async def _fetch_and_attach_variables(
             vars_by_activity.setdefault(key, []).append(
                 _mask_variable_value(v, include_script_body=include_script_body)
             )
-    except Exception as exc:
+    except PolicyError:
+        # An allowlist misconfiguration or deny-list gate is a programmer
+        # bug - propagate so it fails loud at call sites and in tests.
+        raise
+    except (httpx.HTTPError, ServiceNowMCPError) as exc:
+        # Best-effort enrichment: tolerate transient HTTP failures and
+        # ServiceNow-side errors (NotFoundError, ServerError, etc.) by
+        # degrading to a warning.
         warnings.append(f"Could not fetch activity variables: {exc}")
 
     return vars_by_activity, warnings
@@ -153,7 +162,17 @@ async def _fetch_activity_definition(
             display_values=True,
         )
         return record, warnings
-    except Exception as exc:
+    except PolicyError:
+        # Deny-list gate misconfiguration is a programmer bug - fail loud.
+        raise
+    except (httpx.HTTPError, ServiceNowMCPError, ValueError) as exc:
+        # Best-effort enrichment. Tolerate:
+        #   - httpx.HTTPError / ServiceNowMCPError: transient HTTP or
+        #     ServiceNow-side issues (NotFound, ServerError, etc.).
+        #   - ValueError: ``definition_sys_id`` is a reference value taken
+        #     from a ServiceNow record; an untrusted value that fails
+        #     ``validate_sys_id`` means "no definition linked" for this
+        #     activity, not a programmer bug.
         logger.warning("Could not fetch element definition %s: %s", definition_sys_id, exc)
         warnings.append(f"Could not fetch activity definition from wf_element_definition: {exc}")
         return None, warnings
