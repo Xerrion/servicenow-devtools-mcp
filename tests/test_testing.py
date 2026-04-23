@@ -51,7 +51,7 @@ class TestAtfListTests:
                 json={
                     "result": [
                         {
-                            "sys_id": "test1",
+                            "sys_id": "b444ac06613fc8d63795be9ad0beaf55",
                             "name": "Validate incident creation",
                             "description": "Test incident table automation",
                             "active": "true",
@@ -59,7 +59,7 @@ class TestAtfListTests:
                             "test_origin": "manual",
                         },
                         {
-                            "sys_id": "test2",
+                            "sys_id": "109f4b3c50d7b0df729d299bc6f8e9ef",
                             "name": "Check user permissions",
                             "description": "Verify ITIL role assignment",
                             "active": "true",
@@ -78,8 +78,8 @@ class TestAtfListTests:
 
         assert result["status"] == "success"
         assert result["data"]["record_count"] == 2
-        assert result["data"]["records"][0]["sys_id"] == "test1"
-        assert result["data"]["records"][1]["sys_id"] == "test2"
+        assert result["data"]["records"][0]["sys_id"] == "b444ac06613fc8d63795be9ad0beaf55"
+        assert result["data"]["records"][1]["sys_id"] == "109f4b3c50d7b0df729d299bc6f8e9ef"
 
     @pytest.mark.asyncio()
     @respx.mock
@@ -91,7 +91,7 @@ class TestAtfListTests:
                 json={
                     "result": [
                         {
-                            "sys_id": "test1",
+                            "sys_id": "b444ac06613fc8d63795be9ad0beaf55",
                             "name": "Active test only",
                             "description": "Test",
                             "active": "true",
@@ -105,7 +105,7 @@ class TestAtfListTests:
         )
 
         tools, query_store = _register_and_get_tools(settings, auth_provider)
-        token = query_store.create({"query": "active=true"})
+        token = query_store.create({"query": "active=true", "table": "sys_atf_test"})
         raw = await tools["atf_list_tests"](query_token=token)
         result = decode_response(raw)
 
@@ -143,12 +143,12 @@ class TestAtfGetTest:
     async def test_get_test_success(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Returns test record and steps in combined response."""
         # Mock test record
-        respx.get(f"{BASE_URL}/api/now/table/sys_atf_test/test123").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_atf_test/7288edd0fc3ffcbe93a0cf06e3568e28").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "test123",
+                        "sys_id": "7288edd0fc3ffcbe93a0cf06e3568e28",
                         "name": "Incident workflow test",
                         "description": "Validates incident state transitions",
                         "active": "true",
@@ -163,14 +163,14 @@ class TestAtfGetTest:
                 json={
                     "result": [
                         {
-                            "sys_id": "step1",
+                            "sys_id": "84f1443f50ba4a894ac616a5f064c686",
                             "display_name": "Open record",
                             "step_config": "Record Producer",
                             "order": "1",
                             "inputs": "{}",
                         },
                         {
-                            "sys_id": "step2",
+                            "sys_id": "4a663a0c99bf1bd49e069a66286dda78",
                             "display_name": "Validate state",
                             "step_config": "Field Values Validation",
                             "order": "2",
@@ -183,11 +183,11 @@ class TestAtfGetTest:
         )
 
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["atf_get_test"](test_id="test123")
+        raw = await tools["atf_get_test"](test_id="7288edd0fc3ffcbe93a0cf06e3568e28")
         result = decode_response(raw)
 
         assert result["status"] == "success"
-        assert result["data"]["test"]["sys_id"] == "test123"
+        assert result["data"]["test"]["sys_id"] == "7288edd0fc3ffcbe93a0cf06e3568e28"
         assert result["data"]["step_count"] == 2
         assert len(result["data"]["steps"]) == 2
 
@@ -203,7 +203,7 @@ class TestAtfGetTest:
         )
 
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["atf_get_test"](test_id="missing")
+        raw = await tools["atf_get_test"](test_id="f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0")
         result = decode_response(raw)
 
         assert result["status"] == "error"
@@ -212,12 +212,12 @@ class TestAtfGetTest:
     @respx.mock
     async def test_get_test_with_steps(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Returns test with 3 steps ordered correctly."""
-        respx.get(f"{BASE_URL}/api/now/table/sys_atf_test/test456").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_atf_test/a51821834d0fe748cf923a6ee607e647").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "test456",
+                        "sys_id": "a51821834d0fe748cf923a6ee607e647",
                         "name": "Multi-step test",
                         "description": "Complex workflow",
                         "active": "true",
@@ -231,21 +231,21 @@ class TestAtfGetTest:
                 json={
                     "result": [
                         {
-                            "sys_id": "s1",
+                            "sys_id": "640d87e741e6aa4c669a82a4cd304787",
                             "display_name": "Step 1",
                             "order": "1",
                             "step_config": "Config",
                             "inputs": "{}",
                         },
                         {
-                            "sys_id": "s2",
+                            "sys_id": "4205714cdfe14ed9e3d030ddf7887781",
                             "display_name": "Step 2",
                             "order": "2",
                             "step_config": "Config",
                             "inputs": "{}",
                         },
                         {
-                            "sys_id": "s3",
+                            "sys_id": "dd33a084ba223dd231b0aa962f77a592",
                             "display_name": "Step 3",
                             "order": "3",
                             "step_config": "Config",
@@ -258,7 +258,7 @@ class TestAtfGetTest:
         )
 
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["atf_get_test"](test_id="test456")
+        raw = await tools["atf_get_test"](test_id="a51821834d0fe748cf923a6ee607e647")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -282,7 +282,7 @@ class TestAtfListSuites:
                 json={
                     "result": [
                         {
-                            "sys_id": "suite1",
+                            "sys_id": "617a1ac5c6b3bf6aa248f570575c6752",
                             "name": "Regression Suite",
                             "description": "Full regression tests",
                             "active": "true",
@@ -307,7 +307,7 @@ class TestAtfListSuites:
 
         assert result["status"] == "success"
         assert result["data"]["record_count"] == 1
-        assert result["data"]["suites"][0]["sys_id"] == "suite1"
+        assert result["data"]["suites"][0]["sys_id"] == "617a1ac5c6b3bf6aa248f570575c6752"
         assert result["data"]["suites"][0]["member_count"] == "5"
 
     @pytest.mark.asyncio()
@@ -344,7 +344,7 @@ class TestAtfGetResults:
                 json={
                     "result": [
                         {
-                            "sys_id": "result1",
+                            "sys_id": "e80eb64ba7e143bde0ea09702b4417a7",
                             "status": "success",
                             "start_time": "2026-02-20 10:00:00",
                             "end_time": "2026-02-20 10:00:15",
@@ -359,7 +359,7 @@ class TestAtfGetResults:
         )
 
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["atf_get_results"](test_id="test123")
+        raw = await tools["atf_get_results"](test_id="7288edd0fc3ffcbe93a0cf06e3568e28")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -393,7 +393,7 @@ class TestAtfGetResults:
         )
 
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["atf_get_results"](suite_id="suite456")
+        raw = await tools["atf_get_results"](suite_id="5fbf10a1272bc00c1777003333454539")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -405,7 +405,9 @@ class TestAtfGetResults:
     async def test_get_results_both_ids_provided(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Returns error when both test_id and suite_id are provided."""
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["atf_get_results"](test_id="test123", suite_id="suite456")
+        raw = await tools["atf_get_results"](
+            test_id="7288edd0fc3ffcbe93a0cf06e3568e28", suite_id="5fbf10a1272bc00c1777003333454539"
+        )
         result = decode_response(raw)
 
         assert result["status"] == "error"
@@ -434,7 +436,7 @@ class TestAtfGetResults:
         )
 
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["atf_get_results"](test_id="test999")
+        raw = await tools["atf_get_results"](test_id="6d851dca996d8dc604e7625e49045f60")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -453,7 +455,7 @@ class TestAtfRunTest:
         respx.post(f"{BASE_URL}/api/now/sn_atf_tg/test_runner").mock(
             return_value=httpx.Response(
                 200,
-                json={"result": {"snboqId": "exec123"}},
+                json={"result": {"snboqId": "251cd4a5ab4671b4df3e44be2bfb2635"}},
             )
         )
         # Mock progress endpoint - completed immediately
@@ -465,14 +467,16 @@ class TestAtfRunTest:
         )
 
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["atf_run_test"](test_id="test456", poll=True, poll_interval=2, max_poll_duration=10)
+        raw = await tools["atf_run_test"](
+            test_id="a51821834d0fe748cf923a6ee607e647", poll=True, poll_interval=2, max_poll_duration=10
+        )
         result = decode_response(raw)
 
         assert result["status"] == "success"
-        assert result["data"]["execution_id"] == "exec123"
+        assert result["data"]["execution_id"] == "251cd4a5ab4671b4df3e44be2bfb2635"
         assert result["data"]["status"] == "completed"
         assert result["data"]["progress"] == 100
-        assert result["data"]["test_id"] == "test456"
+        assert result["data"]["test_id"] == "a51821834d0fe748cf923a6ee607e647"
 
     @pytest.mark.asyncio()
     @respx.mock
@@ -481,19 +485,19 @@ class TestAtfRunTest:
         respx.post(f"{BASE_URL}/api/now/sn_atf_tg/test_runner").mock(
             return_value=httpx.Response(
                 200,
-                json={"result": {"snboqId": "exec789"}},
+                json={"result": {"snboqId": "6d870f06aaaf54f00bca318fe10612d4"}},
             )
         )
 
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["atf_run_test"](test_id="test999", poll=False)
+        raw = await tools["atf_run_test"](test_id="6d851dca996d8dc604e7625e49045f60", poll=False)
         result = decode_response(raw)
 
         assert result["status"] == "success"
-        assert result["data"]["execution_id"] == "exec789"
+        assert result["data"]["execution_id"] == "6d870f06aaaf54f00bca318fe10612d4"
         assert result["data"]["status"] == "started"
         assert result["data"]["polling"] is False
-        assert result["data"]["test_id"] == "test999"
+        assert result["data"]["test_id"] == "6d851dca996d8dc604e7625e49045f60"
 
     @pytest.mark.asyncio()
     async def test_run_test_write_gate_blocks(
@@ -502,7 +506,7 @@ class TestAtfRunTest:
         """Write gate blocks execution in production environment."""
         tools, _query_store = _register_and_get_tools(prod_settings, prod_auth_provider)
 
-        raw = await tools["atf_run_test"](test_id="test123")
+        raw = await tools["atf_run_test"](test_id="7288edd0fc3ffcbe93a0cf06e3568e28")
         result = decode_response(raw)
 
         assert result["status"] == "error"
@@ -520,7 +524,7 @@ class TestAtfRunTest:
         )
 
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["atf_run_test"](test_id="test_no_id", poll=True)
+        raw = await tools["atf_run_test"](test_id="11110000000000000000000000000000", poll=True)
         result = decode_response(raw)
 
         assert result["status"] == "error"
@@ -533,7 +537,7 @@ class TestAtfRunTest:
         respx.post(f"{BASE_URL}/api/now/sn_atf_tg/test_runner").mock(
             return_value=httpx.Response(
                 200,
-                json={"result": {"snboqId": "exec_timeout"}},
+                json={"result": {"snboqId": "01010101010101010101010101010101"}},
             )
         )
         # Progress always in progress
@@ -546,7 +550,7 @@ class TestAtfRunTest:
 
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["atf_run_test"](
-            test_id="test_long",
+            test_id="22220000000000000000000000000000",
             poll=True,
             poll_interval=2,
             max_poll_duration=10,
@@ -555,7 +559,7 @@ class TestAtfRunTest:
 
         assert result["status"] == "success"
         assert result["data"]["status"] == "polling_timeout"
-        assert result["data"]["execution_id"] == "exec_timeout"
+        assert result["data"]["execution_id"] == "01010101010101010101010101010101"
         assert result["data"]["last_known_state"] == "in progress"
         assert "warnings" in result
 
@@ -566,7 +570,7 @@ class TestAtfRunTest:
         respx.post(f"{BASE_URL}/api/now/sn_atf_tg/test_runner").mock(
             return_value=httpx.Response(
                 200,
-                json={"result": {"snboqId": "exec_fail"}},
+                json={"result": {"snboqId": "02020202020202020202020202020202"}},
             )
         )
         respx.get(f"{BASE_URL}/api/now/sn_atf_tg/test_runner_progress").mock(
@@ -578,7 +582,7 @@ class TestAtfRunTest:
 
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["atf_run_test"](
-            test_id="test_fail",
+            test_id="33330000000000000000000000000000",
             poll=True,
             poll_interval=2,
             max_poll_duration=10,
@@ -587,7 +591,7 @@ class TestAtfRunTest:
 
         assert result["status"] == "success"
         assert result["data"]["status"] == "failure"
-        assert result["data"]["execution_id"] == "exec_fail"
+        assert result["data"]["execution_id"] == "02020202020202020202020202020202"
 
 
 class TestAtfRunSuite:
@@ -600,7 +604,7 @@ class TestAtfRunSuite:
         respx.post(f"{BASE_URL}/api/now/sn_atf_tg/test_runner").mock(
             return_value=httpx.Response(
                 200,
-                json={"result": {"snboqId": "suite_exec123"}},
+                json={"result": {"snboqId": "03030303030303030303030303030303"}},
             )
         )
         respx.get(f"{BASE_URL}/api/now/sn_atf_tg/test_runner_progress").mock(
@@ -612,7 +616,7 @@ class TestAtfRunSuite:
 
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["atf_run_suite"](
-            suite_id="suite789",
+            suite_id="5761f555263e769e9d805337dbe8314c",
             poll=True,
             poll_interval=2,
             max_poll_duration=10,
@@ -620,9 +624,9 @@ class TestAtfRunSuite:
         result = decode_response(raw)
 
         assert result["status"] == "success"
-        assert result["data"]["execution_id"] == "suite_exec123"
+        assert result["data"]["execution_id"] == "03030303030303030303030303030303"
         assert result["data"]["status"] == "completed"
-        assert result["data"]["suite_id"] == "suite789"
+        assert result["data"]["suite_id"] == "5761f555263e769e9d805337dbe8314c"
 
     @pytest.mark.asyncio()
     @respx.mock
@@ -631,16 +635,16 @@ class TestAtfRunSuite:
         respx.post(f"{BASE_URL}/api/now/sn_atf_tg/test_runner").mock(
             return_value=httpx.Response(
                 200,
-                json={"result": {"snboqId": "suite_no_poll"}},
+                json={"result": {"snboqId": "04040404040404040404040404040404"}},
             )
         )
 
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["atf_run_suite"](suite_id="suite_fast", poll=False)
+        raw = await tools["atf_run_suite"](suite_id="44440000000000000000000000000000", poll=False)
         result = decode_response(raw)
 
         assert result["status"] == "success"
-        assert result["data"]["execution_id"] == "suite_no_poll"
+        assert result["data"]["execution_id"] == "04040404040404040404040404040404"
         assert result["data"]["status"] == "started"
         assert result["data"]["polling"] is False
 
@@ -651,7 +655,7 @@ class TestAtfRunSuite:
         """Write gate blocks suite execution in production."""
         tools, _query_store = _register_and_get_tools(prod_settings, prod_auth_provider)
 
-        raw = await tools["atf_run_suite"](suite_id="suite999")
+        raw = await tools["atf_run_suite"](suite_id="7cce8eebf30cbc1823469b4830873c8c")
         result = decode_response(raw)
 
         assert result["status"] == "error"
@@ -669,7 +673,7 @@ class TestAtfRunSuite:
         )
 
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["atf_run_suite"](suite_id="suite_no_id", poll=True)
+        raw = await tools["atf_run_suite"](suite_id="55550000000000000000000000000000", poll=True)
         result = decode_response(raw)
 
         assert result["status"] == "error"
@@ -682,7 +686,7 @@ class TestAtfRunSuite:
         respx.post(f"{BASE_URL}/api/now/sn_atf_tg/test_runner").mock(
             return_value=httpx.Response(
                 200,
-                json={"result": {"snboqId": "suite_exec_timeout"}},
+                json={"result": {"snboqId": "05050505050505050505050505050505"}},
             )
         )
         respx.get(f"{BASE_URL}/api/now/sn_atf_tg/test_runner_progress").mock(
@@ -694,7 +698,7 @@ class TestAtfRunSuite:
 
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["atf_run_suite"](
-            suite_id="suite_long",
+            suite_id="66660000000000000000000000000000",
             poll=True,
             poll_interval=2,
             max_poll_duration=10,
@@ -703,8 +707,8 @@ class TestAtfRunSuite:
 
         assert result["status"] == "success"
         assert result["data"]["status"] == "polling_timeout"
-        assert result["data"]["execution_id"] == "suite_exec_timeout"
-        assert result["data"]["suite_id"] == "suite_long"
+        assert result["data"]["execution_id"] == "05050505050505050505050505050505"
+        assert result["data"]["suite_id"] == "66660000000000000000000000000000"
         assert result["data"]["last_known_state"] == "in progress"
         assert "warnings" in result
 
@@ -715,7 +719,7 @@ class TestAtfRunSuite:
         respx.post(f"{BASE_URL}/api/now/sn_atf_tg/test_runner").mock(
             return_value=httpx.Response(
                 200,
-                json={"result": {"snboqId": "suite_cancel"}},
+                json={"result": {"snboqId": "06060606060606060606060606060606"}},
             )
         )
         respx.get(f"{BASE_URL}/api/now/sn_atf_tg/test_runner_progress").mock(
@@ -727,7 +731,7 @@ class TestAtfRunSuite:
 
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
         raw = await tools["atf_run_suite"](
-            suite_id="suite_cancel",
+            suite_id="77770000000000000000000000000000",
             poll=True,
             poll_interval=2,
             max_poll_duration=10,
@@ -736,7 +740,7 @@ class TestAtfRunSuite:
 
         assert result["status"] == "success"
         assert result["data"]["status"] == "cancelled"
-        assert result["data"]["execution_id"] == "suite_cancel"
+        assert result["data"]["execution_id"] == "06060606060606060606060606060606"
 
 
 class TestAtfTestHealth:
@@ -764,7 +768,7 @@ class TestAtfTestHealth:
         )
 
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["atf_test_health"](test_id="test_stable", days=30, limit=50)
+        raw = await tools["atf_test_health"](test_id="88880000000000000000000000000000", days=30, limit=50)
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -796,7 +800,7 @@ class TestAtfTestHealth:
         )
 
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["atf_test_health"](test_id="test_flaky", days=30, limit=50)
+        raw = await tools["atf_test_health"](test_id="99990000000000000000000000000000", days=30, limit=50)
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -813,42 +817,42 @@ class TestAtfTestHealth:
                 json={
                     "result": [
                         {
-                            "sys_id": "r1",
+                            "sys_id": "5573e39b6600496d40f493d00ec76584",
                             "status": "success",
                             "sys_created_on": "2026-02-01 10:00:00",
                         },
                         {
-                            "sys_id": "r2",
+                            "sys_id": "a50126cc2d6c726de0ca203c3b659f65",
                             "status": "success",
                             "sys_created_on": "2026-02-02 10:00:00",
                         },
                         {
-                            "sys_id": "r3",
+                            "sys_id": "aa893358be4b506d8aeb52b29b8a9cac",
                             "status": "success",
                             "sys_created_on": "2026-02-03 10:00:00",
                         },
                         {
-                            "sys_id": "r4",
+                            "sys_id": "7e264138d0ca103b872057862b9b0359",
                             "status": "success",
                             "sys_created_on": "2026-02-04 10:00:00",
                         },
                         {
-                            "sys_id": "r5",
+                            "sys_id": "51236c5daf199e04c283254bc3ac655a",
                             "status": "failure",
                             "sys_created_on": "2026-02-05 10:00:00",
                         },
                         {
-                            "sys_id": "r6",
+                            "sys_id": "9bf579a927659749fe98171e8ab27ac0",
                             "status": "failure",
                             "sys_created_on": "2026-02-06 10:00:00",
                         },
                         {
-                            "sys_id": "r7",
+                            "sys_id": "daf1ccf042adbc9eba53bea801d6170e",
                             "status": "failure",
                             "sys_created_on": "2026-02-07 10:00:00",
                         },
                         {
-                            "sys_id": "r8",
+                            "sys_id": "4e436c8053f56559b1b98f9168983e4d",
                             "status": "failure",
                             "sys_created_on": "2026-02-08 10:00:00",
                         },
@@ -859,7 +863,7 @@ class TestAtfTestHealth:
         )
 
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["atf_test_health"](test_id="test_degrading", days=30, limit=50)
+        raw = await tools["atf_test_health"](test_id="aaaa0000000000000000000000000000", days=30, limit=50)
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -879,7 +883,7 @@ class TestAtfTestHealth:
         )
 
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["atf_test_health"](test_id="test_no_data", days=30, limit=50)
+        raw = await tools["atf_test_health"](test_id="bbbb0000000000000000000000000000", days=30, limit=50)
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -902,7 +906,9 @@ class TestAtfTestHealth:
     async def test_health_both_ids_provided(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Call with both test_id and suite_id. Assert error."""
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["atf_test_health"](test_id="test123", suite_id="suite456")
+        raw = await tools["atf_test_health"](
+            test_id="7288edd0fc3ffcbe93a0cf06e3568e28", suite_id="5fbf10a1272bc00c1777003333454539"
+        )
         result = decode_response(raw)
 
         assert result["status"] == "error"
@@ -920,42 +926,42 @@ class TestAtfTestHealth:
                 json={
                     "result": [
                         {
-                            "sys_id": "r1",
+                            "sys_id": "5573e39b6600496d40f493d00ec76584",
                             "status": "failure",
                             "sys_created_on": "2026-02-01 10:00:00",
                         },
                         {
-                            "sys_id": "r2",
+                            "sys_id": "a50126cc2d6c726de0ca203c3b659f65",
                             "status": "failure",
                             "sys_created_on": "2026-02-02 10:00:00",
                         },
                         {
-                            "sys_id": "r3",
+                            "sys_id": "aa893358be4b506d8aeb52b29b8a9cac",
                             "status": "failure",
                             "sys_created_on": "2026-02-03 10:00:00",
                         },
                         {
-                            "sys_id": "r4",
+                            "sys_id": "7e264138d0ca103b872057862b9b0359",
                             "status": "failure",
                             "sys_created_on": "2026-02-04 10:00:00",
                         },
                         {
-                            "sys_id": "r5",
+                            "sys_id": "51236c5daf199e04c283254bc3ac655a",
                             "status": "success",
                             "sys_created_on": "2026-02-05 10:00:00",
                         },
                         {
-                            "sys_id": "r6",
+                            "sys_id": "9bf579a927659749fe98171e8ab27ac0",
                             "status": "success",
                             "sys_created_on": "2026-02-06 10:00:00",
                         },
                         {
-                            "sys_id": "r7",
+                            "sys_id": "daf1ccf042adbc9eba53bea801d6170e",
                             "status": "success",
                             "sys_created_on": "2026-02-07 10:00:00",
                         },
                         {
-                            "sys_id": "r8",
+                            "sys_id": "4e436c8053f56559b1b98f9168983e4d",
                             "status": "success",
                             "sys_created_on": "2026-02-08 10:00:00",
                         },
@@ -966,7 +972,7 @@ class TestAtfTestHealth:
         )
 
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["atf_test_health"](test_id="test_improving", days=30, limit=50)
+        raw = await tools["atf_test_health"](test_id="cccc0000000000000000000000000000", days=30, limit=50)
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -983,12 +989,12 @@ class TestAtfTestHealth:
                 json={
                     "result": [
                         {
-                            "sys_id": "r1",
+                            "sys_id": "5573e39b6600496d40f493d00ec76584",
                             "status": "success",
                             "sys_created_on": "2026-02-01 10:00:00",
                         },
                         {
-                            "sys_id": "r2",
+                            "sys_id": "a50126cc2d6c726de0ca203c3b659f65",
                             "status": "failure",
                             "sys_created_on": "2026-02-02 10:00:00",
                         },
@@ -999,7 +1005,7 @@ class TestAtfTestHealth:
         )
 
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["atf_test_health"](test_id="test_few_runs", days=30, limit=50)
+        raw = await tools["atf_test_health"](test_id="dddd0000000000000000000000000000", days=30, limit=50)
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -1028,7 +1034,7 @@ class TestAtfTestHealth:
         )
 
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["atf_test_health"](suite_id="suite_healthy", days=30, limit=50)
+        raw = await tools["atf_test_health"](suite_id="eeee0000000000000000000000000000", days=30, limit=50)
         result = decode_response(raw)
 
         assert result["status"] == "success"

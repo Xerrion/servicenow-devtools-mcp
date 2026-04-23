@@ -7,9 +7,8 @@ import uuid
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any, override
 
-from toon_format import encode as toon_encode
-
-from servicenow_mcp.errors import ForbiddenError
+from servicenow_mcp._vendor.toon_format import encode as toon_encode
+from servicenow_mcp.errors import ForbiddenError, PolicyError
 from servicenow_mcp.sentry import capture_exception as sentry_capture
 
 
@@ -99,7 +98,7 @@ def validate_identifier(name: str | dict[str, Any] | None) -> None:
     """
     if not isinstance(name, str):
         name = resolve_ref_value(name)
-    if not _IDENTIFIER_RE.match(name):
+    if not _IDENTIFIER_RE.fullmatch(name):
         raise ValueError(
             f"Invalid identifier: {name!r}. "
             "Only lowercase alphanumeric characters, underscores, and dot-walked segments are allowed."
@@ -110,7 +109,7 @@ def validate_sys_id(value: str) -> None:
     """Raise ValueError if *value* is not a valid ServiceNow sys_id (32-char hex)."""
     if not isinstance(value, str):
         value = resolve_ref_value(value)
-    if not _SYS_ID_RE.match(value):
+    if not _SYS_ID_RE.fullmatch(value):
         raise ValueError(f"Invalid sys_id: {value!r}. Expected a 32-character lowercase hexadecimal string.")
 
 
@@ -724,15 +723,31 @@ class ServiceNowQuery:
         return self.build()
 
 
-def resolve_query_token(query_token: str, query_store: "QueryTokenStore", correlation_id: str) -> str:
+def resolve_query_token(
+    query_token: str,
+    query_store: "QueryTokenStore",
+    expected_table: str,
+    correlation_id: str,
+) -> str:
     """Resolve a query token to the encoded query string it represents.
 
     Args:
         query_token: The token from build_query, or empty string for no filter.
         query_store: The shared QueryTokenStore instance.
+        expected_table: The table the caller is about to query with this
+            token. If the token was built for a different table, a
+            ``PolicyError`` is raised. This prevents cross-table token
+            replay (e.g. a token built for ``sys_properties`` being
+            presented to an ``incident`` query).
         correlation_id: Request correlation ID for error formatting.
 
-    Returns the encoded query string. Raises ValueError if the token is invalid or expired.
+    Returns:
+        The encoded query string.
+
+    Raises:
+        ValueError: If the token is invalid or expired.
+        PolicyError: If the token's bound table does not match
+            *expected_table*.
     """
     _ = correlation_id  # Kept for API consistency across tool helpers
     if not query_token:
@@ -740,6 +755,12 @@ def resolve_query_token(query_token: str, query_store: "QueryTokenStore", correl
     payload = query_store.get(query_token)
     if payload is None:
         raise ValueError("Invalid or expired query token. Use the build_query tool to create a query first.")
+    token_table = payload.get("table")
+    if token_table != expected_table:
+        raise PolicyError(
+            f"Query token was built for table {token_table!r} but used against table {expected_table!r}. "
+            "Rebuild the query with the correct table."
+        )
     return payload["query"]
 
 

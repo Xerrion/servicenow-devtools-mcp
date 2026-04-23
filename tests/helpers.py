@@ -4,7 +4,8 @@ from collections.abc import Callable
 from typing import Any, Protocol, cast
 
 from mcp.server.fastmcp import FastMCP
-from toon_format import decode as toon_decode
+
+from servicenow_mcp._vendor.toon_format import decode as toon_decode
 
 
 class RegisteredToolLike(Protocol):

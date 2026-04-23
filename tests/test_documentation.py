@@ -48,7 +48,7 @@ class TestDocsLogicMap:
                 json={
                     "result": [
                         {
-                            "sys_id": "br1",
+                            "sys_id": "8baeabad365de895ab58ec0d6dd2c1e2",
                             "name": "Set defaults",
                             "when": "before",
                             "action_insert": "true",
@@ -57,7 +57,7 @@ class TestDocsLogicMap:
                             "active": "true",
                         },
                         {
-                            "sys_id": "br2",
+                            "sys_id": "45caf3e7f1e7ce17456aec79ce1ab853",
                             "name": "Send notification",
                             "when": "after",
                             "action_insert": "false",
@@ -77,7 +77,7 @@ class TestDocsLogicMap:
                 json={
                     "result": [
                         {
-                            "sys_id": "cs1",
+                            "sys_id": "f9ce352c1d3e957f5b6330307d618b98",
                             "name": "Validate priority",
                             "type": "onChange",
                             "active": "true",
@@ -140,7 +140,7 @@ class TestDocsLogicMap:
                 json={
                     "result": [
                         {
-                            "sys_id": "br_del",
+                            "sys_id": "61bf664b40fbd88d122defa600c69f14",
                             "name": "On delete",
                             "when": "before",
                             "action_insert": "false",
@@ -149,7 +149,7 @@ class TestDocsLogicMap:
                             "active": "true",
                         },
                         {
-                            "sys_id": "br_all",
+                            "sys_id": "3d94aec2ee47e55f945e280c4f258d94",
                             "name": "On all",
                             "when": "before",
                             "action_insert": "false",
@@ -201,7 +201,7 @@ class TestDocsLogicMap:
                 json={
                     "result": [
                         {
-                            "sys_id": "uip1",
+                            "sys_id": "a1151e6d2642a62fbecdab41e26d6bb2",
                             "short_description": "Make field read-only",
                             "active": "true",
                         },
@@ -216,7 +216,7 @@ class TestDocsLogicMap:
                 json={
                     "result": [
                         {
-                            "sys_id": "uia1",
+                            "sys_id": "d8ebd7fd78247f151e5b789805832857",
                             "name": "Close Incident",
                             "action_name": "close",
                             "active": "true",
@@ -253,12 +253,12 @@ class TestDocsArtifactSummary:
     ) -> None:
         """Returns artifact summary with referenced tables and referenced_by."""
         # Get the artifact
-        respx.get(f"{BASE_URL}/api/now/table/sys_script/br001").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_script/5f94cbf2a18c848c38da0c789d5da01b").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "br001",
+                        "sys_id": "5f94cbf2a18c848c38da0c789d5da01b",
                         "name": "Update CI",
                         "script": "var gr = new GlideRecord('cmdb_ci'); gr.addQuery('name', current.ci); gr.query();",
                         "collection": "incident",
@@ -276,7 +276,9 @@ class TestDocsArtifactSummary:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["docs_artifact_summary"](artifact_type="business_rule", sys_id="br001")
+        raw = await tools["docs_artifact_summary"](
+            artifact_type="business_rule", sys_id="5f94cbf2a18c848c38da0c789d5da01b"
+        )
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -289,12 +291,14 @@ class TestDocsArtifactSummary:
     @respx.mock
     async def test_not_found_returns_error(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Returns error for non-existent artifact."""
-        respx.get(f"{BASE_URL}/api/now/table/sys_script/bad_id").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_script/35a1af58a3b00bde3d8af97f82562ac2").mock(
             return_value=httpx.Response(404, json={"error": {"message": "Not found"}})
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["docs_artifact_summary"](artifact_type="business_rule", sys_id="bad_id")
+        raw = await tools["docs_artifact_summary"](
+            artifact_type="business_rule", sys_id="35a1af58a3b00bde3d8af97f82562ac2"
+        )
         result = decode_response(raw)
 
         assert result["status"] == "error"
@@ -305,7 +309,9 @@ class TestDocsArtifactSummary:
     ) -> None:
         """Unknown artifact_type returns an error with valid types listed."""
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["docs_artifact_summary"](artifact_type="bogus_type", sys_id="abc123")
+        raw = await tools["docs_artifact_summary"](
+            artifact_type="bogus_type", sys_id="6367c48dd193d56ea7b0baad25b19455"
+        )
         result = decode_response(raw)
 
         assert result["status"] == "error"
@@ -316,12 +322,12 @@ class TestDocsArtifactSummary:
     @respx.mock
     async def test_code_search_failure_is_silent(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Code search exception is caught silently; referenced_by is empty."""
-        respx.get(f"{BASE_URL}/api/now/table/sys_script/br_search_fail").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_script/2edaa2dc068427312415c976a18155dd").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "br_search_fail",
+                        "sys_id": "2edaa2dc068427312415c976a18155dd",
                         "name": "SearchFail BR",
                         "script": "var gr = new GlideRecord('task'); gr.query();",
                         "collection": "incident",
@@ -336,7 +342,9 @@ class TestDocsArtifactSummary:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["docs_artifact_summary"](artifact_type="business_rule", sys_id="br_search_fail")
+        raw = await tools["docs_artifact_summary"](
+            artifact_type="business_rule", sys_id="2edaa2dc068427312415c976a18155dd"
+        )
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -347,12 +355,12 @@ class TestDocsArtifactSummary:
     @respx.mock
     async def test_masks_sensitive_fields(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Sensitive fields in the artifact record are masked in the response."""
-        respx.get(f"{BASE_URL}/api/now/table/sys_script/br_sensitive").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_script/a4735c7a88ec47eec3fba55319b9df81").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "br_sensitive",
+                        "sys_id": "a4735c7a88ec47eec3fba55319b9df81",
                         "name": "Sensitive BR",
                         "script": "gs.log('hello');",
                         "collection": "incident",
@@ -371,7 +379,9 @@ class TestDocsArtifactSummary:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["docs_artifact_summary"](artifact_type="business_rule", sys_id="br_sensitive")
+        raw = await tools["docs_artifact_summary"](
+            artifact_type="business_rule", sys_id="a4735c7a88ec47eec3fba55319b9df81", include_script_body=True
+        )
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -395,12 +405,12 @@ class TestDocsTestScenarios:
     @respx.mock
     async def test_detects_condition_branches(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Detects if/else conditions and suggests test scenarios."""
-        respx.get(f"{BASE_URL}/api/now/table/sys_script/br001").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_script/5f94cbf2a18c848c38da0c789d5da01b").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "br001",
+                        "sys_id": "5f94cbf2a18c848c38da0c789d5da01b",
                         "name": "Priority handler",
                         "script": "if (current.priority == 1) { current.state = 2; } else { current.state = 1; }",
                         "collection": "incident",
@@ -410,7 +420,9 @@ class TestDocsTestScenarios:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["docs_test_scenarios"](artifact_type="business_rule", sys_id="br001")
+        raw = await tools["docs_test_scenarios"](
+            artifact_type="business_rule", sys_id="5f94cbf2a18c848c38da0c789d5da01b"
+        )
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -423,12 +435,12 @@ class TestDocsTestScenarios:
     @respx.mock
     async def test_detects_insert_vs_update(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Detects insert/update operation checks."""
-        respx.get(f"{BASE_URL}/api/now/table/sys_script/br002").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_script/3d89a2d60f9752f52469325512b23c1e").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "br002",
+                        "sys_id": "3d89a2d60f9752f52469325512b23c1e",
                         "name": "Operation handler",
                         "script": "if (current.operation() == 'insert') { gs.log('new'); } else if (current.operation() == 'update') { gs.log('update'); }",
                         "collection": "incident",
@@ -438,7 +450,9 @@ class TestDocsTestScenarios:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["docs_test_scenarios"](artifact_type="business_rule", sys_id="br002")
+        raw = await tools["docs_test_scenarios"](
+            artifact_type="business_rule", sys_id="3d89a2d60f9752f52469325512b23c1e"
+        )
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -449,12 +463,12 @@ class TestDocsTestScenarios:
     @respx.mock
     async def test_empty_script_returns_generic(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Empty script returns generic suggestions."""
-        respx.get(f"{BASE_URL}/api/now/table/sys_script/br003").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_script/1bf9bbae004e659911b334ee1b5bc4b6").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "br003",
+                        "sys_id": "1bf9bbae004e659911b334ee1b5bc4b6",
                         "name": "Empty BR",
                         "script": "",
                         "collection": "incident",
@@ -464,7 +478,9 @@ class TestDocsTestScenarios:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["docs_test_scenarios"](artifact_type="business_rule", sys_id="br003")
+        raw = await tools["docs_test_scenarios"](
+            artifact_type="business_rule", sys_id="1bf9bbae004e659911b334ee1b5bc4b6"
+        )
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -477,7 +493,7 @@ class TestDocsTestScenarios:
     ) -> None:
         """Unknown artifact_type returns an error with valid types listed."""
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["docs_test_scenarios"](artifact_type="bogus_type", sys_id="abc123")
+        raw = await tools["docs_test_scenarios"](artifact_type="bogus_type", sys_id="6367c48dd193d56ea7b0baad25b19455")
         result = decode_response(raw)
 
         assert result["status"] == "error"
@@ -488,12 +504,12 @@ class TestDocsTestScenarios:
     @respx.mock
     async def test_detects_delete_operation(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Detects delete operation check in script."""
-        respx.get(f"{BASE_URL}/api/now/table/sys_script/br_del").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_script/61bf664b40fbd88d122defa600c69f14").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "br_del",
+                        "sys_id": "61bf664b40fbd88d122defa600c69f14",
                         "name": "Delete handler",
                         "script": "if (current.operation() == 'delete') { gs.log('deleted'); }",
                         "collection": "incident",
@@ -503,7 +519,9 @@ class TestDocsTestScenarios:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["docs_test_scenarios"](artifact_type="business_rule", sys_id="br_del")
+        raw = await tools["docs_test_scenarios"](
+            artifact_type="business_rule", sys_id="61bf664b40fbd88d122defa600c69f14"
+        )
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -514,12 +532,12 @@ class TestDocsTestScenarios:
     @respx.mock
     async def test_detects_is_new_record(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Detects isNewRecord() check in script."""
-        respx.get(f"{BASE_URL}/api/now/table/sys_script/br_new").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_script/83839a9c296d5abac37d82d3b4840022").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "br_new",
+                        "sys_id": "83839a9c296d5abac37d82d3b4840022",
                         "name": "New record handler",
                         "script": "if (current.isNewRecord()) { current.state = 1; }",
                         "collection": "incident",
@@ -529,7 +547,9 @@ class TestDocsTestScenarios:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["docs_test_scenarios"](artifact_type="business_rule", sys_id="br_new")
+        raw = await tools["docs_test_scenarios"](
+            artifact_type="business_rule", sys_id="83839a9c296d5abac37d82d3b4840022"
+        )
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -540,12 +560,12 @@ class TestDocsTestScenarios:
     @respx.mock
     async def test_detects_role_check(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Detects gs.hasRole() check in script."""
-        respx.get(f"{BASE_URL}/api/now/table/sys_script/br_role").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_script/e70b73e9294b3ae08fa13456ec932bdd").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "br_role",
+                        "sys_id": "e70b73e9294b3ae08fa13456ec932bdd",
                         "name": "Role gated",
                         "script": "if (gs.hasRole('admin')) { current.state = 2; }",
                         "collection": "incident",
@@ -555,7 +575,9 @@ class TestDocsTestScenarios:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["docs_test_scenarios"](artifact_type="business_rule", sys_id="br_role")
+        raw = await tools["docs_test_scenarios"](
+            artifact_type="business_rule", sys_id="e70b73e9294b3ae08fa13456ec932bdd"
+        )
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -566,12 +588,12 @@ class TestDocsTestScenarios:
     @respx.mock
     async def test_detects_abort_action(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Detects setAbortAction(true) in script."""
-        respx.get(f"{BASE_URL}/api/now/table/sys_script/br_abort").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_script/c00bbddf942d596518d4ccdad89a4bdc").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "br_abort",
+                        "sys_id": "c00bbddf942d596518d4ccdad89a4bdc",
                         "name": "Abort handler",
                         "script": "if (current.priority == 1) { current.setAbortAction(true); }",
                         "collection": "incident",
@@ -581,7 +603,9 @@ class TestDocsTestScenarios:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["docs_test_scenarios"](artifact_type="business_rule", sys_id="br_abort")
+        raw = await tools["docs_test_scenarios"](
+            artifact_type="business_rule", sys_id="c00bbddf942d596518d4ccdad89a4bdc"
+        )
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -592,12 +616,12 @@ class TestDocsTestScenarios:
     @respx.mock
     async def test_detects_gliderecord_dependency(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Detects GlideRecord table dependencies in script."""
-        respx.get(f"{BASE_URL}/api/now/table/sys_script/br_gr").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_script/302dfaa738c5008f7359702d3a68d9bb").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "br_gr",
+                        "sys_id": "302dfaa738c5008f7359702d3a68d9bb",
                         "name": "GR lookup",
                         "script": "var gr = new GlideRecord('sys_user'); gr.get(current.assigned_to);",
                         "collection": "incident",
@@ -607,7 +631,9 @@ class TestDocsTestScenarios:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["docs_test_scenarios"](artifact_type="business_rule", sys_id="br_gr")
+        raw = await tools["docs_test_scenarios"](
+            artifact_type="business_rule", sys_id="302dfaa738c5008f7359702d3a68d9bb"
+        )
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -619,12 +645,12 @@ class TestDocsTestScenarios:
     async def test_no_patterns_returns_generic(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Script with no detectable patterns returns generic fallback scenario."""
         # Use a non-empty script that matches none of the detection patterns
-        respx.get(f"{BASE_URL}/api/now/table/sys_script/br_plain").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_script/3190599a75cb88b0c8873d2695a1eaa2").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "br_plain",
+                        "sys_id": "3190599a75cb88b0c8873d2695a1eaa2",
                         "name": "Plain BR",
                         "script": "gs.log('hello world');",
                         "collection": "incident",
@@ -634,7 +660,9 @@ class TestDocsTestScenarios:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["docs_test_scenarios"](artifact_type="business_rule", sys_id="br_plain")
+        raw = await tools["docs_test_scenarios"](
+            artifact_type="business_rule", sys_id="3190599a75cb88b0c8873d2695a1eaa2"
+        )
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -646,12 +674,12 @@ class TestDocsTestScenarios:
     @respx.mock
     async def test_masks_sensitive_fields_in_record(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Sensitive fields in the artifact record are masked before generating scenarios."""
-        respx.get(f"{BASE_URL}/api/now/table/sys_script/br_sensitive").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_script/a4735c7a88ec47eec3fba55319b9df81").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "br_sensitive",
+                        "sys_id": "a4735c7a88ec47eec3fba55319b9df81",
                         "name": "Sensitive BR",
                         "script": "if (current.priority == 1) { current.state = 2; }",
                         "collection": "incident",
@@ -662,7 +690,9 @@ class TestDocsTestScenarios:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["docs_test_scenarios"](artifact_type="business_rule", sys_id="br_sensitive")
+        raw = await tools["docs_test_scenarios"](
+            artifact_type="business_rule", sys_id="a4735c7a88ec47eec3fba55319b9df81"
+        )
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -684,7 +714,7 @@ class TestDocsReviewNotes:
     ) -> None:
         """Unknown artifact_type returns an error with valid types listed."""
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["docs_review_notes"](artifact_type="bogus_type", sys_id="abc123")
+        raw = await tools["docs_review_notes"](artifact_type="bogus_type", sys_id="6367c48dd193d56ea7b0baad25b19455")
         result = decode_response(raw)
 
         assert result["status"] == "error"
@@ -695,12 +725,12 @@ class TestDocsReviewNotes:
     @respx.mock
     async def test_empty_script_no_findings(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Empty script returns empty findings list."""
-        respx.get(f"{BASE_URL}/api/now/table/sys_script/br_empty").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_script/5be222eb14c6f8214c606ca364c61ff2").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "br_empty",
+                        "sys_id": "5be222eb14c6f8214c606ca364c61ff2",
                         "name": "Empty BR",
                         "script": "   ",
                         "collection": "incident",
@@ -710,7 +740,7 @@ class TestDocsReviewNotes:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["docs_review_notes"](artifact_type="business_rule", sys_id="br_empty")
+        raw = await tools["docs_review_notes"](artifact_type="business_rule", sys_id="5be222eb14c6f8214c606ca364c61ff2")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -722,12 +752,12 @@ class TestDocsReviewNotes:
     async def test_detects_current_update(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Detects current.update() anti-pattern in script."""
         script = "current.state = 2;\ncurrent.update();"
-        respx.get(f"{BASE_URL}/api/now/table/sys_script/br_cupd").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_script/d833ee4ab99720915651478f5fef8e68").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "br_cupd",
+                        "sys_id": "d833ee4ab99720915651478f5fef8e68",
                         "name": "Current update BR",
                         "script": script,
                         "collection": "incident",
@@ -737,7 +767,7 @@ class TestDocsReviewNotes:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["docs_review_notes"](artifact_type="business_rule", sys_id="br_cupd")
+        raw = await tools["docs_review_notes"](artifact_type="business_rule", sys_id="d833ee4ab99720915651478f5fef8e68")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -756,12 +786,12 @@ class TestDocsReviewNotes:
             "  inner.get(gr.assigned_to);\n"
             "}"
         )
-        respx.get(f"{BASE_URL}/api/now/table/sys_script/br001").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_script/5f94cbf2a18c848c38da0c789d5da01b").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "br001",
+                        "sys_id": "5f94cbf2a18c848c38da0c789d5da01b",
                         "name": "Bad BR",
                         "script": script,
                         "collection": "incident",
@@ -771,7 +801,7 @@ class TestDocsReviewNotes:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["docs_review_notes"](artifact_type="business_rule", sys_id="br001")
+        raw = await tools["docs_review_notes"](artifact_type="business_rule", sys_id="5f94cbf2a18c848c38da0c789d5da01b")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -785,12 +815,12 @@ class TestDocsReviewNotes:
     async def test_detects_hardcoded_sysid(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Detects hardcoded 32-char hex sys_ids in script."""
         script = "var user = gs.getUser('6816f79cc0a8016401c5a33be04be441');"
-        respx.get(f"{BASE_URL}/api/now/table/sys_script/br002").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_script/3d89a2d60f9752f52469325512b23c1e").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "br002",
+                        "sys_id": "3d89a2d60f9752f52469325512b23c1e",
                         "name": "Hardcoded BR",
                         "script": script,
                         "collection": "incident",
@@ -800,7 +830,7 @@ class TestDocsReviewNotes:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["docs_review_notes"](artifact_type="business_rule", sys_id="br002")
+        raw = await tools["docs_review_notes"](artifact_type="business_rule", sys_id="3d89a2d60f9752f52469325512b23c1e")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -812,12 +842,12 @@ class TestDocsReviewNotes:
     async def test_clean_script_no_findings(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Clean script returns no findings."""
         script = "current.state = 2;"
-        respx.get(f"{BASE_URL}/api/now/table/sys_script/br003").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_script/1bf9bbae004e659911b334ee1b5bc4b6").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "br003",
+                        "sys_id": "1bf9bbae004e659911b334ee1b5bc4b6",
                         "name": "Clean BR",
                         "script": script,
                         "collection": "incident",
@@ -827,7 +857,7 @@ class TestDocsReviewNotes:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["docs_review_notes"](artifact_type="business_rule", sys_id="br003")
+        raw = await tools["docs_review_notes"](artifact_type="business_rule", sys_id="1bf9bbae004e659911b334ee1b5bc4b6")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -837,12 +867,12 @@ class TestDocsReviewNotes:
     @respx.mock
     async def test_masks_sensitive_fields_in_record(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Sensitive fields in the artifact record are masked before scanning."""
-        respx.get(f"{BASE_URL}/api/now/table/sys_script/br_sensitive").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_script/a4735c7a88ec47eec3fba55319b9df81").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "br_sensitive",
+                        "sys_id": "a4735c7a88ec47eec3fba55319b9df81",
                         "name": "Sensitive BR",
                         "script": "current.state = 2;",
                         "collection": "incident",
@@ -854,7 +884,7 @@ class TestDocsReviewNotes:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["docs_review_notes"](artifact_type="business_rule", sys_id="br_sensitive")
+        raw = await tools["docs_review_notes"](artifact_type="business_rule", sys_id="a4735c7a88ec47eec3fba55319b9df81")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -866,12 +896,12 @@ class TestDocsReviewNotes:
     async def test_loop_truncated_at_eof(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Loop condition at EOF with no body is silently skipped."""
         script = "var gr = new GlideRecord('task');\ngr.query();\nwhile (gr.next())   "
-        respx.get(f"{BASE_URL}/api/now/table/sys_script/br002").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_script/3d89a2d60f9752f52469325512b23c1e").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "br002",
+                        "sys_id": "3d89a2d60f9752f52469325512b23c1e",
                         "name": "Truncated BR",
                         "script": script,
                         "collection": "incident",
@@ -881,7 +911,7 @@ class TestDocsReviewNotes:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["docs_review_notes"](artifact_type="business_rule", sys_id="br002")
+        raw = await tools["docs_review_notes"](artifact_type="business_rule", sys_id="3d89a2d60f9752f52469325512b23c1e")
         result = decode_response(raw)
 
         assert result["status"] == "success"

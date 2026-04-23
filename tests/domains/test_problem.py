@@ -42,12 +42,12 @@ class TestProblemList:
                 json={
                     "result": [
                         {
-                            "sys_id": "id1",
+                            "sys_id": "4e89d81a2e6fb4be2578d245fd8511c1",
                             "number": "PRB0010001",
                             "short_description": "Test 1",
                         },
                         {
-                            "sys_id": "id2",
+                            "sys_id": "867d5f8110f8aa79dd63d7440f217242",
                             "number": "PRB0010002",
                             "short_description": "Test 2",
                         },
@@ -87,16 +87,16 @@ class TestProblemList:
         await tools["problem_list"](
             state="in_progress",
             priority="1",
-            assigned_to="user123",
-            assignment_group="group456",
+            assigned_to="95c946bf622ef93b0a211cd0fd028dfd",
+            assignment_group="948e04007eb5c3b60182c0a3ed3b6e7e",
         )
 
         request = respx.calls.last.request
         url_str = str(request.url)
         assert "state%3D2" in url_str
         assert "priority%3D1" in url_str
-        assert "assigned_to%3Duser123" in url_str
-        assert "assignment_group%3Dgroup456" in url_str
+        assert "assigned_to%3D95c946bf622ef93b0a211cd0fd028dfd" in url_str
+        assert "assignment_group%3D948e04007eb5c3b60182c0a3ed3b6e7e" in url_str
 
     @pytest.mark.asyncio()
     @respx.mock
@@ -140,7 +140,7 @@ class TestProblemGet:
                 json={
                     "result": [
                         {
-                            "sys_id": "abc123",
+                            "sys_id": "6367c48dd193d56ea7b0baad25b19455",
                             "number": "PRB0010001",
                             "short_description": "Test problem",
                         }
@@ -155,7 +155,7 @@ class TestProblemGet:
 
         assert data["status"] == "success"
         assert data["data"]["number"] == "PRB0010001"
-        assert data["data"]["sys_id"] == "abc123"
+        assert data["data"]["sys_id"] == "6367c48dd193d56ea7b0baad25b19455"
 
     @pytest.mark.asyncio()
     async def test_get_invalid_prefix(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
@@ -190,7 +190,7 @@ class TestProblemGet:
                 json={
                     "result": [
                         {
-                            "sys_id": "abc123",
+                            "sys_id": "6367c48dd193d56ea7b0baad25b19455",
                             "number": "PRB0010001",
                             "short_description": "Test",
                         }
@@ -221,7 +221,7 @@ class TestProblemCreate:
                 201,
                 json={
                     "result": {
-                        "sys_id": "new123",
+                        "sys_id": "bdb8465ce041d94a0e490564f2162dcc",
                         "number": "PRB0010002",
                         "short_description": "New problem",
                         "state": "1",
@@ -250,12 +250,12 @@ class TestProblemCreate:
                 201,
                 json={
                     "result": {
-                        "sys_id": "new456",
+                        "sys_id": "e57f9bd335aea54e5336fa986ee8c7b7",
                         "number": "PRB0010003",
                         "short_description": "Full problem",
                         "description": "Detailed info",
-                        "assigned_to": "user123",
-                        "assignment_group": "group456",
+                        "assigned_to": "95c946bf622ef93b0a211cd0fd028dfd",
+                        "assignment_group": "948e04007eb5c3b60182c0a3ed3b6e7e",
                         "category": "software",
                         "subcategory": "os",
                     }
@@ -267,8 +267,8 @@ class TestProblemCreate:
         result = await tools["problem_create"](
             short_description="Full problem",
             description="Detailed info",
-            assigned_to="user123",
-            assignment_group="group456",
+            assigned_to="95c946bf622ef93b0a211cd0fd028dfd",
+            assignment_group="948e04007eb5c3b60182c0a3ed3b6e7e",
             category="software",
             subcategory="os",
         )
@@ -277,7 +277,7 @@ class TestProblemCreate:
         assert data["status"] == "success"
         assert data["data"]["number"] == "PRB0010003"
         assert data["data"]["description"] == "Detailed info"
-        assert data["data"]["assigned_to"] == "user123"
+        assert data["data"]["assigned_to"] == "95c946bf622ef93b0a211cd0fd028dfd"
 
     @pytest.mark.asyncio()
     async def test_create_missing_short_description(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
@@ -365,7 +365,7 @@ class TestProblemUpdate:
                 json={
                     "result": [
                         {
-                            "sys_id": "abc123",
+                            "sys_id": "6367c48dd193d56ea7b0baad25b19455",
                             "number": "PRB0010001",
                             "short_description": "Old",
                         }
@@ -373,12 +373,12 @@ class TestProblemUpdate:
                 },
             )
         )
-        respx.patch(f"{BASE_URL}/api/now/table/problem/abc123").mock(
+        respx.patch(f"{BASE_URL}/api/now/table/problem/6367c48dd193d56ea7b0baad25b19455").mock(
             return_value=Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "abc123",
+                        "sys_id": "6367c48dd193d56ea7b0baad25b19455",
                         "number": "PRB0010001",
                         "short_description": "Updated",
                     }
@@ -426,7 +426,7 @@ class TestProblemUpdate:
         respx.get(f"{BASE_URL}/api/now/table/problem").mock(
             return_value=Response(
                 200,
-                json={"result": [{"sys_id": "abc123", "number": "PRB0010001"}]},
+                json={"result": [{"sys_id": "6367c48dd193d56ea7b0baad25b19455", "number": "PRB0010001"}]},
             )
         )
 
@@ -444,15 +444,15 @@ class TestProblemUpdate:
         respx.get(f"{BASE_URL}/api/now/table/problem").mock(
             return_value=Response(
                 200,
-                json={"result": [{"sys_id": "abc123", "number": "PRB0010001"}]},
+                json={"result": [{"sys_id": "6367c48dd193d56ea7b0baad25b19455", "number": "PRB0010001"}]},
             )
         )
-        respx.patch(f"{BASE_URL}/api/now/table/problem/abc123").mock(
+        respx.patch(f"{BASE_URL}/api/now/table/problem/6367c48dd193d56ea7b0baad25b19455").mock(
             return_value=Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "abc123",
+                        "sys_id": "6367c48dd193d56ea7b0baad25b19455",
                         "number": "PRB0010001",
                         "state": "3",
                     }
@@ -478,15 +478,15 @@ class TestProblemUpdate:
         respx.get(f"{BASE_URL}/api/now/table/problem").mock(
             return_value=Response(
                 200,
-                json={"result": [{"sys_id": "abc123", "number": "PRB0010001"}]},
+                json={"result": [{"sys_id": "6367c48dd193d56ea7b0baad25b19455", "number": "PRB0010001"}]},
             )
         )
-        respx.patch(f"{BASE_URL}/api/now/table/problem/abc123").mock(
+        respx.patch(f"{BASE_URL}/api/now/table/problem/6367c48dd193d56ea7b0baad25b19455").mock(
             return_value=Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "abc123",
+                        "sys_id": "6367c48dd193d56ea7b0baad25b19455",
                         "number": "PRB0010001",
                         "short_description": "Updated desc",
                         "urgency": "2",
@@ -494,8 +494,8 @@ class TestProblemUpdate:
                         "priority": "1",
                         "state": "5",
                         "description": "Full description",
-                        "assigned_to": "user789",
-                        "assignment_group": "group321",
+                        "assigned_to": "da469dabaacf11c033fabc4a90cd8895",
+                        "assignment_group": "a69b441f09f0379a23331ecd0c52e140",
                         "category": "hardware",
                         "subcategory": "disk",
                     }
@@ -512,8 +512,8 @@ class TestProblemUpdate:
             priority=1,
             state="fix_in_progress",
             description="Full description",
-            assigned_to="user789",
-            assignment_group="group321",
+            assigned_to="da469dabaacf11c033fabc4a90cd8895",
+            assignment_group="a69b441f09f0379a23331ecd0c52e140",
             category="hardware",
             subcategory="disk",
         )
@@ -548,15 +548,15 @@ class TestProblemRootCause:
         respx.get(f"{BASE_URL}/api/now/table/problem").mock(
             return_value=Response(
                 200,
-                json={"result": [{"sys_id": "abc123", "number": "PRB0010001"}]},
+                json={"result": [{"sys_id": "6367c48dd193d56ea7b0baad25b19455", "number": "PRB0010001"}]},
             )
         )
-        respx.patch(f"{BASE_URL}/api/now/table/problem/abc123").mock(
+        respx.patch(f"{BASE_URL}/api/now/table/problem/6367c48dd193d56ea7b0baad25b19455").mock(
             return_value=Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "abc123",
+                        "sys_id": "6367c48dd193d56ea7b0baad25b19455",
                         "number": "PRB0010001",
                         "cause_notes": "Root cause identified",
                     }
@@ -581,15 +581,15 @@ class TestProblemRootCause:
         respx.get(f"{BASE_URL}/api/now/table/problem").mock(
             return_value=Response(
                 200,
-                json={"result": [{"sys_id": "abc123", "number": "PRB0010001"}]},
+                json={"result": [{"sys_id": "6367c48dd193d56ea7b0baad25b19455", "number": "PRB0010001"}]},
             )
         )
-        respx.patch(f"{BASE_URL}/api/now/table/problem/abc123").mock(
+        respx.patch(f"{BASE_URL}/api/now/table/problem/6367c48dd193d56ea7b0baad25b19455").mock(
             return_value=Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "abc123",
+                        "sys_id": "6367c48dd193d56ea7b0baad25b19455",
                         "number": "PRB0010001",
                         "cause_notes": "Memory leak in module X",
                         "fix_notes": "Patch applied to module X",
@@ -691,15 +691,15 @@ class TestProblemRootCause:
         respx.get(f"{BASE_URL}/api/now/table/problem").mock(
             return_value=Response(
                 200,
-                json={"result": [{"sys_id": "abc123", "number": "PRB0010001"}]},
+                json={"result": [{"sys_id": "6367c48dd193d56ea7b0baad25b19455", "number": "PRB0010001"}]},
             )
         )
-        respx.patch(f"{BASE_URL}/api/now/table/problem/abc123").mock(
+        respx.patch(f"{BASE_URL}/api/now/table/problem/6367c48dd193d56ea7b0baad25b19455").mock(
             return_value=Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "abc123",
+                        "sys_id": "6367c48dd193d56ea7b0baad25b19455",
                         "number": "PRB0010001",
                         "cause_notes": "Memory leak in module X",
                     }

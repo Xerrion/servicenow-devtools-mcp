@@ -43,12 +43,12 @@ class TestRequestList:
                 json={
                     "result": [
                         {
-                            "sys_id": "id1",
+                            "sys_id": "4e89d81a2e6fb4be2578d245fd8511c1",
                             "number": "REQ0010001",
                             "short_description": "Request 1",
                         },
                         {
-                            "sys_id": "id2",
+                            "sys_id": "867d5f8110f8aa79dd63d7440f217242",
                             "number": "REQ0010002",
                             "short_description": "Request 2",
                         },
@@ -84,10 +84,10 @@ class TestRequestList:
         respx.get(f"{BASE_URL}/api/now/table/sc_request").mock(return_value=Response(200, json={"result": []}))
 
         tools = _register_and_get_tools(settings, auth_provider)
-        await tools["request_list"](requested_for="user123")
+        await tools["request_list"](requested_for="95c946bf622ef93b0a211cd0fd028dfd")
 
         request = respx.calls.last.request
-        assert "requested_for%3Duser123" in str(request.url)
+        assert "requested_for%3D95c946bf622ef93b0a211cd0fd028dfd" in str(request.url)
 
     @pytest.mark.asyncio()
     @respx.mock
@@ -96,13 +96,17 @@ class TestRequestList:
         respx.get(f"{BASE_URL}/api/now/table/sc_request").mock(return_value=Response(200, json={"result": []}))
 
         tools = _register_and_get_tools(settings, auth_provider)
-        await tools["request_list"](state="1", requested_for="user123", assignment_group="group456")
+        await tools["request_list"](
+            state="1",
+            requested_for="95c946bf622ef93b0a211cd0fd028dfd",
+            assignment_group="948e04007eb5c3b60182c0a3ed3b6e7e",
+        )
 
         request = respx.calls.last.request
         url = str(request.url)
         assert "state%3D1" in url
-        assert "requested_for%3Duser123" in url
-        assert "assignment_group%3Dgroup456" in url
+        assert "requested_for%3D95c946bf622ef93b0a211cd0fd028dfd" in url
+        assert "assignment_group%3D948e04007eb5c3b60182c0a3ed3b6e7e" in url
 
 
 class TestRequestGet:
@@ -118,7 +122,7 @@ class TestRequestGet:
                 json={
                     "result": [
                         {
-                            "sys_id": "abc123",
+                            "sys_id": "6367c48dd193d56ea7b0baad25b19455",
                             "number": "REQ0010001",
                             "short_description": "Test request",
                         },
@@ -133,7 +137,7 @@ class TestRequestGet:
 
         assert data["status"] == "success"
         assert data["data"]["number"] == "REQ0010001"
-        assert data["data"]["sys_id"] == "abc123"
+        assert data["data"]["sys_id"] == "6367c48dd193d56ea7b0baad25b19455"
 
     @pytest.mark.asyncio()
     async def test_get_invalid_prefix(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
@@ -168,7 +172,7 @@ class TestRequestGet:
                 json={
                     "result": [
                         {
-                            "sys_id": "abc123",
+                            "sys_id": "6367c48dd193d56ea7b0baad25b19455",
                             "number": "REQ0010001",
                             "short_description": "Test request",
                         },
@@ -201,12 +205,12 @@ class TestRequestItems:
                 json={
                     "result": [
                         {
-                            "sys_id": "item1",
+                            "sys_id": "4e702d8dacb758a70499bd7a1cd42590",
                             "number": "RITM0010001",
                             "short_description": "Item 1",
                         },
                         {
-                            "sys_id": "item2",
+                            "sys_id": "cbc7e024367097309a6aba1dc0023de5",
                             "number": "RITM0010002",
                             "short_description": "Item 2",
                         },
@@ -263,7 +267,7 @@ class TestRequestItemGet:
                 json={
                     "result": [
                         {
-                            "sys_id": "item123",
+                            "sys_id": "41857183a56ba0402914ad20df39a464",
                             "number": "RITM0010001",
                             "short_description": "Test item",
                         },
@@ -278,7 +282,7 @@ class TestRequestItemGet:
 
         assert data["status"] == "success"
         assert data["data"]["number"] == "RITM0010001"
-        assert data["data"]["sys_id"] == "item123"
+        assert data["data"]["sys_id"] == "41857183a56ba0402914ad20df39a464"
 
     @pytest.mark.asyncio()
     async def test_get_invalid_prefix(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
@@ -317,15 +321,15 @@ class TestRequestItemUpdate:
         respx.get(f"{BASE_URL}/api/now/table/sc_req_item").mock(
             return_value=Response(
                 200,
-                json={"result": [{"sys_id": "item123", "number": "RITM0010001"}]},
+                json={"result": [{"sys_id": "41857183a56ba0402914ad20df39a464", "number": "RITM0010001"}]},
             )
         )
-        respx.patch(f"{BASE_URL}/api/now/table/sc_req_item/item123").mock(
+        respx.patch(f"{BASE_URL}/api/now/table/sc_req_item/41857183a56ba0402914ad20df39a464").mock(
             return_value=Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "item123",
+                        "sys_id": "41857183a56ba0402914ad20df39a464",
                         "number": "RITM0010001",
                         "state": "3",
                     }
@@ -350,18 +354,18 @@ class TestRequestItemUpdate:
         respx.get(f"{BASE_URL}/api/now/table/sc_req_item").mock(
             return_value=Response(
                 200,
-                json={"result": [{"sys_id": "item123", "number": "RITM0010001"}]},
+                json={"result": [{"sys_id": "41857183a56ba0402914ad20df39a464", "number": "RITM0010001"}]},
             )
         )
-        respx.patch(f"{BASE_URL}/api/now/table/sc_req_item/item123").mock(
+        respx.patch(f"{BASE_URL}/api/now/table/sc_req_item/41857183a56ba0402914ad20df39a464").mock(
             return_value=Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "item123",
+                        "sys_id": "41857183a56ba0402914ad20df39a464",
                         "number": "RITM0010001",
-                        "assignment_group": "group456",
-                        "assigned_to": "user789",
+                        "assignment_group": "948e04007eb5c3b60182c0a3ed3b6e7e",
+                        "assigned_to": "da469dabaacf11c033fabc4a90cd8895",
                     }
                 },
             )
@@ -370,14 +374,14 @@ class TestRequestItemUpdate:
         tools = _register_and_get_tools(settings, auth_provider)
         result = await tools["request_item_update"](
             number="RITM0010001",
-            assignment_group="group456",
-            assigned_to="user789",
+            assignment_group="948e04007eb5c3b60182c0a3ed3b6e7e",
+            assigned_to="da469dabaacf11c033fabc4a90cd8895",
         )
         data = decode_response(result)
 
         assert data["status"] == "success"
-        assert data["data"]["assignment_group"] == "group456"
-        assert data["data"]["assigned_to"] == "user789"
+        assert data["data"]["assignment_group"] == "948e04007eb5c3b60182c0a3ed3b6e7e"
+        assert data["data"]["assigned_to"] == "da469dabaacf11c033fabc4a90cd8895"
 
     @pytest.mark.asyncio()
     @patch("servicenow_mcp.policy.write_gate", return_value=None)
@@ -418,7 +422,7 @@ class TestRequestItemUpdate:
         respx.get(f"{BASE_URL}/api/now/table/sc_req_item").mock(
             return_value=Response(
                 200,
-                json={"result": [{"sys_id": "item123", "number": "RITM0010001"}]},
+                json={"result": [{"sys_id": "41857183a56ba0402914ad20df39a464", "number": "RITM0010001"}]},
             )
         )
 

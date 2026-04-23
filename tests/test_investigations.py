@@ -49,7 +49,7 @@ class TestInvestigateRun:
                 json={
                     "result": [
                         {
-                            "sys_id": "fc001",
+                            "sys_id": "b45e2ae965e607a079b6677d64ba7c83",
                             "name": "Approval Flow",
                             "state": "IN_PROGRESS",
                             "sys_created_on": "2026-01-01 00:00:00",
@@ -108,12 +108,12 @@ class TestInvestigateRun:
     ) -> None:
         """investigate_explain returns contextual explanation for a finding."""
         # Mock fetching the flow_context record
-        respx.get(f"{BASE_URL}/api/now/table/flow_context/fc001").mock(
+        respx.get(f"{BASE_URL}/api/now/table/flow_context/b45e2ae965e607a079b6677d64ba7c83").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "fc001",
+                        "sys_id": "b45e2ae965e607a079b6677d64ba7c83",
                         "name": "Approval Flow",
                         "state": "IN_PROGRESS",
                         "sys_created_on": "2026-01-01 00:00:00",
@@ -125,7 +125,7 @@ class TestInvestigateRun:
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["investigate_explain"](
             investigation="stale_automations",
-            element_id="flow_context:fc001",
+            element_id="flow_context:b45e2ae965e607a079b6677d64ba7c83",
         )
         result = decode_response(raw)
 
@@ -150,7 +150,7 @@ class TestStaleAutomations:
                 json={
                     "result": [
                         {
-                            "sys_id": "fc001",
+                            "sys_id": "b45e2ae965e607a079b6677d64ba7c83",
                             "name": "Stuck Flow",
                             "state": "IN_PROGRESS",
                             "sys_created_on": "2026-01-01 00:00:00",
@@ -240,7 +240,7 @@ class TestDeprecatedApis:
         def _code_search_side_effect(request: httpx.Request) -> httpx.Response:
             """Return a match only when the query contains 'Packages.'."""
             hits = (
-                [{"sys_id": "script001", "className": "sys_script_include", "name": "OldHelper"}]
+                [{"sys_id": "f080e34a96799d32cdc642f724be7e8c", "className": "sys_script_include", "name": "OldHelper"}]
                 if "Packages." in str(request.url)
                 else []
             )
@@ -301,9 +301,9 @@ class TestTableHealth:
                 200,
                 json={
                     "result": [
-                        {"sys_id": "br1", "name": "BR One", "when": "before"},
-                        {"sys_id": "br2", "name": "BR Two", "when": "after"},
-                        {"sys_id": "br3", "name": "BR Three", "when": "async"},
+                        {"sys_id": "8baeabad365de895ab58ec0d6dd2c1e2", "name": "BR One", "when": "before"},
+                        {"sys_id": "45caf3e7f1e7ce17456aec79ce1ab853", "name": "BR Two", "when": "after"},
+                        {"sys_id": "e2b8e6746ec1c186d1bc96993ce34da6", "name": "BR Three", "when": "async"},
                     ]
                 },
                 headers={"X-Total-Count": "3"},
@@ -313,7 +313,7 @@ class TestTableHealth:
         respx.get(f"{BASE_URL}/api/now/table/sys_script_client").mock(
             return_value=httpx.Response(
                 200,
-                json={"result": [{"sys_id": "cs1", "name": "CS One"}]},
+                json={"result": [{"sys_id": "f9ce352c1d3e957f5b6330307d618b98", "name": "CS One"}]},
                 headers={"X-Total-Count": "1"},
             )
         )
@@ -326,8 +326,8 @@ class TestTableHealth:
                 200,
                 json={
                     "result": [
-                        {"sys_id": "acl1", "name": "incident.*.read"},
-                        {"sys_id": "acl2", "name": "incident.*.write"},
+                        {"sys_id": "a22a175514b88956ca45212cf48e1287", "name": "incident.*.read"},
+                        {"sys_id": "919246ee55548f64fe2c4ca2715ec446", "name": "incident.*.write"},
                     ]
                 },
                 headers={"X-Total-Count": "2"},
@@ -416,7 +416,7 @@ class TestAclConflicts:
                 json={
                     "result": [
                         {
-                            "sys_id": "acl1",
+                            "sys_id": "a22a175514b88956ca45212cf48e1287",
                             "name": "incident.*.read",
                             "operation": "read",
                             "condition": "active=true",
@@ -424,7 +424,7 @@ class TestAclConflicts:
                             "active": "true",
                         },
                         {
-                            "sys_id": "acl2",
+                            "sys_id": "919246ee55548f64fe2c4ca2715ec446",
                             "name": "incident.*.read",
                             "operation": "read",
                             "condition": "priority=1",
@@ -457,7 +457,7 @@ class TestAclConflicts:
                 json={
                     "result": [
                         {
-                            "sys_id": "acl1",
+                            "sys_id": "a22a175514b88956ca45212cf48e1287",
                             "name": "incident.*.read",
                             "operation": "read",
                             "condition": "",
@@ -465,7 +465,7 @@ class TestAclConflicts:
                             "active": "true",
                         },
                         {
-                            "sys_id": "acl2",
+                            "sys_id": "919246ee55548f64fe2c4ca2715ec446",
                             "name": "incident.*.write",
                             "operation": "write",
                             "condition": "",
@@ -502,21 +502,21 @@ class TestErrorAnalysis:
                 json={
                     "result": [
                         {
-                            "sys_id": "log1",
+                            "sys_id": "f4f1b5fb935f19c3ed564c873a77041e",
                             "message": "Error evaluating script",
                             "source": "sys_script.My BR",
                             "level": "0",
                             "sys_created_on": "2026-02-20 10:00:00",
                         },
                         {
-                            "sys_id": "log2",
+                            "sys_id": "8272fbd4ea89b69b3ccf4f94a9578f95",
                             "message": "Error evaluating script again",
                             "source": "sys_script.My BR",
                             "level": "0",
                             "sys_created_on": "2026-02-20 10:05:00",
                         },
                         {
-                            "sys_id": "log3",
+                            "sys_id": "740e4fa6e316646b192a2ddc68a44060",
                             "message": "Null pointer",
                             "source": "sys_script_include.Helper",
                             "level": "0",
@@ -585,7 +585,7 @@ class TestSlowTransactions:
                 json={
                     "result": [
                         {
-                            "sys_id": "qp001",
+                            "sys_id": "eae5779340d58657f7ef93b78f5e1f1d",
                             "name": "incident - complex query",
                             "count": "450",
                             "sys_created_on": "2026-02-20 08:00:00",
@@ -760,12 +760,12 @@ class TestExplainStaleAutomations:
     @respx.mock
     async def test_explain_flow_context(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """explain() returns context for a stuck flow_context record."""
-        respx.get(f"{BASE_URL}/api/now/table/flow_context/fc001").mock(
+        respx.get(f"{BASE_URL}/api/now/table/flow_context/b45e2ae965e607a079b6677d64ba7c83").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "fc001",
+                        "sys_id": "b45e2ae965e607a079b6677d64ba7c83",
                         "name": "Approval Flow",
                         "state": "IN_PROGRESS",
                         "sys_created_on": "2026-01-01 00:00:00",
@@ -777,7 +777,7 @@ class TestExplainStaleAutomations:
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["investigate_explain"](
             investigation="stale_automations",
-            element_id="flow_context:fc001",
+            element_id="flow_context:b45e2ae965e607a079b6677d64ba7c83",
         )
         result = decode_response(raw)
 
@@ -785,18 +785,18 @@ class TestExplainStaleAutomations:
         assert "explanation" in result["data"]
         assert "element" in result["data"]
         assert "Approval Flow" in result["data"]["explanation"]
-        assert result["data"]["record"]["sys_id"] == "fc001"
+        assert result["data"]["record"]["sys_id"] == "b45e2ae965e607a079b6677d64ba7c83"
 
     @pytest.mark.asyncio()
     @respx.mock
     async def test_explain_sys_script(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """explain() returns context for a disabled business rule."""
-        respx.get(f"{BASE_URL}/api/now/table/sys_script/br001").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_script/5f94cbf2a18c848c38da0c789d5da01b").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "br001",
+                        "sys_id": "5f94cbf2a18c848c38da0c789d5da01b",
                         "name": "Old BR",
                         "active": "false",
                         "collection": "incident",
@@ -808,7 +808,7 @@ class TestExplainStaleAutomations:
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["investigate_explain"](
             investigation="stale_automations",
-            element_id="sys_script:br001",
+            element_id="sys_script:5f94cbf2a18c848c38da0c789d5da01b",
         )
         result = decode_response(raw)
 
@@ -820,12 +820,12 @@ class TestExplainStaleAutomations:
     @respx.mock
     async def test_explain_sys_script_include(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """explain() returns context for a disabled script include."""
-        respx.get(f"{BASE_URL}/api/now/table/sys_script_include/si001").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_script_include/0fb49cae66242ebeb4673f0b5daca08d").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "si001",
+                        "sys_id": "0fb49cae66242ebeb4673f0b5daca08d",
                         "name": "LegacyHelper",
                         "active": "false",
                         "api_name": "global.LegacyHelper",
@@ -837,7 +837,7 @@ class TestExplainStaleAutomations:
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["investigate_explain"](
             investigation="stale_automations",
-            element_id="sys_script_include:si001",
+            element_id="sys_script_include:0fb49cae66242ebeb4673f0b5daca08d",
         )
         result = decode_response(raw)
 
@@ -849,12 +849,12 @@ class TestExplainStaleAutomations:
     @respx.mock
     async def test_explain_sysauto_script(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """explain() returns context for a stale scheduled job."""
-        respx.get(f"{BASE_URL}/api/now/table/sysauto_script/sj001").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sysauto_script/05bcd64a30c30d6dbc77c74c1fa0818c").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "sj001",
+                        "sys_id": "05bcd64a30c30d6dbc77c74c1fa0818c",
                         "name": "Nightly Cleanup",
                         "last_run": "2025-06-01 00:00:00",
                         "run_type": "daily",
@@ -866,7 +866,7 @@ class TestExplainStaleAutomations:
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["investigate_explain"](
             investigation="stale_automations",
-            element_id="sysauto_script:sj001",
+            element_id="sysauto_script:05bcd64a30c30d6dbc77c74c1fa0818c",
         )
         result = decode_response(raw)
 
@@ -882,12 +882,12 @@ class TestExplainDeprecatedApis:
     @respx.mock
     async def test_explain_deprecated_script(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """explain() returns context for a script using deprecated APIs."""
-        respx.get(f"{BASE_URL}/api/now/table/sys_script_include/script001").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_script_include/f080e34a96799d32cdc642f724be7e8c").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "script001",
+                        "sys_id": "f080e34a96799d32cdc642f724be7e8c",
                         "name": "OldHelper",
                         "api_name": "global.OldHelper",
                         "script": "var x = Packages.com.example.Test;",
@@ -899,14 +899,14 @@ class TestExplainDeprecatedApis:
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["investigate_explain"](
             investigation="deprecated_apis",
-            element_id="sys_script_include:script001",
+            element_id="sys_script_include:f080e34a96799d32cdc642f724be7e8c",
         )
         result = decode_response(raw)
 
         assert result["status"] == "success"
         assert "deprecated" in result["data"]["explanation"].lower()
         assert "OldHelper" in result["data"]["explanation"]
-        assert result["data"]["element"] == "sys_script_include:script001"
+        assert result["data"]["element"] == "sys_script_include:f080e34a96799d32cdc642f724be7e8c"
 
 
 class TestExplainErrorAnalysis:
@@ -916,12 +916,12 @@ class TestExplainErrorAnalysis:
     @respx.mock
     async def test_explain_syslog_error(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """explain() returns context for a syslog error entry."""
-        respx.get(f"{BASE_URL}/api/now/table/syslog/log001").mock(
+        respx.get(f"{BASE_URL}/api/now/table/syslog/c7437b6f8d9c00ea14eab197e745aacd").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "log001",
+                        "sys_id": "c7437b6f8d9c00ea14eab197e745aacd",
                         "message": "Error evaluating script",
                         "source": "sys_script.My BR",
                         "level": "0",
@@ -934,14 +934,14 @@ class TestExplainErrorAnalysis:
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["investigate_explain"](
             investigation="error_analysis",
-            element_id="syslog:log001",
+            element_id="syslog:c7437b6f8d9c00ea14eab197e745aacd",
         )
         result = decode_response(raw)
 
         assert result["status"] == "success"
         assert "sys_script.My BR" in result["data"]["explanation"]
         assert "Error evaluating script" in result["data"]["explanation"]
-        assert result["data"]["element"] == "syslog:log001"
+        assert result["data"]["element"] == "syslog:c7437b6f8d9c00ea14eab197e745aacd"
 
 
 class TestExplainSlowTransactions:
@@ -951,12 +951,12 @@ class TestExplainSlowTransactions:
     @respx.mock
     async def test_explain_query_pattern(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """explain() returns context for a slow query pattern."""
-        respx.get(f"{BASE_URL}/api/now/table/sys_query_pattern/qp001").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_query_pattern/eae5779340d58657f7ef93b78f5e1f1d").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "qp001",
+                        "sys_id": "eae5779340d58657f7ef93b78f5e1f1d",
                         "name": "incident - complex query",
                         "count": "450",
                         "sys_created_on": "2026-02-20 08:00:00",
@@ -968,7 +968,7 @@ class TestExplainSlowTransactions:
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["investigate_explain"](
             investigation="slow_transactions",
-            element_id="sys_query_pattern:qp001",
+            element_id="sys_query_pattern:eae5779340d58657f7ef93b78f5e1f1d",
         )
         result = decode_response(raw)
 
@@ -976,7 +976,7 @@ class TestExplainSlowTransactions:
         assert "sys_query_pattern" in result["data"]["explanation"]
         assert "incident - complex query" in result["data"]["explanation"]
         assert "450" in result["data"]["explanation"]
-        assert result["data"]["element"] == "sys_query_pattern:qp001"
+        assert result["data"]["element"] == "sys_query_pattern:eae5779340d58657f7ef93b78f5e1f1d"
 
 
 class TestExplainPerformanceBottlenecks:
@@ -986,12 +986,12 @@ class TestExplainPerformanceBottlenecks:
     @respx.mock
     async def test_explain_table_with_colon(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """explain() with table:sys_id returns record context."""
-        respx.get(f"{BASE_URL}/api/now/table/sysauto_script/sj001").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sysauto_script/05bcd64a30c30d6dbc77c74c1fa0818c").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "sj001",
+                        "sys_id": "05bcd64a30c30d6dbc77c74c1fa0818c",
                         "name": "Heavy Job",
                         "run_type": "daily",
                     }
@@ -1002,14 +1002,14 @@ class TestExplainPerformanceBottlenecks:
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["investigate_explain"](
             investigation="performance_bottlenecks",
-            element_id="sysauto_script:sj001",
+            element_id="sysauto_script:05bcd64a30c30d6dbc77c74c1fa0818c",
         )
         result = decode_response(raw)
 
         assert result["status"] == "success"
         assert "Heavy Job" in result["data"]["explanation"]
         assert "bottleneck" in result["data"]["explanation"].lower()
-        assert result["data"]["record"]["sys_id"] == "sj001"
+        assert result["data"]["record"]["sys_id"] == "05bcd64a30c30d6dbc77c74c1fa0818c"
 
     @pytest.mark.asyncio()
     async def test_explain_invalid_table_identifier(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
@@ -1017,7 +1017,7 @@ class TestExplainPerformanceBottlenecks:
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["investigate_explain"](
             investigation="performance_bottlenecks",
-            element_id="../evil_table:sj001",
+            element_id="../evil_table:05bcd64a30c30d6dbc77c74c1fa0818c",
         )
         result = decode_response(raw)
 
@@ -1030,7 +1030,7 @@ class TestExplainPerformanceBottlenecks:
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["investigate_explain"](
             investigation="performance_bottlenecks",
-            element_id="sys_user_token:sj001",
+            element_id="sys_user_token:05bcd64a30c30d6dbc77c74c1fa0818c",
         )
         result = decode_response(raw)
 
@@ -1085,19 +1085,26 @@ class TestExplainAclConflicts:
     @pytest.mark.asyncio()
     @respx.mock
     async def test_explain_acl_record(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
-        """explain() returns context for an ACL conflict finding."""
-        respx.get(f"{BASE_URL}/api/now/table/sys_security_acl/acl001").mock(
+        """explain() returns context for an ACL conflict finding.
+
+        ``sys_security_acl`` is denied for tool callers, so the investigation
+        uses ``get_records_privileged`` which queries the list endpoint with a
+        ``sys_id`` filter rather than fetching by path.
+        """
+        respx.get(f"{BASE_URL}/api/now/table/sys_security_acl").mock(
             return_value=httpx.Response(
                 200,
                 json={
-                    "result": {
-                        "sys_id": "acl001",
-                        "name": "incident.*.read",
-                        "operation": "read",
-                        "condition": "active=true",
-                        "script": "",
-                        "active": "true",
-                    }
+                    "result": [
+                        {
+                            "sys_id": "9b332a2446a6dbc9d0d8da69a4397e33",
+                            "name": "incident.*.read",
+                            "operation": "read",
+                            "condition": "active=true",
+                            "script": "",
+                            "active": "true",
+                        }
+                    ]
                 },
             )
         )
@@ -1105,7 +1112,7 @@ class TestExplainAclConflicts:
         tools = _register_and_get_tools(settings, auth_provider)
         raw = await tools["investigate_explain"](
             investigation="acl_conflicts",
-            element_id="acl001",
+            element_id="9b332a2446a6dbc9d0d8da69a4397e33",
         )
         result = decode_response(raw)
 
@@ -1116,7 +1123,7 @@ class TestExplainAclConflicts:
             "conflicting" in result["data"]["explanation"].lower()
             or "consolidated" in result["data"]["explanation"].lower()
         )
-        assert result["data"]["record"]["sys_id"] == "acl001"
+        assert result["data"]["record"]["sys_id"] == "9b332a2446a6dbc9d0d8da69a4397e33"
 
 
 class TestExplainTableHealth:
@@ -1545,7 +1552,7 @@ class TestPerformanceBottlenecksCoverage:
                 json={
                     "result": [
                         {
-                            "sys_id": "flow1",
+                            "sys_id": "633fdbe8d66e59b2804697cd8982e215",
                             "name": "Running Flow",
                             "state": "IN_PROGRESS",
                             "sys_created_on": "2026-02-20 08:00:00",
@@ -1595,7 +1602,7 @@ class TestStaleAutomationsCoverage:
                 json={
                     "result": [
                         {
-                            "sys_id": "br001",
+                            "sys_id": "5f94cbf2a18c848c38da0c789d5da01b",
                             "name": "Disabled BR",
                             "collection": "incident",
                             "sys_updated_on": "2026-01-01 00:00:00",
@@ -1612,7 +1619,7 @@ class TestStaleAutomationsCoverage:
                 json={
                     "result": [
                         {
-                            "sys_id": "si001",
+                            "sys_id": "0fb49cae66242ebeb4673f0b5daca08d",
                             "name": "OldHelper",
                             "api_name": "global.OldHelper",
                             "sys_updated_on": "2026-01-01 00:00:00",
@@ -1629,7 +1636,7 @@ class TestStaleAutomationsCoverage:
                 json={
                     "result": [
                         {
-                            "sys_id": "sj001",
+                            "sys_id": "05bcd64a30c30d6dbc77c74c1fa0818c",
                             "name": "Stale Job",
                             "run_type": "daily",
                             "last_run": "2025-01-01 00:00:00",
@@ -1929,7 +1936,7 @@ class TestTableHealthCoverage:
                 json={
                     "result": [
                         {
-                            "sys_id": "log1",
+                            "sys_id": "f4f1b5fb935f19c3ed564c873a77041e",
                             "message": "Error",
                             "source": "incident",
                             "sys_created_on": "2026-02-20 10:00:00",

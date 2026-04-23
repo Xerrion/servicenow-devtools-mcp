@@ -1132,3 +1132,111 @@ class TestValidateSysId:
     def test_empty_string(self) -> None:
         with pytest.raises(ValueError, match="Invalid sys_id"):
             validate_sys_id("")
+
+    @pytest.mark.parametrize(
+        "attack",
+        [
+            "../../etc/passwd",
+            "%2e%2e%2f",
+            "a" * 31 + "/",
+            "/" + "a" * 31,
+            "a" * 16 + "/" + "a" * 15,
+            "a" * 32 + "/../other",
+            "a" * 32 + "?sysparm_fields=password",
+            "a" * 32 + "#fragment",
+            "a" * 32 + "&admin=true",
+            "a" * 32 + "\x00",
+            "a" * 32 + " ",
+            " " + "a" * 32,
+            "a" * 32 + "\n",
+        ],
+    )
+    def test_rejects_path_traversal_and_smuggling(self, attack: str) -> None:
+        """validate_sys_id must reject any string containing URL/path metacharacters.
+
+        The 32-hex regex is the single chokepoint that guarantees sys_id values
+        can be safely interpolated into REST URL paths. This test asserts the
+        regex anchors (``^...$``) and character class hold against the most
+        common injection shapes: directory traversal, URL-encoded traversal,
+        query-string smuggling, fragment appending, null bytes, and whitespace
+        padding.
+        """
+        with pytest.raises(ValueError, match="Invalid sys_id"):
+            validate_sys_id(attack)
+
+
+# ---------------------------------------------------------------------------
+# resolve_query_token - table binding enforcement
+# ---------------------------------------------------------------------------
+
+
+class TestResolveQueryTokenTableBinding:
+    """Tests for the table-binding check inside resolve_query_token.
+
+    Phase 4 (MED-1) binds every query token to the table it was built for,
+    so a token built against one table cannot be replayed against another.
+    """
+
+    def test_matching_table_resolves_to_query(self) -> None:
+        """Token whose payload.table matches expected_table returns the query."""
+        from servicenow_mcp.state import QueryTokenStore
+        from servicenow_mcp.utils import resolve_query_token
+
+        store = QueryTokenStore(ttl_seconds=60)
+        token = store.create({"table": "incident", "query": "active=true"})
+
+        resolved = resolve_query_token(token, store, "incident", correlation_id="cid-1")
+
+        assert resolved == "active=true"
+
+    def test_mismatched_table_raises_policy_error(self) -> None:
+        """A token built for one table cannot be used against another."""
+        from servicenow_mcp.errors import PolicyError
+        from servicenow_mcp.state import QueryTokenStore
+        from servicenow_mcp.utils import resolve_query_token
+
+        store = QueryTokenStore(ttl_seconds=60)
+        # Pretend the caller built a query for sys_properties, then tried to
+        # replay it against incident.
+        token = store.create({"table": "sys_properties", "query": "name=glide.ui.session_timeout"})
+
+        with pytest.raises(PolicyError, match="built for table 'sys_properties'"):
+            resolve_query_token(token, store, "incident", correlation_id="cid-1")
+
+    def test_missing_table_key_raises_policy_error(self) -> None:
+        """QueryTokenStore.create rejects payloads that lack a 'table' key.
+
+        This is a hard structural invariant: unbound tokens cannot exist, so
+        the table-binding check inside resolve_query_token can never be
+        bypassed by a malformed payload reaching a tool call path.
+        """
+        from servicenow_mcp.state import QueryTokenStore
+
+        store = QueryTokenStore(ttl_seconds=60)
+
+        with pytest.raises(ValueError, match="non-empty 'table' key"):
+            store.create({"query": "active=true"})  # no 'table' key
+
+        with pytest.raises(ValueError, match="non-empty 'table' key"):
+            store.create({"table": "", "query": "active=true"})  # empty table
+
+    def test_empty_token_returns_empty_string(self) -> None:
+        """Empty token is a no-op - resolves to an empty query without table check."""
+        from servicenow_mcp.state import QueryTokenStore
+        from servicenow_mcp.utils import resolve_query_token
+
+        store = QueryTokenStore(ttl_seconds=60)
+
+        resolved = resolve_query_token("", store, "incident", correlation_id="cid-1")
+
+        assert resolved == ""
+
+    def test_invalid_token_raises_value_error(self) -> None:
+        """An unknown or expired token raises ValueError (not PolicyError)."""
+        from servicenow_mcp.state import QueryTokenStore
+        from servicenow_mcp.utils import resolve_query_token
+
+        store = QueryTokenStore(ttl_seconds=60)
+
+        with pytest.raises(ValueError, match="Invalid or expired query token"):
+            resolve_query_token("nonexistent-token", store, "incident", correlation_id="cid-1")

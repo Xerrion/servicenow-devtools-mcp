@@ -4,17 +4,24 @@ import asyncio
 import logging
 from typing import Any
 
+import httpx
 from mcp.server.fastmcp import FastMCP
 
 from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.config import Settings
 from servicenow_mcp.decorators import tool_handler
+from servicenow_mcp.errors import PolicyError, ServiceNowMCPError
 from servicenow_mcp.policy import (
     INTERNAL_QUERY_LIMIT,
+    SCRIPT_BODY_MASK,
     check_table_access,
     enforce_query_safety,
     mask_sensitive_fields,
+)
+from servicenow_mcp.tools.flow_designer import (
+    CODE_AWARE_SCRIPT_VARIABLE_NAMES,
+    STRICT_SCRIPT_VARIABLE_NAMES,
 )
 from servicenow_mcp.utils import (
     ServiceNowQuery,
@@ -25,6 +32,32 @@ from servicenow_mcp.utils import (
 
 
 logger = logging.getLogger(__name__)
+
+
+# Derived union of Flow Designer's two script-variable sets. Single source of
+# truth lives in ``flow_designer``; any field added there (strict or
+# code-aware) propagates here automatically, so legacy workflow activity
+# variables stay aligned with flow action variables without manual edits.
+SCRIPT_VARIABLE_NAMES: frozenset[str] = STRICT_SCRIPT_VARIABLE_NAMES | CODE_AWARE_SCRIPT_VARIABLE_NAMES
+
+
+# ``sys_variable_value`` is on ``DENIED_TABLES`` because it can hold secrets
+# pasted into workflow activity variables. Legitimate workflow introspection
+# needs to read it; we do so via the client's privileged-read path with an
+# explicit, single-entry allowlist so any future caller mistake fails closed.
+_PRIVILEGED_VARIABLE_TABLES: frozenset[str] = frozenset({"sys_variable_value"})
+
+
+def _mask_variable_value(variable: dict[str, Any], *, include_script_body: bool) -> dict[str, Any]:
+    """Return the variable dict with its ``value`` masked when it names a script body."""
+    masked = mask_sensitive_fields(variable)
+    if include_script_body:
+        return masked
+    name = str(masked.get("variable", "")).lower()
+    is_script_slot = name in SCRIPT_VARIABLE_NAMES or name.endswith("_script")
+    if is_script_slot and "value" in masked:
+        masked["value"] = SCRIPT_BODY_MASK
+    return masked
 
 
 # ------------------------------------------------------------------
@@ -58,6 +91,8 @@ async def _fetch_and_attach_variables(
     client: ServiceNowClient,
     activity_records: list[dict[str, Any]],
     settings: Settings,
+    *,
+    include_script_body: bool = False,
 ) -> tuple[dict[str, list[dict[str, Any]]], list[str]]:
     """Bulk-fetch activity variables and group them by activity sys_id.
 
@@ -74,20 +109,33 @@ async def _fetch_and_attach_variables(
         vars_query = (
             ServiceNowQuery().equals("document", "wf_activity").in_list("document_key", activity_sys_ids).build()
         )
-        vars_safety = enforce_query_safety("sys_variable_value", vars_query, INTERNAL_QUERY_LIMIT, settings)
-        vars_result = await client.query_records(
+        # ``sys_variable_value`` is denied for general callers; this helper
+        # owns the decision to read it and routes through the privileged
+        # path with a narrow allowlist. Clamping against ``max_row_limit``
+        # happens inside ``get_records_privileged``.
+        vars_result = await client.get_records_privileged(
             "sys_variable_value",
-            vars_query,
-            fields=["sys_id", "variable", "value", "document_key"],
-            limit=vars_safety["limit"],
-            display_values=False,
+            allowed_tables=_PRIVILEGED_VARIABLE_TABLES,
+            query=vars_query,
+            fields="sys_id,variable,value,document_key",
+            limit=INTERNAL_QUERY_LIMIT,
         )
-        if len(vars_result["records"]) >= vars_safety["limit"]:
-            warnings.append(f"Activity variables may be truncated at {vars_safety['limit']} records")
+        effective_limit = vars_result["effective_limit"]
+        if len(vars_result["records"]) >= effective_limit:
+            warnings.append(f"Activity variables may be truncated at {effective_limit} records")
         for v in vars_result["records"]:
             key = resolve_ref_value(v.get("document_key", ""))
-            vars_by_activity.setdefault(key, []).append(mask_sensitive_fields(v))
-    except Exception as exc:
+            vars_by_activity.setdefault(key, []).append(
+                _mask_variable_value(v, include_script_body=include_script_body)
+            )
+    except PolicyError:
+        # An allowlist misconfiguration or deny-list gate is a programmer
+        # bug - propagate so it fails loud at call sites and in tests.
+        raise
+    except (httpx.HTTPError, ServiceNowMCPError) as exc:
+        # Best-effort enrichment: tolerate transient HTTP failures and
+        # ServiceNow-side errors (NotFoundError, ServerError, etc.) by
+        # degrading to a warning.
         warnings.append(f"Could not fetch activity variables: {exc}")
 
     return vars_by_activity, warnings
@@ -114,7 +162,17 @@ async def _fetch_activity_definition(
             display_values=True,
         )
         return record, warnings
-    except Exception as exc:
+    except PolicyError:
+        # Deny-list gate misconfiguration is a programmer bug - fail loud.
+        raise
+    except (httpx.HTTPError, ServiceNowMCPError, ValueError) as exc:
+        # Best-effort enrichment. Tolerate:
+        #   - httpx.HTTPError / ServiceNowMCPError: transient HTTP or
+        #     ServiceNow-side issues (NotFound, ServerError, etc.).
+        #   - ValueError: ``definition_sys_id`` is a reference value taken
+        #     from a ServiceNow record; an untrusted value that fails
+        #     ``validate_sys_id`` means "no definition linked" for this
+        #     activity, not a programmer bug.
         logger.warning("Could not fetch element definition %s: %s", definition_sys_id, exc)
         warnings.append(f"Could not fetch activity definition from wf_element_definition: {exc}")
         return None, warnings
@@ -223,6 +281,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
     @tool_handler
     async def workflow_map(
         workflow_version_sys_id: str,
+        include_script_body: bool = False,
         *,
         correlation_id: str,
     ) -> str:
@@ -233,12 +292,17 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
 
         Args:
             workflow_version_sys_id: The sys_id of the wf_workflow_version record.
+            include_script_body: If True, return activity variable values that
+                carry script/condition bodies verbatim. Script/markup bodies
+                are masked by default. Set True only when you need to inspect
+                the code itself; script bodies may contain hardcoded secrets.
         """
         validate_identifier(workflow_version_sys_id)
         check_table_access("wf_workflow_version")
         check_table_access("wf_activity")
         check_table_access("wf_transition")
-        check_table_access("sys_variable_value")
+        # ``sys_variable_value`` is handled by ``_fetch_and_attach_variables``
+        # via the privileged-read path (see ``_PRIVILEGED_VARIABLE_TABLES``).
 
         activity_query = ServiceNowQuery().equals("workflow_version", workflow_version_sys_id).order_by("x").build()
         transition_query = ServiceNowQuery().equals("from.workflow_version", workflow_version_sys_id).build()
@@ -318,7 +382,12 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 warnings.append(f"Transitions may be truncated at {trans_safety['limit']} records")
 
             activity_records = activity_result["records"]
-            vars_by_activity, var_warnings = await _fetch_and_attach_variables(client, activity_records, settings)
+            vars_by_activity, var_warnings = await _fetch_and_attach_variables(
+                client,
+                activity_records,
+                settings,
+                include_script_body=include_script_body,
+            )
             warnings.extend(var_warnings)
 
         # Attach variables to each activity
@@ -328,11 +397,20 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             masked["variables"] = vars_by_activity.get(resolve_ref_value(a["sys_id"]), [])
             activities.append(masked)
 
+        # wf_transition.condition carries scriptable condition bodies; mask
+        # them when the caller has not opted in.
+        masked_transitions: list[dict[str, Any]] = []
+        for t in transition_result["records"]:
+            t_masked = mask_sensitive_fields(t)
+            if not include_script_body and "condition" in t_masked and t_masked["condition"]:
+                t_masked["condition"] = SCRIPT_BODY_MASK
+            masked_transitions.append(t_masked)
+
         return format_response(
             data={
                 "version": mask_sensitive_fields(version_record),
                 "activities": activities,
-                "transitions": [mask_sensitive_fields(t) for t in transition_result["records"]],
+                "transitions": masked_transitions,
             },
             correlation_id=correlation_id,
             warnings=warnings if warnings else None,
@@ -419,6 +497,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
     @tool_handler
     async def workflow_activity_detail(
         activity_sys_id: str,
+        include_script_body: bool = False,
         *,
         correlation_id: str,
     ) -> str:
@@ -428,15 +507,24 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
 
         Args:
             activity_sys_id: The sys_id of the wf_activity record.
+            include_script_body: If True, return activity variable values that
+                carry script/condition bodies verbatim. Script/markup bodies
+                are masked by default. Set True only when you need to inspect
+                the code itself; script bodies may contain hardcoded secrets.
         """
         validate_identifier(activity_sys_id)
         check_table_access("wf_activity")
-        check_table_access("sys_variable_value")
+        # ``sys_variable_value`` is denied for general callers; this tool
+        # routes it through the privileged-read path with a narrow allowlist
+        # (see ``_PRIVILEGED_VARIABLE_TABLES``).
 
         variables_query = (
             ServiceNowQuery().equals("document", "wf_activity").equals("document_key", activity_sys_id).build()
         )
-        vars_safety = enforce_query_safety("sys_variable_value", variables_query, 50, settings)
+        # Per-tool narrow cap: a single activity should never need more than 50
+        # variables; ``get_records_privileged`` will further clamp against
+        # ``settings.max_row_limit``.
+        vars_limit = 50
 
         warnings: list[str] = []
 
@@ -448,16 +536,18 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             # Phase 2: critical fetches (display activity + variables)
             display_activity, variables_result = await asyncio.gather(
                 client.get_record("wf_activity", activity_sys_id, display_values=True),
-                client.query_records(
+                client.get_records_privileged(
                     "sys_variable_value",
-                    variables_query,
-                    fields=["sys_id", "variable", "value", "document_key"],
-                    limit=vars_safety["limit"],
+                    allowed_tables=_PRIVILEGED_VARIABLE_TABLES,
+                    query=variables_query,
+                    fields="sys_id,variable,value,document_key",
+                    limit=vars_limit,
                     display_values=True,
                 ),
             )
-            if len(variables_result["records"]) >= vars_safety["limit"]:
-                warnings.append(f"Activity variables may be truncated at {vars_safety['limit']} records")
+            effective_limit = variables_result["effective_limit"]
+            if len(variables_result["records"]) >= effective_limit:
+                warnings.append(f"Activity variables may be truncated at {effective_limit} records")
 
             # Non-critical: element definition (may be inaccessible on some instances)
             definition_record, def_warnings = await _fetch_activity_definition(client, definition_sys_id)
@@ -467,7 +557,10 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
             data={
                 "activity": mask_sensitive_fields(display_activity),
                 "definition": mask_sensitive_fields(definition_record) if definition_record else None,
-                "variables": [mask_sensitive_fields(v) for v in variables_result["records"]],
+                "variables": [
+                    _mask_variable_value(v, include_script_body=include_script_body)
+                    for v in variables_result["records"]
+                ],
             },
             correlation_id=correlation_id,
             warnings=warnings if warnings else None,

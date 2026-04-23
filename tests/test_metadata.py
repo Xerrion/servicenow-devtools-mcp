@@ -75,13 +75,13 @@ class TestMetaListArtifacts:
                 json={
                     "result": [
                         {
-                            "sys_id": "br1",
+                            "sys_id": "8baeabad365de895ab58ec0d6dd2c1e2",
                             "name": "Set Priority",
                             "collection": "incident",
                             "active": "true",
                         },
                         {
-                            "sys_id": "br2",
+                            "sys_id": "45caf3e7f1e7ce17456aec79ce1ab853",
                             "name": "Auto Close",
                             "collection": "incident",
                             "active": "false",
@@ -113,7 +113,7 @@ class TestMetaListArtifacts:
                 json={
                     "result": [
                         {
-                            "sys_id": "br1",
+                            "sys_id": "8baeabad365de895ab58ec0d6dd2c1e2",
                             "name": "Set Priority",
                             "collection": "incident",
                             "active": "true",
@@ -125,7 +125,7 @@ class TestMetaListArtifacts:
         )
 
         tools, query_store = _register_and_get_tools(settings, auth_provider)
-        token = query_store.create({"query": "collection=incident^active=true"})
+        token = query_store.create({"query": "collection=incident^active=true", "table": "sys_script"})
         raw = await tools["meta_list_artifacts"](artifact_type="business_rule", query_token=token)
         result = decode_response(raw)
 
@@ -194,12 +194,12 @@ class TestMetaGetArtifact:
     @respx.mock
     async def test_returns_full_artifact(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Returns full artifact details including script body."""
-        respx.get(f"{BASE_URL}/api/now/table/sys_script/br1").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_script/8baeabad365de895ab58ec0d6dd2c1e2").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "br1",
+                        "sys_id": "8baeabad365de895ab58ec0d6dd2c1e2",
                         "name": "Set Priority",
                         "collection": "incident",
                         "script": "current.priority = 1;",
@@ -211,11 +211,13 @@ class TestMetaGetArtifact:
         )
 
         tools, _query_store = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["meta_get_artifact"](artifact_type="business_rule", sys_id="br1")
+        raw = await tools["meta_get_artifact"](
+            artifact_type="business_rule", sys_id="8baeabad365de895ab58ec0d6dd2c1e2", include_script_body=True
+        )
         result = decode_response(raw)
 
         assert result["status"] == "success"
-        assert result["data"]["sys_id"] == "br1"
+        assert result["data"]["sys_id"] == "8baeabad365de895ab58ec0d6dd2c1e2"
         assert result["data"]["script"] == "current.priority = 1;"
 
     @pytest.mark.asyncio()
@@ -251,7 +253,7 @@ class TestMetaFindReferences:
                             {
                                 "className": "sys_script",
                                 "name": "Set Priority",
-                                "sys_id": "br1",
+                                "sys_id": "8baeabad365de895ab58ec0d6dd2c1e2",
                                 "field_name": "script",
                                 "matches": [{"context": "var gr = new GlideRecord()"}],
                             }
@@ -287,7 +289,7 @@ class TestMetaFindReferences:
                         json={
                             "result": [
                                 {
-                                    "sys_id": "br1",
+                                    "sys_id": "8baeabad365de895ab58ec0d6dd2c1e2",
                                     "name": "Set Priority",
                                     "sys_class_name": "sys_script",
                                 }
@@ -428,7 +430,7 @@ class TestMetaWhatWrites:
                 json={
                     "result": [
                         {
-                            "sys_id": "br1",
+                            "sys_id": "8baeabad365de895ab58ec0d6dd2c1e2",
                             "name": "Set Priority",
                             "collection": "incident",
                             "when": "before",
@@ -461,7 +463,7 @@ class TestMetaWhatWrites:
                 json={
                     "result": [
                         {
-                            "sys_id": "br1",
+                            "sys_id": "8baeabad365de895ab58ec0d6dd2c1e2",
                             "name": "Set Priority",
                             "collection": "incident",
                             "when": "before",
@@ -469,7 +471,7 @@ class TestMetaWhatWrites:
                             "active": "true",
                         },
                         {
-                            "sys_id": "br2",
+                            "sys_id": "45caf3e7f1e7ce17456aec79ce1ab853",
                             "name": "Log State",
                             "collection": "incident",
                             "when": "after",
@@ -520,7 +522,11 @@ class TestMetadataHelpers:
         cs_result: dict[str, Any] = {
             "search_results": [
                 {"className": "sys_script", "sys_id": "allowed1", "name": "Allowed BR"},
-                {"className": "sys_user_has_password", "sys_id": "denied1", "name": "Denied Record"},
+                {
+                    "className": "sys_user_has_password",
+                    "sys_id": "40cf839e914805ac5cccdc87f01a5876",
+                    "name": "Denied Record",
+                },
             ],
         }
 
@@ -545,7 +551,13 @@ class TestMetadataHelpers:
         ) -> dict[str, Any]:
             if table == "sys_script":
                 return {
-                    "records": [{"sys_id": "rec1", "name": "Found BR", "sys_class_name": "sys_script"}],
+                    "records": [
+                        {
+                            "sys_id": "3ff45714ea4c3069586dde97f40b9527",
+                            "name": "Found BR",
+                            "sys_class_name": "sys_script",
+                        }
+                    ],
                     "count": 1,
                 }
             raise RuntimeError(f"HTTP error for table {table}")
@@ -556,7 +568,7 @@ class TestMetadataHelpers:
 
         assert len(matches) == 1
         assert matches[0]["table"] == "sys_script"
-        assert matches[0]["sys_id"] == "rec1"
+        assert matches[0]["sys_id"] == "3ff45714ea4c3069586dde97f40b9527"
 
     @pytest.mark.asyncio()
     async def test_search_via_table_scan_skips_denied_tables_via_policy(self) -> None:
@@ -564,7 +576,9 @@ class TestMetadataHelpers:
         mock_client = AsyncMock()
         mock_client.query_records = AsyncMock(
             return_value={
-                "records": [{"sys_id": "rec1", "name": "Found", "sys_class_name": "sys_script"}],
+                "records": [
+                    {"sys_id": "3ff45714ea4c3069586dde97f40b9527", "name": "Found", "sys_class_name": "sys_script"}
+                ],
                 "count": 1,
             }
         )

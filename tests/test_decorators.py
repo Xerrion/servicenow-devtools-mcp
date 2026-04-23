@@ -4,8 +4,7 @@ import inspect
 import uuid
 from typing import Any
 
-from toon_format import decode as toon_decode
-
+from servicenow_mcp._vendor.toon_format import decode as toon_decode
 from servicenow_mcp.decorators import tool_handler
 from servicenow_mcp.errors import ForbiddenError
 from servicenow_mcp.utils import format_response

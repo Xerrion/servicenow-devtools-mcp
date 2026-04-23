@@ -13,6 +13,7 @@ from servicenow_mcp.errors import NotFoundError, PolicyError
 from servicenow_mcp.policy import check_table_access, enforce_query_safety, mask_sensitive_fields
 from servicenow_mcp.tools._attachment_common import (
     build_attachment_download_payload,
+    build_attachment_metadata_payload,
     ensure_attachment_size_value_within_limit,
     ensure_attachment_size_within_limit,
     get_attachment_size_bytes,
@@ -227,16 +228,38 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
 
     @mcp.tool()
     @tool_handler
-    async def attachment_download(sys_id: str, *, correlation_id: str = "") -> str:
-        """Download attachment content by attachment sys_id.
+    async def attachment_download(
+        sys_id: str,
+        include_content: bool = False,
+        *,
+        correlation_id: str = "",
+    ) -> str:
+        """Download attachment metadata by attachment sys_id.
+
+        Returns metadata only by default (``sys_id``, ``table_name``,
+        ``table_sys_id``, ``file_name``, ``content_type``, ``size_bytes``).
+        Pass ``include_content=True`` to additionally fetch and base64-encode
+        the bytes into ``content_base64``. The metadata-only path never
+        transfers the attachment body, so it also never counts against the
+        10 MB transfer cap.
 
         Args:
             sys_id: The sys_id of the attachment to download.
+            include_content: When True, include base64-encoded content. Defaults to False (metadata only).
         """
         validate_sys_id(sys_id)
         async with ServiceNowClient(settings, auth_provider) as client:
             metadata = await _get_attachment_metadata_checked(client, sys_id)
-            ensure_attachment_size_value_within_limit(get_attachment_size_bytes(metadata), operation="download")
+            size_bytes = get_attachment_size_bytes(metadata)
+
+            if not include_content:
+                masked_metadata = mask_sensitive_fields(metadata)
+                return format_response(
+                    data=build_attachment_metadata_payload(masked_metadata, size_bytes),
+                    correlation_id=correlation_id,
+                )
+
+            ensure_attachment_size_value_within_limit(size_bytes, operation="download")
             content = _require_bytes_content(await client.download_attachment(sys_id))
 
         ensure_attachment_size_within_limit(content, operation="download")
@@ -252,15 +275,20 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         table_name: str,
         table_sys_id: str,
         file_name: str,
+        include_content: bool = False,
         *,
         correlation_id: str = "",
     ) -> str:
-        """Download attachment content by source record and file name.
+        """Download attachment metadata by source record and file name.
+
+        Returns metadata only by default. Pass ``include_content=True`` to
+        additionally fetch and base64-encode the bytes into ``content_base64``.
 
         Args:
             table_name: The source table name.
             table_sys_id: The source record sys_id.
             file_name: The attachment file name.
+            include_content: When True, include base64-encoded content. Defaults to False (metadata only).
         """
         validate_identifier(table_name)
         validate_sys_id(table_sys_id)
@@ -273,7 +301,17 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                 table_sys_id,
                 file_name,
             )
-            ensure_attachment_size_value_within_limit(get_attachment_size_bytes(metadata), operation="download")
+            size_bytes = get_attachment_size_bytes(metadata)
+
+            if not include_content:
+                masked_metadata = mask_sensitive_fields(metadata)
+                return format_response(
+                    data=build_attachment_metadata_payload(masked_metadata, size_bytes),
+                    correlation_id=correlation_id,
+                    warnings=warnings,
+                )
+
+            ensure_attachment_size_value_within_limit(size_bytes, operation="download")
             content = _require_bytes_content(await client.download_attachment(attachment_sys_id))
 
         ensure_attachment_size_within_limit(content, operation="download")

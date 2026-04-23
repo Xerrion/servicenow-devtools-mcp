@@ -15,6 +15,7 @@ from servicenow_mcp.config import Settings
 from servicenow_mcp.decorators import tool_handler
 from servicenow_mcp.policy import (
     INTERNAL_QUERY_LIMIT,
+    SCRIPT_BODY_MASK,
     check_table_access,
     enforce_query_safety,
     mask_sensitive_fields,
@@ -44,6 +45,12 @@ FIELD_ACTIVITY_DEF_NAME = "activity_definition.name"
 # Known variable names that reliably contain script bodies in workflow activities.
 STRICT_SCRIPT_VARIABLE_NAMES: frozenset[str] = frozenset({"script", "run_script", "script_body"})
 CODE_AWARE_SCRIPT_VARIABLE_NAMES: frozenset[str] = frozenset({"condition"})
+
+# ``sys_variable_value`` is on ``DENIED_TABLES``. The migration-analysis
+# helper below legitimately needs to read it to surface embedded script
+# bodies; it does so via the client's privileged-read path with an
+# explicit, single-entry allowlist so any future caller mistake fails closed.
+_PRIVILEGED_VARIABLE_TABLES: frozenset[str] = frozenset({"sys_variable_value"})
 _SCRIPT_OBJECT_PATTERN: re.Pattern[str] = re.compile(
     r"\b(?:gs|current|workflow|answer|inputs|outputs)\s*\.|answer\s*=",
     re.IGNORECASE,
@@ -57,6 +64,36 @@ _SCRIPT_KEYWORD_PATTERN: re.Pattern[str] = re.compile(
 def _contains_script_code(text: str) -> bool:
     """Return True when *text* contains patterns indicating executable script."""
     return bool(_SCRIPT_OBJECT_PATTERN.search(text) or _SCRIPT_KEYWORD_PATTERN.search(text))
+
+
+def _mask_script_variable(
+    variable: dict[str, Any],
+    *,
+    include_script_body: bool,
+) -> dict[str, Any]:
+    """Mask ``value`` on variable dicts whose ``variable`` name is a known script slot.
+
+    Uses ``STRICT_SCRIPT_VARIABLE_NAMES`` plus the heuristic that any
+    variable name ending in ``_script`` or typed as ``script`` /
+    ``condition_string`` carries executable code. Runs credential masking
+    first so sensitive-name fields retain ``MASK_VALUE``.
+    """
+    masked = mask_sensitive_fields(variable)
+    if include_script_body:
+        return masked
+    name = str(masked.get("variable", masked.get("name", ""))).lower().strip()
+    var_type = str(masked.get("type", "")).lower().strip()
+    is_script_slot = (
+        name in STRICT_SCRIPT_VARIABLE_NAMES
+        or name in CODE_AWARE_SCRIPT_VARIABLE_NAMES
+        or name.endswith("_script")
+        or var_type in {"script", "condition_string"}
+    )
+    if is_script_slot and "value" in masked and masked["value"]:
+        masked["value"] = SCRIPT_BODY_MASK
+    if is_script_slot and "default_value" in masked and masked["default_value"]:
+        masked["default_value"] = SCRIPT_BODY_MASK
+    return masked
 
 
 # Maps legacy workflow activity type names to their Flow Designer equivalents.
@@ -640,24 +677,28 @@ async def _extract_activity_scripts(
         groups variable records by activity sys_id, extracted_scripts contains
         script bodies found in those variables, and warnings lists any truncation notices.
     """
-    check_table_access("sys_variable_value")
+    # ``sys_variable_value`` is denied for general callers; this helper owns
+    # the decision to read it and routes through the privileged-read path
+    # with a narrow allowlist (see ``_PRIVILEGED_VARIABLE_TABLES``).
 
     vars_by_activity: dict[str, list[dict[str, Any]]] = {}
     if not activity_sys_ids:
         return vars_by_activity, [], []
 
     vars_query = ServiceNowQuery().equals("document", "wf_activity").in_list("document_key", activity_sys_ids).build()
-    vars_safety = enforce_query_safety("sys_variable_value", vars_query, INTERNAL_QUERY_LIMIT, settings)
-    vars_result = await client.query_records(
+    # ``get_records_privileged`` clamps against ``settings.max_row_limit``
+    # internally, so pass the desired cap directly.
+    vars_result = await client.get_records_privileged(
         "sys_variable_value",
-        vars_query,
-        fields=["sys_id", "variable", "value", "document_key"],
-        limit=vars_safety["limit"],
-        display_values=False,
+        allowed_tables=_PRIVILEGED_VARIABLE_TABLES,
+        query=vars_query,
+        fields="sys_id,variable,value,document_key",
+        limit=INTERNAL_QUERY_LIMIT,
     )
+    effective_limit = vars_result["effective_limit"]
     warnings: list[str] = []
-    if len(vars_result["records"]) >= vars_safety["limit"]:
-        warnings.append(f"Activity variables may be truncated at {vars_safety['limit']} records")
+    if len(vars_result["records"]) >= effective_limit:
+        warnings.append(f"Activity variables may be truncated at {effective_limit} records")
     for v in vars_result["records"]:
         key = resolve_ref_value(v.get("document_key", ""))
         vars_by_activity.setdefault(key, []).append(mask_sensitive_fields(v))
@@ -776,6 +817,8 @@ def _assemble_migration_response(
     vars_by_activity: dict[str, list[dict[str, Any]]],
     extracted_scripts: list[dict[str, str]],
     version_record: dict[str, Any],
+    *,
+    include_script_body: bool = False,
 ) -> dict[str, Any]:
     """Build the complete migration analysis response from pre-fetched data.
 
@@ -801,7 +844,28 @@ def _assemble_migration_response(
 
     workflow_name = resolve_ref_value(version_record.get("name", ""))
     workflow_table = resolve_ref_value(version_record.get("table", ""))
-    workflow_condition = resolve_ref_value(version_record.get("condition", ""))
+    workflow_condition_raw = resolve_ref_value(version_record.get("condition", ""))
+    workflow_condition = (
+        workflow_condition_raw if include_script_body else (SCRIPT_BODY_MASK if workflow_condition_raw else "")
+    )
+
+    masked_transitions: list[dict[str, Any]] = []
+    for t in transitions:
+        t_masked = mask_sensitive_fields(t)
+        if not include_script_body and t_masked.get("condition"):
+            t_masked["condition"] = SCRIPT_BODY_MASK
+        masked_transitions.append(t_masked)
+
+    # Mask script bodies in the extracted_scripts payload unless opted in.
+    scripts_out: list[dict[str, str]] = []
+    for entry in extracted_scripts:
+        if include_script_body:
+            scripts_out.append(entry)
+            continue
+        masked_entry = dict(entry)
+        if "script_body" in masked_entry:
+            masked_entry["script_body"] = SCRIPT_BODY_MASK
+        scripts_out.append(masked_entry)
 
     return {
         "workflow": {
@@ -813,12 +877,12 @@ def _assemble_migration_response(
         },
         "topology": {
             "activities": [mask_sensitive_fields(a) for a in activities],
-            "transitions": [mask_sensitive_fields(t) for t in transitions],
+            "transitions": masked_transitions,
             "cycles": cycles,
         },
         "migration_blockers": migration_blockers,
         "activity_mapping": activity_mapping,
-        "extracted_scripts": extracted_scripts,
+        "extracted_scripts": scripts_out,
         "complexity": {
             "score": complexity_score,
             "breakdown": {
@@ -935,6 +999,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
     @tool_handler
     async def flow_get(
         flow_sys_id: str,
+        include_script_body: bool = False,
         *,
         correlation_id: str = "",
     ) -> str:
@@ -942,6 +1007,11 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
 
         Args:
             flow_sys_id: The sys_id of the sys_hub_flow record.
+            include_script_body: If True, return flow variable default values
+                that carry script/condition bodies verbatim. Script/markup
+                bodies are masked by default. Set True only when you need to
+                inspect the code itself; script bodies may contain hardcoded
+                secrets.
         """
         validate_identifier(flow_sys_id)
         check_table_access("sys_hub_flow")
@@ -971,7 +1041,9 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         return format_response(
             data={
                 "flow": mask_sensitive_fields(flow_record),
-                "variables": [mask_sensitive_fields(v) for v in var_result["records"]],
+                "variables": [
+                    _mask_script_variable(v, include_script_body=include_script_body) for v in var_result["records"]
+                ],
             },
             correlation_id=correlation_id,
         )
@@ -1291,6 +1363,7 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
     @tool_handler
     async def workflow_migration_analysis(
         workflow_version_sys_id: str,
+        include_script_body: bool = False,
         *,
         correlation_id: str = "",
     ) -> str:
@@ -1302,6 +1375,10 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
 
         Args:
             workflow_version_sys_id: The sys_id of the wf_workflow_version record to analyze.
+            include_script_body: If True, return extracted script bodies and
+                transition condition bodies verbatim. Script/markup bodies are
+                masked by default. Set True only when you need to inspect the
+                code itself; script bodies may contain hardcoded secrets.
         """
         validate_identifier(workflow_version_sys_id)
 
@@ -1318,7 +1395,14 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         all_warnings = topo_warnings + vars_warnings
 
         result = _assemble_migration_response(
-            activities, transitions, cycles, activity_name_lookup, vars_by_activity, extracted_scripts, version_record
+            activities,
+            transitions,
+            cycles,
+            activity_name_lookup,
+            vars_by_activity,
+            extracted_scripts,
+            version_record,
+            include_script_body=include_script_body,
         )
 
         return format_response(

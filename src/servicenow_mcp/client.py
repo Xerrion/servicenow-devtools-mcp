@@ -1,6 +1,7 @@
 """Async ServiceNow REST API client."""
 
 import logging
+import re
 import uuid
 from typing import Any
 from urllib.parse import quote
@@ -13,10 +14,15 @@ from servicenow_mcp.errors import (
     AuthError,
     ForbiddenError,
     NotFoundError,
+    PolicyError,
     ServerError,
     ServiceNowMCPError,
 )
-from servicenow_mcp.policy import INTERNAL_QUERY_LIMIT
+from servicenow_mcp.policy import (
+    INTERNAL_QUERY_LIMIT,
+    enforce_privileged_query_safety,
+    mask_sensitive_fields,
+)
 from servicenow_mcp.sentry import set_sentry_context
 from servicenow_mcp.utils import ServiceNowQuery, validate_identifier, validate_sys_id
 
@@ -25,6 +31,14 @@ logger = logging.getLogger(__name__)
 
 
 _ATF_PLUGIN_ERROR = "ATF Cloud Runner plugin (sn_atf_tg) may not be installed"
+
+# Scrubbing constants for error-message sanitization. Long quoted values are
+# almost always row data (cleartext field values) that would bleed to Sentry
+# via the exception message; short quoted values are field names / identifiers
+# and stay readable for triage.
+_ERROR_MESSAGE_MAX_LEN = 500
+_QUOTED_VALUE_MIN_LEN = 32
+_LONG_QUOTE_RE = re.compile(rf"""(['"])([^'"]{{{_QUOTED_VALUE_MIN_LEN},}})\1""")
 
 
 class ServiceNowClient:
@@ -67,6 +81,7 @@ class ServiceNowClient:
         validate_identifier(table)
         base = f"{self._settings.servicenow_instance_url}/api/now/table/{table}"
         if sys_id:
+            validate_sys_id(sys_id)
             base = f"{base}/{sys_id}"
         return base
 
@@ -145,14 +160,22 @@ class ServiceNowClient:
 
     @staticmethod
     def _extract_error_message(response: httpx.Response, default: str) -> str:
-        """Try to extract error message from ServiceNow JSON response."""
+        """Extract a scrubbed error message from a ServiceNow JSON response.
+
+        Long quoted substrings (likely row data) are redacted in-place and
+        the result is truncated to a bounded length so the message is safe
+        to propagate into exception text that Sentry may capture.
+        """
         try:
             body = response.json()
-            if "error" in body and "message" in body["error"]:
-                return body["error"]["message"]
+            message = body["error"]["message"] if "error" in body and "message" in body["error"] else default
         except Exception:
-            pass
-        return default
+            message = default
+
+        message = _LONG_QUOTE_RE.sub(lambda m: f"{m.group(1)}<redacted>{m.group(1)}", message)
+        if len(message) > _ERROR_MESSAGE_MAX_LEN:
+            message = message[:_ERROR_MESSAGE_MAX_LEN] + "... [truncated]"
+        return message
 
     async def get_record(
         self,
@@ -209,6 +232,95 @@ class ServiceNowClient:
         self._raise_for_status(response)
         records = self._extract_result(response.json())
         return {"records": records, "count": self._parse_total_count(response)}
+
+    async def get_records_privileged(
+        self,
+        table: str,
+        *,
+        allowed_tables: frozenset[str] | set[str],
+        query: str = "",
+        fields: str = "",
+        limit: int = 100,
+        offset: int = 0,
+        display_values: bool = False,
+    ) -> dict[str, Any]:
+        """INTERNAL USE ONLY - bypass the DENIED_TABLES gate via an explicit allowlist.
+
+        Callers (currently: select investigation modules that must read
+        ``sys_security_acl`` and similar hardened tables) MUST pre-declare
+        the exact tables they intend to read by passing them in
+        *allowed_tables*. Any table outside that set - even one that is
+        NOT on ``DENIED_TABLES`` - is rejected with ``PolicyError``, so
+        the allowlist is the gate and mistakes fail closed.
+
+        "Privileged" means ONLY "bypass DENIED_TABLES" - it does NOT opt
+        out of cost-control clamps or the large-table date-filter
+        requirement. Those invariants are applied here via
+        ``enforce_privileged_query_safety`` so callers do not have to
+        hand-inline them (and drift).
+
+        ``validate_identifier(table)`` still runs via ``_table_url``, and
+        the returned records are passed through ``mask_sensitive_fields``
+        (table-aware) so credential fields and script bodies are masked
+        on the way out. This method MUST NOT be exposed to tool-call
+        paths: it is only imported by investigation modules that own the
+        decision about which hardened tables they will read.
+
+        Args:
+            table: The ServiceNow table name.
+            allowed_tables: The exact set of tables the caller has
+                pre-declared it intends to read.
+            query: Optional encoded query string.
+            fields: Comma-separated field list (empty for default).
+            limit: Max rows to return. Clamped to ``settings.max_row_limit``.
+            offset: Row offset for pagination.
+            display_values: If True, return display values (``sysparm_display_value=true``).
+
+        Returns:
+            ``{"records": [...], "count": int, "effective_limit": int}``
+            with credential fields and script bodies masked. ``effective_limit``
+            is the clamped limit actually sent to ServiceNow - callers
+            comparing ``len(records)`` against it can emit a truncation
+            warning without re-clamping themselves.
+
+        Raises:
+            PolicyError: If *table* is not in *allowed_tables*.
+            QuerySafetyError: If *table* is on ``settings.large_table_names``
+                and *query* lacks a date-bounded filter.
+        """
+        if table not in allowed_tables:
+            raise PolicyError(
+                f"get_records_privileged(): table {table!r} is not in the caller's "
+                f"declared allowlist (allowed={sorted(allowed_tables)}). "
+                "The allowlist is the gate; this is never relaxed to DENIED_TABLES."
+            )
+
+        effective_limit = enforce_privileged_query_safety(table, query, limit, self._settings)
+
+        http = self._ensure_client()
+        params: dict[str, str] = {
+            "sysparm_query": query,
+            "sysparm_limit": str(effective_limit),
+            "sysparm_offset": str(offset),
+        }
+        if fields:
+            params["sysparm_fields"] = fields
+        if display_values:
+            params["sysparm_display_value"] = "true"
+
+        response = await http.get(
+            self._table_url(table),
+            headers=await self._headers(),
+            params=params,
+        )
+        self._raise_for_status(response)
+        records = self._extract_result(response.json())
+        masked = [mask_sensitive_fields(r, table=table) for r in records]
+        return {
+            "records": masked,
+            "count": self._parse_total_count(response),
+            "effective_limit": effective_limit,
+        }
 
     async def list_attachments(
         self,
@@ -417,6 +529,7 @@ class ServiceNowClient:
 
     def _email_url(self, email_id: str) -> str:
         """Build the Email API URL."""
+        validate_sys_id(email_id)
         return f"{self._settings.servicenow_instance_url}/api/now/v1/email/{email_id}"
 
     async def get_email(
@@ -443,6 +556,7 @@ class ServiceNowClient:
     def _import_set_url(self, staging_table: str, sys_id: str) -> str:
         """Build the Import Set API URL."""
         validate_identifier(staging_table)
+        validate_sys_id(sys_id)
         return f"{self._settings.servicenow_instance_url}/api/now/import/{staging_table}/{sys_id}"
 
     async def get_import_set_record(
@@ -585,6 +699,7 @@ class ServiceNowClient:
         validate_identifier(class_name)
         base = f"{self._settings.servicenow_instance_url}/api/now/cmdb/instance/{class_name}"
         if sys_id:
+            validate_sys_id(sys_id)
             base = f"{base}/{sys_id}"
         return base
 
@@ -701,6 +816,7 @@ class ServiceNowClient:
 
     async def sc_get_catalog(self, sys_id: str) -> Any:
         """Retrieve details of a specific catalog."""
+        validate_sys_id(sys_id)
         http = self._ensure_client()
         response = await http.get(
             self._sc_url("catalogs", sys_id),
@@ -717,6 +833,7 @@ class ServiceNowClient:
         top_level_only: bool = False,
     ) -> Any:
         """Retrieve categories for a specific catalog."""
+        validate_sys_id(catalog_sys_id)
         http = self._ensure_client()
         params: dict[str, str] = {}
         if limit is not None:
@@ -736,6 +853,7 @@ class ServiceNowClient:
 
     async def sc_get_category(self, sys_id: str) -> Any:
         """Retrieve details of a specific category."""
+        validate_sys_id(sys_id)
         http = self._ensure_client()
         response = await http.get(
             self._sc_url("categories", sys_id),
@@ -774,6 +892,7 @@ class ServiceNowClient:
 
     async def sc_get_item(self, sys_id: str) -> Any:
         """Retrieve details of a specific catalog item."""
+        validate_sys_id(sys_id)
         http = self._ensure_client()
         response = await http.get(
             self._sc_url("items", sys_id),
@@ -784,6 +903,7 @@ class ServiceNowClient:
 
     async def sc_get_item_variables(self, sys_id: str) -> Any:
         """Retrieve variables for a specific catalog item."""
+        validate_sys_id(sys_id)
         http = self._ensure_client()
         response = await http.get(
             self._sc_url("items", sys_id, "variables"),
@@ -799,6 +919,7 @@ class ServiceNowClient:
             item_sys_id: The sys_id of the catalog item.
             variables: Variable name-value pairs for the item.
         """
+        validate_sys_id(item_sys_id)
         http = self._ensure_client()
         body: dict[str, Any] = {}
         if variables:
@@ -820,6 +941,7 @@ class ServiceNowClient:
             item_sys_id: The sys_id of the catalog item.
             variables: Variable name-value pairs for the item.
         """
+        validate_sys_id(item_sys_id)
         http = self._ensure_client()
         body: dict[str, Any] = {}
         if variables:
@@ -882,6 +1004,7 @@ class ServiceNowClient:
         Returns:
             Response dict with at minimum a "snboqId" for tracking the execution.
         """
+        validate_sys_id(test_or_suite_id)
         http = self._ensure_client()
         data = {"suiteId" if is_suite else "testId": test_or_suite_id}
 
@@ -910,6 +1033,7 @@ class ServiceNowClient:
         Returns:
             Progress dict with fields like "progress" and "state".
         """
+        validate_sys_id(snboq_id)
         http = self._ensure_client()
         params: dict[str, str] = {"snboqId": snboq_id}
 
@@ -938,6 +1062,7 @@ class ServiceNowClient:
         Returns:
             Result dict confirming cancellation.
         """
+        validate_sys_id(snboq_id)
         http = self._ensure_client()
         data = {"snboqId": snboq_id}
 

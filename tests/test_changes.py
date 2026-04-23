@@ -40,12 +40,12 @@ class TestChangesUpdatesetInspect:
     async def test_returns_grouped_summary(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Returns update set members grouped by table/type."""
         # Mock the update set record fetch
-        respx.get(f"{BASE_URL}/api/now/table/sys_update_set/us001").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_update_set/f7c5a9c7fa7010efe496857fbfc9d0d5").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "us001",
+                        "sys_id": "f7c5a9c7fa7010efe496857fbfc9d0d5",
                         "name": "My Update Set",
                         "state": "in progress",
                         "application": "Global",
@@ -60,28 +60,28 @@ class TestChangesUpdatesetInspect:
                 json={
                     "result": [
                         {
-                            "sys_id": "m1",
+                            "sys_id": "ae23b94ccaf714337e4ce5ba99ef3dc2",
                             "name": "sys_script_include_abc",
                             "type": "sys_script_include",
                             "action": "INSERT_OR_UPDATE",
                             "target_name": "MyUtil",
-                            "update_set": "us001",
+                            "update_set": "f7c5a9c7fa7010efe496857fbfc9d0d5",
                         },
                         {
-                            "sys_id": "m2",
+                            "sys_id": "32d332da761f44df7959e5887b6b94cb",
                             "name": "sys_script_def",
                             "type": "sys_script",
                             "action": "INSERT_OR_UPDATE",
                             "target_name": "BR: Validate incident",
-                            "update_set": "us001",
+                            "update_set": "f7c5a9c7fa7010efe496857fbfc9d0d5",
                         },
                         {
-                            "sys_id": "m3",
+                            "sys_id": "862a51f8b6294a4b0729a7c5c929bfd6",
                             "name": "sys_ui_policy_ghi",
                             "type": "sys_ui_policy",
                             "action": "INSERT_OR_UPDATE",
                             "target_name": "Hide fields when resolved",
-                            "update_set": "us001",
+                            "update_set": "f7c5a9c7fa7010efe496857fbfc9d0d5",
                         },
                     ]
                 },
@@ -90,12 +90,12 @@ class TestChangesUpdatesetInspect:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["changes_updateset_inspect"](update_set_id="us001")
+        raw = await tools["changes_updateset_inspect"](update_set_id="f7c5a9c7fa7010efe496857fbfc9d0d5")
         result = decode_response(raw)
 
         assert result["status"] == "success"
         data = result["data"]
-        assert data["update_set"]["sys_id"] == "us001"
+        assert data["update_set"]["sys_id"] == "f7c5a9c7fa7010efe496857fbfc9d0d5"
         assert data["total_members"] == 3
         # Should be grouped by type
         assert "groups" in data
@@ -105,12 +105,12 @@ class TestChangesUpdatesetInspect:
     @respx.mock
     async def test_flags_risk_indicators(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Flags risk when dangerous artifact types are present (ACLs, scripts)."""
-        respx.get(f"{BASE_URL}/api/now/table/sys_update_set/us002").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_update_set/246378846af9222db26d7a2ab0462245").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "us002",
+                        "sys_id": "246378846af9222db26d7a2ab0462245",
                         "name": "Risky Changes",
                         "state": "in progress",
                     }
@@ -123,7 +123,7 @@ class TestChangesUpdatesetInspect:
                 json={
                     "result": [
                         {
-                            "sys_id": "m1",
+                            "sys_id": "ae23b94ccaf714337e4ce5ba99ef3dc2",
                             "name": "sys_security_acl_abc",
                             "type": "sys_security_acl",
                             "action": "INSERT_OR_UPDATE",
@@ -136,7 +136,7 @@ class TestChangesUpdatesetInspect:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["changes_updateset_inspect"](update_set_id="us002")
+        raw = await tools["changes_updateset_inspect"](update_set_id="246378846af9222db26d7a2ab0462245")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -146,12 +146,12 @@ class TestChangesUpdatesetInspect:
     @respx.mock
     async def test_empty_update_set(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Handles update set with no members."""
-        respx.get(f"{BASE_URL}/api/now/table/sys_update_set/us003").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_update_set/50ae2cd3c6fd16820c3fa5f064a93d53").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "us003",
+                        "sys_id": "50ae2cd3c6fd16820c3fa5f064a93d53",
                         "name": "Empty",
                         "state": "in progress",
                     }
@@ -167,7 +167,7 @@ class TestChangesUpdatesetInspect:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["changes_updateset_inspect"](update_set_id="us003")
+        raw = await tools["changes_updateset_inspect"](update_set_id="50ae2cd3c6fd16820c3fa5f064a93d53")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -198,13 +198,13 @@ class TestChangesDiffArtifact:
                 json={
                     "result": [
                         {
-                            "sys_id": "v2",
+                            "sys_id": "a1047eab1035d58682a53557e0b2a75e",
                             "name": "sys_script_include_abc",
                             "payload": '<record><sys_script_include action="INSERT_OR_UPDATE"><script>function hello() { return "world"; }</script></sys_script_include></record>',
                             "sys_recorded_at": "2026-02-20 10:00:00",
                         },
                         {
-                            "sys_id": "v1",
+                            "sys_id": "5a6df720540c20d95d530d3fd6885511",
                             "name": "sys_script_include_abc",
                             "payload": '<record><sys_script_include action="INSERT_OR_UPDATE"><script>function hello() { return "hello"; }</script></sys_script_include></record>',
                             "sys_recorded_at": "2026-02-19 10:00:00",
@@ -265,13 +265,13 @@ class TestChangesDiffArtifact:
                 json={
                     "result": [
                         {
-                            "sys_id": "v2",
+                            "sys_id": "a1047eab1035d58682a53557e0b2a75e",
                             "name": "sys_script_include_xyz",
                             "payload": new_payload,
                             "sys_recorded_at": "2026-02-21 10:00:00",
                         },
                         {
-                            "sys_id": "v1",
+                            "sys_id": "5a6df720540c20d95d530d3fd6885511",
                             "name": "sys_script_include_xyz",
                             "payload": old_payload,
                             "sys_recorded_at": "2026-02-20 10:00:00",
@@ -283,7 +283,7 @@ class TestChangesDiffArtifact:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["changes_diff_artifact"](table="sys_script_include", sys_id="xyz")
+        raw = await tools["changes_diff_artifact"](table="sys_script_include", sys_id="xyz", include_script_body=True)
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -307,13 +307,13 @@ class TestChangesDiffArtifact:
                 json={
                     "result": [
                         {
-                            "sys_id": "v2",
+                            "sys_id": "a1047eab1035d58682a53557e0b2a75e",
                             "name": "sys_script_include_abc",
                             "payload": "<new/>",
                             "sys_recorded_at": "2026-02-21 10:00:00",
                         },
                         {
-                            "sys_id": "v1",
+                            "sys_id": "5a6df720540c20d95d530d3fd6885511",
                             "name": "sys_script_include_abc",
                             "payload": "<old/>",
                             "sys_recorded_at": "2026-02-20 10:00:00",
@@ -354,13 +354,13 @@ class TestChangesDiffArtifact:
                 json={
                     "result": [
                         {
-                            "sys_id": "v2",
+                            "sys_id": "a1047eab1035d58682a53557e0b2a75e",
                             "name": "sys_script_include_abc^^def",
                             "payload": "<new/>",
                             "sys_recorded_at": "2026-02-21 10:00:00",
                         },
                         {
-                            "sys_id": "v1",
+                            "sys_id": "5a6df720540c20d95d530d3fd6885511",
                             "name": "sys_script_include_abc^^def",
                             "payload": "<old/>",
                             "sys_recorded_at": "2026-02-20 10:00:00",
@@ -402,22 +402,22 @@ class TestChangesLastTouched:
                 json={
                     "result": [
                         {
-                            "sys_id": "a1",
+                            "sys_id": "f29bc91bbdab169fc0c0a326965953d1",
                             "user": "admin",
                             "fieldname": "state",
                             "oldvalue": "1",
                             "newvalue": "2",
                             "sys_created_on": "2026-02-20 09:00:00",
-                            "documentkey": "inc001",
+                            "documentkey": "6d55028a7049dbf2f4275991d6fc81cf",
                         },
                         {
-                            "sys_id": "a2",
+                            "sys_id": "b9f85daa6f83cf02ce5c31913d1f64d3",
                             "user": "admin",
                             "fieldname": "assigned_to",
                             "oldvalue": "",
                             "newvalue": "John Doe",
                             "sys_created_on": "2026-02-20 08:30:00",
-                            "documentkey": "inc001",
+                            "documentkey": "6d55028a7049dbf2f4275991d6fc81cf",
                         },
                     ]
                 },
@@ -426,7 +426,7 @@ class TestChangesLastTouched:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["changes_last_touched"](table="incident", sys_id="inc001")
+        raw = await tools["changes_last_touched"](table="incident", sys_id="6d55028a7049dbf2f4275991d6fc81cf")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -446,7 +446,7 @@ class TestChangesLastTouched:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["changes_last_touched"](table="incident", sys_id="inc999")
+        raw = await tools["changes_last_touched"](table="incident", sys_id="2edef9aa2e99060fd11a80ae6eed85b5")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -480,13 +480,13 @@ class TestChangesReleaseNotes:
                 json={
                     "result": [
                         {
-                            "sys_id": "m1",
+                            "sys_id": "ae23b94ccaf714337e4ce5ba99ef3dc2",
                             "type": "sys_script_include",
                             "action": "INSERT_OR_UPDATE",
                             "target_name": "IncidentUtils",
                         },
                         {
-                            "sys_id": "m2",
+                            "sys_id": "32d332da761f44df7959e5887b6b94cb",
                             "type": "sys_script",
                             "action": "INSERT_OR_UPDATE",
                             "target_name": "BR: Auto-assign",
@@ -501,10 +501,10 @@ class TestChangesReleaseNotes:
     @respx.mock
     async def test_generates_markdown_release_notes(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Generates Markdown release notes from update set."""
-        self._mock_release_notes_requests("us001")
+        self._mock_release_notes_requests("f7c5a9c7fa7010efe496857fbfc9d0d5")
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["changes_release_notes"](update_set_id="us001")
+        raw = await tools["changes_release_notes"](update_set_id="f7c5a9c7fa7010efe496857fbfc9d0d5")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -523,10 +523,12 @@ class TestChangesReleaseNotes:
         format_value: str,
     ) -> None:
         """Accepts markdown variants and preserves legacy fallback-to-markdown behavior."""
-        self._mock_release_notes_requests("us005")
+        self._mock_release_notes_requests("bc89942e2774d75ebcc7362c55807e09")
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["changes_release_notes"](update_set_id="us005", format=format_value)
+        raw = await tools["changes_release_notes"](
+            update_set_id="bc89942e2774d75ebcc7362c55807e09", format=format_value
+        )
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -537,12 +539,12 @@ class TestChangesReleaseNotes:
     @respx.mock
     async def test_handles_empty_update_set(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Generates notes even for empty update set."""
-        respx.get(f"{BASE_URL}/api/now/table/sys_update_set/us004").mock(
+        respx.get(f"{BASE_URL}/api/now/table/sys_update_set/1682126ebf3ed4a51478f0c4439c8da6").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "result": {
-                        "sys_id": "us004",
+                        "sys_id": "1682126ebf3ed4a51478f0c4439c8da6",
                         "name": "Empty Release",
                         "state": "in progress",
                     }
@@ -558,7 +560,7 @@ class TestChangesReleaseNotes:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["changes_release_notes"](update_set_id="us004")
+        raw = await tools["changes_release_notes"](update_set_id="1682126ebf3ed4a51478f0c4439c8da6")
         result = decode_response(raw)
 
         assert result["status"] == "success"
