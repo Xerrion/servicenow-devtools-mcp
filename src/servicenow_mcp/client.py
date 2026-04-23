@@ -18,7 +18,11 @@ from servicenow_mcp.errors import (
     ServerError,
     ServiceNowMCPError,
 )
-from servicenow_mcp.policy import INTERNAL_QUERY_LIMIT, mask_sensitive_fields
+from servicenow_mcp.policy import (
+    INTERNAL_QUERY_LIMIT,
+    enforce_privileged_query_safety,
+    mask_sensitive_fields,
+)
 from servicenow_mcp.sentry import set_sentry_context
 from servicenow_mcp.utils import ServiceNowQuery, validate_identifier, validate_sys_id
 
@@ -249,6 +253,12 @@ class ServiceNowClient:
         NOT on ``DENIED_TABLES`` - is rejected with ``PolicyError``, so
         the allowlist is the gate and mistakes fail closed.
 
+        "Privileged" means ONLY "bypass DENIED_TABLES" - it does NOT opt
+        out of cost-control clamps or the large-table date-filter
+        requirement. Those invariants are applied here via
+        ``enforce_privileged_query_safety`` so callers do not have to
+        hand-inline them (and drift).
+
         ``validate_identifier(table)`` still runs via ``_table_url``, and
         the returned records are passed through ``mask_sensitive_fields``
         (table-aware) so credential fields and script bodies are masked
@@ -262,13 +272,21 @@ class ServiceNowClient:
                 pre-declared it intends to read.
             query: Optional encoded query string.
             fields: Comma-separated field list (empty for default).
-            limit: Max rows to return.
+            limit: Max rows to return. Clamped to ``settings.max_row_limit``.
             offset: Row offset for pagination.
             display_values: If True, return display values (``sysparm_display_value=true``).
 
         Returns:
-            ``{"records": [...], "count": int}`` with credential fields
-            and script bodies masked.
+            ``{"records": [...], "count": int, "effective_limit": int}``
+            with credential fields and script bodies masked. ``effective_limit``
+            is the clamped limit actually sent to ServiceNow - callers
+            comparing ``len(records)`` against it can emit a truncation
+            warning without re-clamping themselves.
+
+        Raises:
+            PolicyError: If *table* is not in *allowed_tables*.
+            QuerySafetyError: If *table* is on ``settings.large_table_names``
+                and *query* lacks a date-bounded filter.
         """
         if table not in allowed_tables:
             raise PolicyError(
@@ -277,10 +295,12 @@ class ServiceNowClient:
                 "The allowlist is the gate; this is never relaxed to DENIED_TABLES."
             )
 
+        effective_limit = enforce_privileged_query_safety(table, query, limit, self._settings)
+
         http = self._ensure_client()
         params: dict[str, str] = {
             "sysparm_query": query,
-            "sysparm_limit": str(limit),
+            "sysparm_limit": str(effective_limit),
             "sysparm_offset": str(offset),
         }
         if fields:
@@ -296,7 +316,11 @@ class ServiceNowClient:
         self._raise_for_status(response)
         records = self._extract_result(response.json())
         masked = [mask_sensitive_fields(r, table=table) for r in records]
-        return {"records": masked, "count": self._parse_total_count(response)}
+        return {
+            "records": masked,
+            "count": self._parse_total_count(response),
+            "effective_limit": effective_limit,
+        }
 
     async def list_attachments(
         self,

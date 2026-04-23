@@ -686,19 +686,19 @@ async def _extract_activity_scripts(
         return vars_by_activity, [], []
 
     vars_query = ServiceNowQuery().equals("document", "wf_activity").in_list("document_key", activity_sys_ids).build()
-    # Preserve prior clamp against ``max_row_limit`` now that we bypass
-    # ``enforce_query_safety`` for this table.
-    vars_limit = min(INTERNAL_QUERY_LIMIT, settings.max_row_limit)
+    # ``get_records_privileged`` clamps against ``settings.max_row_limit``
+    # internally, so pass the desired cap directly.
     vars_result = await client.get_records_privileged(
         "sys_variable_value",
         allowed_tables=_PRIVILEGED_VARIABLE_TABLES,
         query=vars_query,
         fields="sys_id,variable,value,document_key",
-        limit=vars_limit,
+        limit=INTERNAL_QUERY_LIMIT,
     )
+    effective_limit = vars_result["effective_limit"]
     warnings: list[str] = []
-    if len(vars_result["records"]) >= vars_limit:
-        warnings.append(f"Activity variables may be truncated at {vars_limit} records")
+    if len(vars_result["records"]) >= effective_limit:
+        warnings.append(f"Activity variables may be truncated at {effective_limit} records")
     for v in vars_result["records"]:
         key = resolve_ref_value(v.get("document_key", ""))
         vars_by_activity.setdefault(key, []).append(mask_sensitive_fields(v))

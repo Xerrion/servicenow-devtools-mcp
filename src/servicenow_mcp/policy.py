@@ -365,6 +365,41 @@ def enforce_query_safety(
     return {"limit": effective_limit}
 
 
+def enforce_privileged_query_safety(
+    table: str,
+    query: str,
+    limit: int | None,
+    settings: Settings,
+) -> int:
+    """Apply the non-deny-list parts of query safety to a privileged read.
+
+    Privileged reads (``ServiceNowClient.get_records_privileged``) bypass
+    ``check_table_access`` by design - the caller's allowlist is the gate.
+    But "privileged" should mean ONLY "bypass DENIED_TABLES", not also
+    "opt out of cost-control clamps and large-table date-filter
+    requirements". This helper applies those two invariants so each
+    privileged caller does not hand-inline them (and drift).
+
+    Returns the effective clamped limit. Raises ``QuerySafetyError`` if
+    the table is large and ``query`` lacks a date-bounded filter.
+    """
+    if _dangerous_bypass_enabled:
+        effective_limit = limit if limit is not None else settings.max_row_limit
+        return max(1, effective_limit)
+
+    effective_limit = settings.max_row_limit if limit is None or limit > settings.max_row_limit else limit
+    effective_limit = max(1, effective_limit)
+
+    if table in settings.large_table_names and not _has_date_filter(query):
+        raise QuerySafetyError(
+            f"Table '{table}' is large and requires a date-bounded filter "
+            f"(e.g., sys_created_on>=YYYY-MM-DD). "
+            f"Add a date field constraint to your query."
+        )
+
+    return effective_limit
+
+
 def write_gate(table: str, settings: Settings, correlation_id: str) -> str | None:
     """Check write access and return a JSON error envelope if blocked, or None if allowed.
 

@@ -111,18 +111,18 @@ async def _fetch_and_attach_variables(
         )
         # ``sys_variable_value`` is denied for general callers; this helper
         # owns the decision to read it and routes through the privileged
-        # path with a narrow allowlist. Preserve the prior clamp against
-        # ``max_row_limit`` so large instances stay bounded.
-        vars_limit = min(INTERNAL_QUERY_LIMIT, settings.max_row_limit)
+        # path with a narrow allowlist. Clamping against ``max_row_limit``
+        # happens inside ``get_records_privileged``.
         vars_result = await client.get_records_privileged(
             "sys_variable_value",
             allowed_tables=_PRIVILEGED_VARIABLE_TABLES,
             query=vars_query,
             fields="sys_id,variable,value,document_key",
-            limit=vars_limit,
+            limit=INTERNAL_QUERY_LIMIT,
         )
-        if len(vars_result["records"]) >= vars_limit:
-            warnings.append(f"Activity variables may be truncated at {vars_limit} records")
+        effective_limit = vars_result["effective_limit"]
+        if len(vars_result["records"]) >= effective_limit:
+            warnings.append(f"Activity variables may be truncated at {effective_limit} records")
         for v in vars_result["records"]:
             key = resolve_ref_value(v.get("document_key", ""))
             vars_by_activity.setdefault(key, []).append(
@@ -521,7 +521,10 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
         variables_query = (
             ServiceNowQuery().equals("document", "wf_activity").equals("document_key", activity_sys_id).build()
         )
-        vars_limit = min(50, settings.max_row_limit)
+        # Per-tool narrow cap: a single activity should never need more than 50
+        # variables; ``get_records_privileged`` will further clamp against
+        # ``settings.max_row_limit``.
+        vars_limit = 50
 
         warnings: list[str] = []
 
@@ -542,8 +545,9 @@ def register_tools(mcp: FastMCP, settings: Settings, auth_provider: BasicAuthPro
                     display_values=True,
                 ),
             )
-            if len(variables_result["records"]) >= vars_limit:
-                warnings.append(f"Activity variables may be truncated at {vars_limit} records")
+            effective_limit = variables_result["effective_limit"]
+            if len(variables_result["records"]) >= effective_limit:
+                warnings.append(f"Activity variables may be truncated at {effective_limit} records")
 
             # Non-critical: element definition (may be inaccessible on some instances)
             definition_record, def_warnings = await _fetch_activity_definition(client, definition_sys_id)

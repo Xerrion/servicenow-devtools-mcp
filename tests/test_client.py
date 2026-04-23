@@ -1,6 +1,7 @@
 """Tests for ServiceNow REST client."""
 
 from typing import Any
+from unittest.mock import patch
 
 import httpx
 import pytest
@@ -416,6 +417,145 @@ class TestGetRecordsPrivileged:
 
         assert route.calls.last is not None
         assert "sysparm_display_value=true" in str(route.calls.last.request.url)
+
+    @pytest.mark.asyncio()
+    @respx.mock
+    async def test_limit_clamped_to_max_row_limit(self, auth_provider: BasicAuthProvider) -> None:
+        """Oversized caller limits are clamped by enforce_privileged_query_safety.
+
+        Privileged reads bypass DENIED_TABLES but MUST still honour cost-control
+        clamps. A caller passing ``limit=10000`` against a tenant configured for
+        ``max_row_limit=50`` should see the outbound request capped at 50 and
+        ``effective_limit`` in the return dict reflect the clamp.
+        """
+        from servicenow_mcp.client import ServiceNowClient
+
+        env = {
+            "SERVICENOW_INSTANCE_URL": "https://test.service-now.com",
+            "SERVICENOW_USERNAME": "admin",
+            "SERVICENOW_PASSWORD": "s3cret",
+            "SERVICENOW_ENV": "dev",
+            "MCP_TOOL_PACKAGE": "full",
+            "MAX_ROW_LIMIT": "50",
+        }
+        with patch.dict("os.environ", env, clear=True):
+            clamped_settings = Settings(_env_file=None)
+
+        route = respx.get(f"{BASE_URL}/api/now/table/sys_security_acl").mock(
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
+        )
+
+        async with ServiceNowClient(clamped_settings, auth_provider) as client:
+            result = await client.get_records_privileged(
+                "sys_security_acl",
+                allowed_tables=frozenset({"sys_security_acl"}),
+                limit=10000,
+            )
+
+        assert route.calls.last is not None
+        assert "sysparm_limit=50" in str(route.calls.last.request.url)
+        assert result["effective_limit"] == 50
+
+    @pytest.mark.asyncio()
+    async def test_large_table_without_date_filter_raises(self, auth_provider: BasicAuthProvider) -> None:
+        """Privileged reads against a large table without a date filter fail fast."""
+        from servicenow_mcp.client import ServiceNowClient
+        from servicenow_mcp.errors import QuerySafetyError
+
+        env = {
+            "SERVICENOW_INSTANCE_URL": "https://test.service-now.com",
+            "SERVICENOW_USERNAME": "admin",
+            "SERVICENOW_PASSWORD": "s3cret",
+            "SERVICENOW_ENV": "dev",
+            "MCP_TOOL_PACKAGE": "full",
+            "LARGE_TABLE_NAMES_CSV": "sys_security_acl",
+        }
+        with patch.dict("os.environ", env, clear=True):
+            large_settings = Settings(_env_file=None)
+
+        async with ServiceNowClient(large_settings, auth_provider) as client:
+            with pytest.raises(QuerySafetyError, match="date-bounded filter"):
+                await client.get_records_privileged(
+                    "sys_security_acl",
+                    allowed_tables=frozenset({"sys_security_acl"}),
+                    query="operation=read",
+                    limit=10,
+                )
+
+    @pytest.mark.asyncio()
+    @respx.mock
+    async def test_large_table_with_date_filter_passes(self, auth_provider: BasicAuthProvider) -> None:
+        """A date-bounded query against a large table is permitted."""
+        from servicenow_mcp.client import ServiceNowClient
+
+        env = {
+            "SERVICENOW_INSTANCE_URL": "https://test.service-now.com",
+            "SERVICENOW_USERNAME": "admin",
+            "SERVICENOW_PASSWORD": "s3cret",
+            "SERVICENOW_ENV": "dev",
+            "MCP_TOOL_PACKAGE": "full",
+            "LARGE_TABLE_NAMES_CSV": "sys_security_acl",
+        }
+        with patch.dict("os.environ", env, clear=True):
+            large_settings = Settings(_env_file=None)
+
+        respx.get(f"{BASE_URL}/api/now/table/sys_security_acl").mock(
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
+        )
+
+        async with ServiceNowClient(large_settings, auth_provider) as client:
+            result = await client.get_records_privileged(
+                "sys_security_acl",
+                allowed_tables=frozenset({"sys_security_acl"}),
+                query="sys_created_on>=2024-01-01^operation=read",
+                limit=10,
+            )
+
+        assert result["count"] == 0
+        assert result["effective_limit"] == 10
+
+    @pytest.mark.asyncio()
+    @respx.mock
+    async def test_display_values_masks_sensitive_fields(
+        self, settings: Settings, auth_provider: BasicAuthProvider
+    ) -> None:
+        """Finding 7: display_values=True must not bypass sensitive-field masking.
+
+        Masking is applied to the parsed record regardless of whether the
+        response was rendered with display values; a password in the result
+        must always be replaced by ``MASK_VALUE``.
+        """
+        from servicenow_mcp.client import ServiceNowClient
+        from servicenow_mcp.policy import MASK_VALUE
+
+        respx.get(f"{BASE_URL}/api/now/table/sys_security_acl").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": [
+                        {
+                            "sys_id": "a" * 32,
+                            "name": "incident",
+                            "password": "hunter2",
+                            "secret_key": "topsecret",
+                        },
+                    ]
+                },
+                headers={"X-Total-Count": "1"},
+            )
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            result = await client.get_records_privileged(
+                "sys_security_acl",
+                allowed_tables=frozenset({"sys_security_acl"}),
+                display_values=True,
+            )
+
+        record = result["records"][0]
+        assert record["password"] == MASK_VALUE
+        assert record["secret_key"] == MASK_VALUE
+        assert record["name"] == "incident"
 
 
 class TestServiceNowClientAttachmentMethods:
