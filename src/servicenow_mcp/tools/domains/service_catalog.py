@@ -1,7 +1,5 @@
 """Service Catalog domain tools."""
 
-import json
-
 from mcp.server.fastmcp import FastMCP
 
 from servicenow_mcp.auth import BasicAuthProvider
@@ -10,6 +8,7 @@ from servicenow_mcp.client import ServiceNowClient
 from servicenow_mcp.config import Settings
 from servicenow_mcp.decorators import tool_handler
 from servicenow_mcp.policy import write_gate
+from servicenow_mcp.tools._payload import parse_payload_json
 from servicenow_mcp.utils import format_response
 
 
@@ -202,7 +201,14 @@ def register_tools(
         if blocked:
             return blocked
 
-        parsed_vars = json.loads(variables) if variables else None
+        parsed_vars: dict | None = None
+        if variables:
+            parsed = parse_payload_json(
+                variables, field_name="variables", correlation_id=correlation_id, validate_keys=False
+            )
+            if isinstance(parsed, str):
+                return parsed
+            parsed_vars = parsed
 
         async with ServiceNowClient(settings, auth_provider) as client:
             result = await client.sc_order_now(item_sys_id, variables=parsed_vars)
@@ -226,7 +232,14 @@ def register_tools(
         if blocked:
             return blocked
 
-        parsed_vars = json.loads(variables) if variables else None
+        parsed_vars: dict | None = None
+        if variables:
+            parsed = parse_payload_json(
+                variables, field_name="variables", correlation_id=correlation_id, validate_keys=False
+            )
+            if isinstance(parsed, str):
+                return parsed
+            parsed_vars = parsed
 
         async with ServiceNowClient(settings, auth_provider) as client:
             result = await client.sc_add_to_cart(item_sys_id, variables=parsed_vars)
