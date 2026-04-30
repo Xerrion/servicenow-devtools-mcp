@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, override
 
 from toon_format import encode as toon_encode
 
-from servicenow_mcp.errors import ForbiddenError
+from servicenow_mcp.errors import ACLError, ForbiddenError
 from servicenow_mcp.sentry import capture_exception as sentry_capture
 
 
@@ -757,18 +757,26 @@ async def safe_tool_call(
 ) -> str:
     """Wrap an MCP tool body with standard error handling.
 
-    Catches ForbiddenError (ACL denial) and generic exceptions,
-    returning consistent JSON error envelopes via format_response.
+    Catches ServiceNow ACL denials, generic forbidden errors, and generic
+    exceptions, returning consistent JSON error envelopes via format_response.
     """
     try:
         return await fn()
-    except ForbiddenError as e:
+    except ACLError as e:
         sentry_capture(e)
         return format_response(
             data=None,
             correlation_id=correlation_id,
             status="error",
             error=f"Access denied by ServiceNow ACL: {e}",
+        )
+    except ForbiddenError as e:
+        sentry_capture(e)
+        return format_response(
+            data=None,
+            correlation_id=correlation_id,
+            status="error",
+            error=f"Access forbidden by ServiceNow: {e}",
         )
     except Exception as e:
         sentry_capture(e)

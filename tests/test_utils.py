@@ -980,18 +980,34 @@ class TestSafeToolCall:
         result = await safe_tool_call(fn, "test-corr-id")
         assert result == '{"status": "ok"}'
 
-    async def test_forbidden_error_returns_acl_envelope(self) -> None:
-        """ForbiddenError is caught and formatted as ACL denial."""
+    async def test_acl_error_returns_acl_envelope(self) -> None:
+        """ACLError is caught and formatted as ACL denial."""
+        from servicenow_mcp.errors import ACLError
 
         async def fn() -> str:
-            raise ForbiddenError("no access to incident")
+            raise ACLError("ACL blocked incident")
 
         result = await safe_tool_call(fn, "test-corr-id")
         parsed = decode_response(result)
         assert parsed["status"] == "error"
         assert isinstance(parsed["error"], dict)
         assert "Access denied by ServiceNow ACL" in parsed["error"]["message"]
-        assert "no access to incident" in parsed["error"]["message"]
+        assert "ACL blocked incident" in parsed["error"]["message"]
+        assert parsed["correlation_id"] == "test-corr-id"
+
+    async def test_forbidden_error_returns_forbidden_envelope(self) -> None:
+        """ForbiddenError is caught and formatted as generic forbidden."""
+
+        async def fn() -> str:
+            raise ForbiddenError("insufficient role")
+
+        result = await safe_tool_call(fn, "test-corr-id")
+        parsed = decode_response(result)
+        assert parsed["status"] == "error"
+        assert isinstance(parsed["error"], dict)
+        assert "Access forbidden by ServiceNow" in parsed["error"]["message"]
+        assert "insufficient role" in parsed["error"]["message"]
+        assert "Access denied by ServiceNow ACL" not in parsed["error"]["message"]
         assert parsed["correlation_id"] == "test-corr-id"
 
     async def test_generic_exception_returns_error_envelope(self) -> None:

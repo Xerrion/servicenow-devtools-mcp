@@ -130,6 +130,50 @@ class TestServiceNowClientGetRecord:
             with pytest.raises(AuthError):
                 await client.get_record("incident", "abc123")
 
+    @pytest.mark.asyncio()
+    @respx.mock
+    async def test_get_record_forbidden_error(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
+        """Raises ForbiddenError for generic 403 responses."""
+        from servicenow_mcp.client import ServiceNowClient
+        from servicenow_mcp.errors import ForbiddenError
+
+        respx.get(f"{BASE_URL}/api/now/table/incident/abc123").mock(
+            return_value=httpx.Response(403, json={"error": {"message": "Insufficient role"}})
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            with pytest.raises(ForbiddenError) as exc_info:
+                await client.get_record("incident", "abc123")
+
+        assert type(exc_info.value) is ForbiddenError
+        assert str(exc_info.value) == "Insufficient role"
+
+    @pytest.mark.asyncio()
+    @respx.mock
+    async def test_get_record_acl_error(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
+        """Raises ACLError for explicit ACL 403 responses."""
+        from servicenow_mcp.client import ServiceNowClient
+        from servicenow_mcp.errors import ACLError
+
+        respx.get(f"{BASE_URL}/api/now/table/incident/abc123").mock(
+            return_value=httpx.Response(
+                403,
+                json={
+                    "error": {
+                        "message": "User Not Authorized",
+                        "detail": "Failed API level ACL Validation",
+                    },
+                    "status": "failure",
+                },
+            )
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            with pytest.raises(ACLError) as exc_info:
+                await client.get_record("incident", "abc123")
+
+        assert str(exc_info.value) == "User Not Authorized"
+
 
 class TestServiceNowClientQueryRecords:
     """Test query_records method."""

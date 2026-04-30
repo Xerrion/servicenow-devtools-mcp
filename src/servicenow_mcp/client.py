@@ -10,6 +10,7 @@ import httpx
 from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.config import Settings
 from servicenow_mcp.errors import (
+    ACLError,
     AuthError,
     ForbiddenError,
     NotFoundError,
@@ -132,6 +133,8 @@ class ServiceNowClient:
             raise AuthError(msg)
         if response.status_code == 403:
             msg = self._extract_error_message(response, "Access forbidden")
+            if self._is_acl_error_response(response):
+                raise ACLError(msg)
             raise ForbiddenError(msg)
         if response.status_code == 404:
             msg = self._extract_error_message(response, "Resource not found")
@@ -142,6 +145,31 @@ class ServiceNowClient:
         if response.status_code >= 400:
             msg = self._extract_error_message(response, "Request failed")
             raise ServiceNowMCPError(msg, status_code=response.status_code)
+
+    @staticmethod
+    def _is_acl_error_response(response: httpx.Response) -> bool:
+        """Return True when a ServiceNow 403 response explicitly reports an ACL denial."""
+        try:
+            payload = response.json()
+        except Exception:
+            logger.debug("Could not parse ServiceNow error body for ACL detection", exc_info=True)
+            return False
+
+        values: list[str] = []
+
+        def collect_strings(value: Any) -> None:
+            if isinstance(value, str):
+                values.append(value)
+            elif isinstance(value, dict):
+                for nested in value.values():
+                    collect_strings(nested)
+            elif isinstance(value, list):
+                for nested in value:
+                    collect_strings(nested)
+
+        collect_strings(payload)
+        normalized = "\n".join(values).lower()
+        return "acl" in normalized or "access control" in normalized
 
     @staticmethod
     def _extract_error_message(response: httpx.Response, default: str) -> str:
