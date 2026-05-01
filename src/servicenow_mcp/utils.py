@@ -9,7 +9,8 @@ from typing import TYPE_CHECKING, Any, override
 
 from toon_format import encode as toon_encode
 
-from servicenow_mcp.errors import ACLError, ForbiddenError
+from servicenow_mcp.errors import ACLError, ForbiddenError, ServiceNowMCPError
+from servicenow_mcp.policy import mask_sensitive_fields
 from servicenow_mcp.sentry import capture_exception as sentry_capture
 
 
@@ -20,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 _IDENTIFIER_RE = re.compile(r"^[a-z0-9_]+(\.[a-z0-9_]+)*$")
 _SYS_ID_RE: re.Pattern[str] = re.compile(r"^[0-9a-f]{32}$")
+_EMPTY_ERROR_FALLBACK = "ServiceNow request failed (no diagnostic available)"
 
 # Operators recognised by ``or_condition()``.
 _ALLOWED_OPERATORS: frozenset[str] = frozenset(
@@ -162,7 +164,7 @@ def format_response(
     data: Any,
     correlation_id: str,
     status: str = "success",
-    error: str | dict[str, str] | None = None,
+    error: str | dict[str, Any] | None = None,
     pagination: dict[str, int] | None = None,
     warnings: list[str] | None = None,
 ) -> str:
@@ -183,6 +185,40 @@ def format_response(
         response["warnings"] = warnings
 
     return serialize(response)
+
+
+def _mask_response_body(body: dict[str, Any]) -> dict[str, Any]:
+    """Apply sensitive-field masking to a ServiceNow response body before surfacing it.
+
+    Walks the dict recursively and masks any field whose name matches the sensitive
+    pattern, leaving structure intact.
+    """
+    return mask_sensitive_fields(body)
+
+
+def _build_sn_error_payload(
+    raw_message: str,
+    response_body: Any | None,
+    *,
+    prefix: str = "",
+) -> str | dict[str, Any]:
+    """Build the error payload for a ServiceNow exception.
+
+    Applies the empty-message fallback and optional prefix, then returns either a plain
+    string (when no response body is available) or a structured dict with the diagnostic
+    message and the raw ServiceNow response body for caller debugging.
+    """
+    message = _EMPTY_ERROR_FALLBACK if not raw_message else f"{prefix}{raw_message}" if prefix else raw_message
+    if response_body is None:
+        return message
+    safe_body: Any
+    if isinstance(response_body, dict):
+        safe_body = _mask_response_body(response_body)
+    elif isinstance(response_body, list):
+        safe_body = [_mask_response_body(item) if isinstance(item, dict) else item for item in response_body]
+    else:
+        safe_body = response_body
+    return {"message": message, "details": safe_body}
 
 
 class ServiceNowQuery:
@@ -771,25 +807,39 @@ async def safe_tool_call(
         return await fn()
     except ACLError as e:
         sentry_capture(e)
+        error_payload = _build_sn_error_payload(
+            str(e),
+            e.response_body,
+            prefix="Access denied by ServiceNow ACL: ",
+        )
         return format_response(
             data=None,
             correlation_id=correlation_id,
             status="error",
-            error=f"Access denied by ServiceNow ACL: {e}",
+            error=error_payload,
         )
     except ForbiddenError as e:
         sentry_capture(e)
+        error_payload = _build_sn_error_payload(
+            str(e),
+            e.response_body,
+            prefix="Access forbidden by ServiceNow: ",
+        )
         return format_response(
             data=None,
             correlation_id=correlation_id,
             status="error",
-            error=f"Access forbidden by ServiceNow: {e}",
+            error=error_payload,
         )
     except Exception as e:
         sentry_capture(e)
+        if isinstance(e, ServiceNowMCPError):
+            error_payload = _build_sn_error_payload(str(e), e.response_body)
+        else:
+            error_payload = str(e)
         return format_response(
             data=None,
             correlation_id=correlation_id,
             status="error",
-            error=str(e),
+            error=error_payload,
         )

@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 _ATF_PLUGIN_ERROR = "ATF Cloud Runner plugin (sn_atf_tg) may not be installed"
+_ERROR_TEXT_MAX_LEN = 500
 
 # Word-boundary matching so unrelated words containing the substring "acl"
 # (e.g. "oracle", "miracle", "barnacle") do not false-positive.
@@ -119,6 +120,12 @@ class ServiceNowClient:
         if response.status_code < 400:
             return
 
+        body: Any | None = None
+        try:
+            body = response.json()
+        except ValueError:
+            body = None
+
         url = str(response.request.url)
         # Strip query parameters for privacy
         if "?" in url:
@@ -135,21 +142,21 @@ class ServiceNowClient:
 
         if response.status_code == 401:
             msg = self._extract_error_message(response, "Authentication failed")
-            raise AuthError(msg)
+            raise AuthError(msg, response_body=body)
         if response.status_code == 403:
             msg = self._extract_error_message(response, "Access forbidden")
             if self._is_acl_error_response(response):
-                raise ACLError(msg)
-            raise ForbiddenError(msg)
+                raise ACLError(msg, response_body=body)
+            raise ForbiddenError(msg, response_body=body)
         if response.status_code == 404:
             msg = self._extract_error_message(response, "Resource not found")
-            raise NotFoundError(msg)
+            raise NotFoundError(msg, response_body=body)
         if response.status_code >= 500:
             msg = self._extract_error_message(response, "ServiceNow server error")
-            raise ServerError(msg, status_code=response.status_code)
+            raise ServerError(msg, status_code=response.status_code, response_body=body)
         if response.status_code >= 400:
             msg = self._extract_error_message(response, "Request failed")
-            raise ServiceNowMCPError(msg, status_code=response.status_code)
+            raise ServiceNowMCPError(msg, status_code=response.status_code, response_body=body)
 
     @staticmethod
     def _is_acl_error_response(response: httpx.Response) -> bool:
@@ -181,10 +188,25 @@ class ServiceNowClient:
         """Try to extract error message from ServiceNow JSON response."""
         try:
             body = response.json()
-            if "error" in body and "message" in body["error"]:
-                return body["error"]["message"]
-        except Exception:
-            logger.debug("Could not parse ServiceNow error body", exc_info=True)
+            if isinstance(body, dict):
+                error = body.get("error")
+                if isinstance(error, dict):
+                    for key in ("message", "detail"):
+                        value = error.get(key)
+                        if isinstance(value, str) and value.strip():
+                            return value
+                for key in ("status_message", "status_text", "message"):
+                    value = body.get(key)
+                    if isinstance(value, str) and value.strip():
+                        return value
+        except ValueError:
+            pass
+        text = response.text
+        if text and text.strip():
+            snippet = text.strip()
+            if len(snippet) > _ERROR_TEXT_MAX_LEN:
+                snippet = f"{snippet[:_ERROR_TEXT_MAX_LEN]}... [truncated]"
+            return snippet
         return default
 
     async def get_record(

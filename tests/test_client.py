@@ -207,6 +207,186 @@ class TestServiceNowClientGetRecord:
         assert str(exc_info.value) == "Insufficient role"
 
 
+class TestServiceNowClientErrorExtraction:
+    """Test ServiceNow API error extraction and status dispatch."""
+
+    @pytest.mark.asyncio()
+    @respx.mock
+    async def test_extract_message_uses_error_message_when_present(
+        self, settings: Settings, auth_provider: BasicAuthProvider
+    ) -> None:
+        """Uses error.message when populated."""
+        from servicenow_mcp.client import ServiceNowClient
+        from servicenow_mcp.errors import ServiceNowMCPError
+
+        body = {"error": {"message": "foo"}}
+        respx.get(f"{BASE_URL}/api/now/table/incident/abc123").mock(return_value=httpx.Response(400, json=body))
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            with pytest.raises(ServiceNowMCPError) as exc_info:
+                await client.get_record("incident", "abc123")
+
+        assert str(exc_info.value) == "foo"
+        assert exc_info.value.response_body == body
+
+    @pytest.mark.asyncio()
+    @respx.mock
+    async def test_extract_message_falls_through_to_detail_when_message_empty(
+        self, settings: Settings, auth_provider: BasicAuthProvider
+    ) -> None:
+        """Uses error.detail when error.message is empty."""
+        from servicenow_mcp.client import ServiceNowClient
+        from servicenow_mcp.errors import ServiceNowMCPError
+
+        respx.get(f"{BASE_URL}/api/now/table/incident/abc123").mock(
+            return_value=httpx.Response(
+                400,
+                json={"error": {"message": "", "detail": "Mandatory variable description not provided"}},
+            )
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            with pytest.raises(ServiceNowMCPError) as exc_info:
+                await client.get_record("incident", "abc123")
+
+        assert str(exc_info.value) == "Mandatory variable description not provided"
+
+    @pytest.mark.asyncio()
+    @respx.mock
+    async def test_extract_message_falls_through_to_detail_when_message_missing(
+        self, settings: Settings, auth_provider: BasicAuthProvider
+    ) -> None:
+        """Uses error.detail when error.message is absent."""
+        from servicenow_mcp.client import ServiceNowClient
+        from servicenow_mcp.errors import ServiceNowMCPError
+
+        respx.get(f"{BASE_URL}/api/now/table/incident/abc123").mock(
+            return_value=httpx.Response(400, json={"error": {"detail": "X"}})
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            with pytest.raises(ServiceNowMCPError) as exc_info:
+                await client.get_record("incident", "abc123")
+
+        assert str(exc_info.value) == "X"
+
+    @pytest.mark.asyncio()
+    @respx.mock
+    async def test_extract_message_uses_status_message_at_top_level(
+        self, settings: Settings, auth_provider: BasicAuthProvider
+    ) -> None:
+        """Uses top-level status_message when no nested error message exists."""
+        from servicenow_mcp.client import ServiceNowClient
+        from servicenow_mcp.errors import ServiceNowMCPError
+
+        respx.get(f"{BASE_URL}/api/now/table/incident/abc123").mock(
+            return_value=httpx.Response(400, json={"status": "failure", "status_message": "Bad input"})
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            with pytest.raises(ServiceNowMCPError) as exc_info:
+                await client.get_record("incident", "abc123")
+
+        assert str(exc_info.value) == "Bad input"
+
+    @pytest.mark.asyncio()
+    @respx.mock
+    async def test_extract_message_falls_back_to_text_when_not_json(
+        self, settings: Settings, auth_provider: BasicAuthProvider
+    ) -> None:
+        """Uses response text when the body is not JSON."""
+        from servicenow_mcp.client import ServiceNowClient
+        from servicenow_mcp.errors import ServerError
+
+        respx.get(f"{BASE_URL}/api/now/table/incident/abc123").mock(
+            return_value=httpx.Response(502, text="<html>Bad Gateway</html>")
+        )
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            with pytest.raises(ServerError) as exc_info:
+                await client.get_record("incident", "abc123")
+
+        assert "Bad Gateway" in str(exc_info.value)
+
+    @pytest.mark.asyncio()
+    @respx.mock
+    async def test_extract_message_truncates_long_text(
+        self, settings: Settings, auth_provider: BasicAuthProvider
+    ) -> None:
+        """Truncates long non-JSON response text."""
+        from servicenow_mcp.client import ServiceNowClient
+        from servicenow_mcp.errors import ServerError
+
+        respx.get(f"{BASE_URL}/api/now/table/incident/abc123").mock(return_value=httpx.Response(502, text="x" * 2000))
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            with pytest.raises(ServerError) as exc_info:
+                await client.get_record("incident", "abc123")
+
+        assert str(exc_info.value).endswith("... [truncated]")
+        assert len(str(exc_info.value)) <= 520
+
+    @pytest.mark.asyncio()
+    @respx.mock
+    async def test_extract_message_uses_default_when_body_empty(
+        self, settings: Settings, auth_provider: BasicAuthProvider
+    ) -> None:
+        """Uses the status-specific default when the body has no diagnostic."""
+        from servicenow_mcp.client import ServiceNowClient
+        from servicenow_mcp.errors import ServiceNowMCPError
+
+        respx.get(f"{BASE_URL}/api/now/table/incident/abc123").mock(return_value=httpx.Response(400, content=b""))
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            with pytest.raises(ServiceNowMCPError) as exc_info:
+                await client.get_record("incident", "abc123")
+
+        assert str(exc_info.value) == "Request failed"
+
+    @pytest.mark.asyncio()
+    @respx.mock
+    async def test_response_body_attached_to_exception(
+        self, settings: Settings, auth_provider: BasicAuthProvider
+    ) -> None:
+        """Attaches parsed JSON response body to the raised exception."""
+        from servicenow_mcp.client import ServiceNowClient
+        from servicenow_mcp.errors import ServiceNowMCPError
+
+        body = {"error": {"detail": "X"}}
+        respx.get(f"{BASE_URL}/api/now/table/incident/abc123").mock(return_value=httpx.Response(400, json=body))
+
+        async with ServiceNowClient(settings, auth_provider) as client:
+            with pytest.raises(ServiceNowMCPError) as exc_info:
+                await client.get_record("incident", "abc123")
+
+        assert exc_info.value.response_body == body
+
+    @pytest.mark.asyncio()
+    @respx.mock
+    async def test_status_code_dispatch_unchanged(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
+        """Maps status codes to the existing exception subclasses."""
+        from servicenow_mcp.client import ServiceNowClient
+        from servicenow_mcp.errors import AuthError, ForbiddenError, NotFoundError, ServerError
+
+        cases = [
+            (401, AuthError, "unauthorized"),
+            (403, ForbiddenError, "forbidden"),
+            (404, NotFoundError, "missing"),
+            (500, ServerError, "server"),
+        ]
+        async with ServiceNowClient(settings, auth_provider) as client:
+            for status_code, error_type, message in cases:
+                body = {"error": {"message": message}}
+                response = httpx.Response(
+                    status_code,
+                    json=body,
+                    request=httpx.Request("GET", f"{BASE_URL}/api/now/table/incident/abc123"),
+                )
+                with pytest.raises(error_type) as exc_info:
+                    client._raise_for_status(response)
+                assert exc_info.value.response_body == body
+
+
 class TestServiceNowClientQueryRecords:
     """Test query_records method."""
 

@@ -6,9 +6,12 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from servicenow_mcp.errors import ForbiddenError
+from servicenow_mcp.errors import ForbiddenError, ServiceNowMCPError
+from servicenow_mcp.policy import MASK_VALUE
 from servicenow_mcp.utils import (
+    _EMPTY_ERROR_FALLBACK,
     ServiceNowQuery,
+    _build_sn_error_payload,
     resolve_ref_value,
     safe_tool_call,
     sanitize_query_value,
@@ -92,6 +95,35 @@ class TestFormatResponse:
         resp = decode_response(raw)
 
         assert "Limit capped at 100" in resp["warnings"]
+
+
+class TestBuildServiceNowErrorPayload:
+    """Test ServiceNow error payload formatting."""
+
+    def test_build_sn_error_payload_masks_sensitive_fields_in_response_body(self) -> None:
+        response_body = {"error": {"detail": "auth failed", "password": "secret123", "user_token": "abc"}}
+
+        result = _build_sn_error_payload("auth failed", response_body)
+
+        assert isinstance(result, dict)
+        assert result["details"]["error"]["detail"] == "auth failed"
+        assert result["details"]["error"]["password"] == MASK_VALUE
+        assert result["details"]["error"]["user_token"] == MASK_VALUE
+
+    def test_build_sn_error_payload_handles_non_dict_response_body(self) -> None:
+        result = _build_sn_error_payload("request failed", "raw string")
+
+        assert result == {"message": "request failed", "details": "raw string"}
+
+    def test_build_sn_error_payload_uses_prefix(self) -> None:
+        result = _build_sn_error_payload("too many tries", None, prefix="Access denied: ")
+
+        assert result == "Access denied: too many tries"
+
+    def test_build_sn_error_payload_uses_empty_fallback(self) -> None:
+        result = _build_sn_error_payload("", None)
+
+        assert result == _EMPTY_ERROR_FALLBACK
 
 
 class TestSerialize:
@@ -1060,6 +1092,43 @@ class TestSafeToolCall:
         assert isinstance(parsed["error"], dict)
         assert "something broke" in parsed["error"]["message"]
         assert parsed["correlation_id"] == "test-corr-id"
+
+    async def test_safe_tool_call_surfaces_response_body_for_servicenow_error(self) -> None:
+        """ServiceNow errors with response bodies include structured details."""
+
+        async def fn() -> str:
+            raise ServiceNowMCPError("msg", response_body={"error": {"detail": "X"}})
+
+        result = await safe_tool_call(fn, "test-corr-id")
+        parsed = decode_response(result)
+
+        assert parsed["status"] == "error"
+        assert parsed["error"]["message"] == "msg"
+        assert parsed["error"]["details"] == {"error": {"detail": "X"}}
+
+    async def test_safe_tool_call_falls_back_to_string_for_plain_exception(self) -> None:
+        """Plain exceptions keep the existing string-message envelope behavior."""
+
+        async def fn() -> str:
+            raise RuntimeError("boom")
+
+        result = await safe_tool_call(fn, "test-corr-id")
+        parsed = decode_response(result)
+
+        assert parsed["status"] == "error"
+        assert parsed["error"] == {"message": "boom"}
+
+    async def test_safe_tool_call_substitutes_message_when_both_empty(self) -> None:
+        """ServiceNow errors with no message or body get a diagnostic fallback."""
+
+        async def fn() -> str:
+            raise ServiceNowMCPError("", response_body=None)
+
+        result = await safe_tool_call(fn, "test-corr-id")
+        parsed = decode_response(result)
+
+        assert parsed["status"] == "error"
+        assert parsed["error"]["message"] == "ServiceNow request failed (no diagnostic available)"
 
 
 # ---------------------------------------------------------------------------
