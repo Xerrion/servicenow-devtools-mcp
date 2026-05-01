@@ -836,7 +836,7 @@ async def safe_tool_call(
         if isinstance(e, ServiceNowMCPError):
             error_payload = _build_sn_error_payload(str(e), e.response_body)
         else:
-            error_payload = str(e)
+            error_payload = str(e) or f"{type(e).__name__} (no message)"
         return format_response(
             data=None,
             correlation_id=correlation_id,

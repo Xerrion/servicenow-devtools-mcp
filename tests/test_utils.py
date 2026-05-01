@@ -1118,6 +1118,34 @@ class TestSafeToolCall:
         assert parsed["status"] == "error"
         assert parsed["error"] == {"message": "boom"}
 
+    async def test_safe_tool_call_substitutes_message_for_empty_non_servicenow_exception(self) -> None:
+        """Plain exceptions with empty messages get a type-name fallback."""
+
+        class TransportHiccup(Exception):
+            pass
+
+        async def fn() -> str:
+            raise TransportHiccup()
+
+        result = await safe_tool_call(fn, "test-corr-id")
+        parsed = decode_response(result)
+
+        assert parsed["status"] == "error"
+        assert parsed["error"]["message"]
+        assert "TransportHiccup" in parsed["error"]["message"]
+
+    async def test_safe_tool_call_preserves_non_empty_message_for_plain_exception(self) -> None:
+        """Plain exceptions with non-empty messages remain unchanged."""
+
+        async def fn() -> str:
+            raise RuntimeError("boom")
+
+        result = await safe_tool_call(fn, "test-corr-id")
+        parsed = decode_response(result)
+
+        assert parsed["status"] == "error"
+        assert parsed["error"] == {"message": "boom"}
+
     async def test_safe_tool_call_substitutes_message_when_both_empty(self) -> None:
         """ServiceNow errors with no message or body get a diagnostic fallback."""
 
