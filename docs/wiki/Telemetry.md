@@ -42,6 +42,7 @@ The module uses a two-level import guard to handle environments where `sentry-sd
 HAS_SENTRY: bool
 try:
     import sentry_sdk
+
     HAS_SENTRY = True
 except ImportError:
     HAS_SENTRY = False
@@ -51,6 +52,7 @@ _HAS_MCP_INTEGRATION = False
 if HAS_SENTRY:
     try:
         from sentry_sdk.integrations.mcp import MCPIntegration
+
         _HAS_MCP_INTEGRATION = True
     except ImportError:
         pass
@@ -66,11 +68,11 @@ When activated, Sentry is initialized with these settings:
 sentry_sdk.init(
     dsn=dsn,
     environment=environment,
-    release=_RELEASE,            # e.g. "servicenow-platform-mcp@0.9.0"
+    release=_RELEASE,  # e.g. "servicenow-platform-mcp@0.9.0"
     send_default_pii=True,
-    integrations=integrations,   # Includes MCPIntegration when available
-    traces_sample_rate=1.0,      # All transactions sampled
-    profiles_sample_rate=None,   # Profiling disabled
+    integrations=integrations,  # Includes MCPIntegration when available
+    traces_sample_rate=1.0,  # All transactions sampled
+    profiles_sample_rate=None,  # Profiling disabled
 )
 ```
 
@@ -180,6 +182,7 @@ Tests use an autouse fixture (`_disable_sentry_capture` in `tests/conftest.py`) 
 @pytest.fixture(autouse=True)
 def _disable_sentry_capture():
     import servicenow_mcp.sentry as _sentry_mod
+
     _sentry_mod._initialized = False
     yield
     _sentry_mod._initialized = False

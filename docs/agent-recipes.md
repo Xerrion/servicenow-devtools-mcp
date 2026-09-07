@@ -49,9 +49,7 @@ ServiceNow [Encoded Queries](https://docs.servicenow.com/bundle/vancouver-platfo
 # Use resolve_labels to handle label-to-value mapping automatically
 # This appends (state=1^priority=1) to the encoded_query internally
 await query(
-    table="incident",
-    resolve_labels="state=open,priority=high",
-    fields="number,short_description,priority,state"
+    table="incident", resolve_labels="state=open,priority=high", fields="number,short_description,priority,state"
 )
 ```
 
@@ -75,11 +73,11 @@ state_val = state_resp["data"]["value"]  # "1"
 
 # 2. Stage the create (preview=True by default)
 # Returns a preview_token inside data
-preview = json.loads(await record_write(
-    action="create",
-    table="incident",
-    data='{"short_description": "Email service down", "state": "1"}'
-))
+preview = json.loads(
+    await record_write(
+        action="create", table="incident", data='{"short_description": "Email service down", "state": "1"}'
+    )
+)
 
 # 3. Commit the change
 await record_apply(preview_token=preview["data"]["preview_token"])
@@ -99,11 +97,7 @@ await record_apply(preview_token=preview["data"]["preview_token"])
 # (state=1 OR state=2) AND (priority <= 2) AND (group name starts with Network)
 query_string = "stateIN1,2^priority<=2^assignment_group.nameSTARTSWITHNetwork"
 
-await query(
-    table="incident",
-    encoded_query=query_string,
-    fields="number,short_description,assignment_group.name"
-)
+await query(table="incident", encoded_query=query_string, fields="number,short_description,assignment_group.name")
 ```
 
 **Notes:** Dot-walking (`assignment_group.name`) is supported. Use `^NQ` (New Query) for top-level OR conditions that require entirely separate filter sets.
@@ -122,7 +116,7 @@ await query(
     encoded_query="active=true^sys_updated_on>=javascript:gs.daysAgoStart(7)",
     fields="name,collection,sys_updated_on,sys_updated_by",
     order_by="-sys_updated_on",
-    limit=50
+    limit=50,
 )
 ```
 
@@ -142,10 +136,7 @@ await query(
 
 # 2. List the captured changes (sys_update_xml)
 await query(
-    table="sys_update_xml",
-    encoded_query="update_set=<sys_id>",
-    fields="name,type,target_name,action",
-    limit=100
+    table="sys_update_xml", encoded_query="update_set=<sys_id>", fields="name,type,target_name,action", limit=100
 )
 ```
 
@@ -166,7 +157,7 @@ await query(
     encoded_query="level=2^sys_created_on>=javascript:gs.minutesAgo(15)",
     fields="message,source,sys_created_on",
     order_by="-sys_created_on",
-    limit=50
+    limit=50,
 )
 ```
 
@@ -187,7 +178,7 @@ await query(
     encoded_query="tablename=incident^documentkey=<sys_id>",
     fields="fieldname,oldvalue,newvalue,sys_created_by,sys_created_on",
     order_by="-sys_created_on",
-    limit=100
+    limit=100,
 )
 ```
 
@@ -228,13 +219,15 @@ import json
 # Stage the update using a local path.
 # content is read, validated, and placed in the first script-bearing field
 # resolved by DictionaryRegistry (here: sys_script.script).
-preview = json.loads(await record_write(
-    action="update",
-    table="sys_script",
-    sys_id="<sys_id>",
-    script_path="/Users/dev/project/br_logic.js",
-    preview=True
-))
+preview = json.loads(
+    await record_write(
+        action="update",
+        table="sys_script",
+        sys_id="<sys_id>",
+        script_path="/Users/dev/project/br_logic.js",
+        preview=True,
+    )
+)
 
 # Commit
 await record_apply(preview_token=preview["data"]["preview_token"])
@@ -254,12 +247,9 @@ await record_apply(preview_token=preview["data"]["preview_token"])
 import json
 
 # Get counts grouped by the reference field 'assignment_group'
-report = json.loads(await query(
-    table="incident",
-    encoded_query="active=true",
-    aggregate="count",
-    group_by="assignment_group"
-))
+report = json.loads(
+    await query(table="incident", encoded_query="active=true", aggregate="count", group_by="assignment_group")
+)
 
 # report["data"] will contain list of {assignment_group: "sys_id", count: "42"}
 ```

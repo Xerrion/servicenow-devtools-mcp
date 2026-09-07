@@ -225,7 +225,9 @@ Inspect ServiceNow Flow Designer artifacts from documented Table API records.
   ```python
   await flow(action="contract", name="Provision Entra ID Group Membership")
   await flow(action="inspect", sys_id="9e858befc3340f105cf89fcd2b01317d")
-  await flow(action="inspect", name="My Flow", sections="flow,published_state,structural_summary,warnings", section_limit=25)
+  await flow(
+      action="inspect", name="My Flow", sections="flow,published_state,structural_summary,warnings", section_limit=25
+  )
   await flow(action="find_by_table", table="incident")
   await flow(action="decode_values", value="H4sIA...")
   await flow(action="list_triggers", trigger_type="record_update", active="true", limit=50)

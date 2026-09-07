@@ -10,6 +10,7 @@ import logging
 from importlib.metadata import version as pkg_version
 from typing import TYPE_CHECKING, Any
 
+
 if TYPE_CHECKING:
     from servicenow_mcp.config import Settings
 

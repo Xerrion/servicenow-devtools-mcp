@@ -327,9 +327,9 @@ async def _validate_query_fields(
 
     field_list = ", ".join(unknown)
     return [
-        f"Query references field(s) not found on table '{table}': {field_list}. "
+        (f"Query references field(s) not found on table '{table}': {field_list}. "
         "ServiceNow silently ignores conditions on unknown fields, so the result is "
-        "NOT filtered by them. Verify the field names against the table dictionary."
+        "NOT filtered by them. Verify the field names against the table dictionary.")
     ]
 
 

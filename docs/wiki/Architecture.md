@@ -56,8 +56,7 @@ def register_tools(
     choices: ChoiceRegistry | None = None,
     dictionary: DictionaryRegistry | None = None,
     client_factory: ServiceNowClientProvider | None = None,
-) -> None:
-    ...
+) -> None: ...
 ```
 
 The bootstrap process dynamically imports modules from `servicenow_mcp.tools` and registers them.
