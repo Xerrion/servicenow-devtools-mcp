@@ -48,7 +48,7 @@ No build step is required for development. The server runs directly from source 
 ## Development Commands
 
 | Command | Purpose |
-|---|---|
+| --- | --- |
 | `uv run ruff check .` | Lint (all rules) |
 | `uv run ruff check --fix .` | Auto-fix lint issues |
 | `uv run ruff format .` | Format code |
@@ -77,7 +77,7 @@ No build step is required for development. The server runs directly from source 
 The project enables an extensive set of ruff lint rules:
 
 | Rule Set | Category |
-|---|---|
+| --- | --- |
 | E | pycodestyle errors |
 | F | pyflakes |
 | W | pycodestyle warnings |
@@ -149,7 +149,7 @@ The `servicenow_mcp.server` module has `call-arg` error code disabled for the dy
 ## Naming Conventions
 
 | Category | Convention | Examples |
-|---|---|---|
+| --- | --- | --- |
 | Functions/methods/variables | `snake_case` | `check_table_access`, `query_store` |
 | Classes | `PascalCase` | `ServiceNowClient`, `ChoiceRegistry` |
 | Constants | `UPPER_SNAKE_CASE` | `DENIED_TABLES`, `MASK_VALUE`, `PACKAGE_REGISTRY` |
@@ -214,7 +214,7 @@ The private callable registry is reserved for tests that must directly invoke re
 Defined in `tests/conftest.py`:
 
 | Fixture | Scope | Description |
-|---|---|---|
+| --- | --- | --- |
 | `_disable_sentry_capture` | autouse | Resets Sentry `_initialized` flag to prevent real captures during tests |
 | `settings` | per-test | Dev environment settings (`SERVICENOW_ENV=dev`) |
 | `prod_settings` | per-test | Production environment settings (`SERVICENOW_ENV=prod`) |
@@ -242,16 +242,19 @@ Uses GitHub's concurrency groups with `cancel-in-progress: true` - new pushes ca
 
 Three parallel jobs run on `ubuntu-latest`:
 
-**1. Lint**
+#### 1. Lint
+
 - Installs dependencies with `uv sync --group dev`
 - Runs `uv run ruff check .` (lint rules)
 - Runs `uv run ruff format --check .` (formatting verification)
 
-**2. Type Check**
+#### 2. Type Check
+
 - Installs dependencies with `uv sync --group dev`
 - Runs `uv run mypy src/`
 
-**3. Test** (matrix: Python 3.12, 3.13, 3.14)
+#### 3. Test (matrix: Python 3.12, 3.13, 3.14)
+
 - Installs the target Python version via `uv python install`
 - Installs dependencies with `uv sync --group dev --python ${{ matrix.python-version }}`
 - Runs `uv run --python ${{ matrix.python-version }} pytest`
@@ -275,7 +278,7 @@ Automated via **release-please** (`.github/workflows/release-please.yml`).
 ### Required Secrets
 
 | Secret | Purpose |
-|---|---|
+| --- | --- |
 | `RELEASE_PLEASE_TOKEN` | GitHub token for creating release PRs |
 | `PYPI_TOKEN` | PyPI API token for package publishing |
 | `CODECOV_TOKEN` | Codecov upload token |
@@ -285,7 +288,7 @@ Automated via **release-please** (`.github/workflows/release-please.yml`).
 Release-please uses conventional commits to determine version bumps:
 
 | Prefix | Version Bump | Example |
-|---|---|---|
+| --- | --- | --- |
 | `feat:` | Minor | `feat: add attachment upload tool` |
 | `fix:` | Patch | `fix: handle empty query results` |
 | `docs:` | None | `docs: update README` |
@@ -307,7 +310,7 @@ Release-please uses conventional commits to determine version bumps:
 ### Core Dependencies
 
 | Package | Purpose |
-|---|---|
+| --- | --- |
 | `mcp` (>=2.1.1) | MCP SDK v2 server framework |
 | `httpx` (>=0.27.0) | Independent async HTTP client for ServiceNow REST API calls |
 | `pydantic` (>=2.0.0) | Data validation |
@@ -320,7 +323,7 @@ Release-please uses conventional commits to determine version bumps:
 ### Dev Dependencies
 
 | Package | Purpose |
-|---|---|
+| --- | --- |
 | `pytest` (>=8.0.0) | Test framework |
 | `pytest-asyncio` (>=0.24.0) | Async test support |
 | `respx` (>=0.21.0) | httpx mocking |

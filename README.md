@@ -222,17 +222,17 @@ the server and is not part of the client-facing schema.
 | `query` | Reads records or aggregates. | `table`; list mode needs `fields`; use `encoded_query`, `limit`, `offset`, `order_by`, `display_values`, `aggregate`, `group_by`, and `resolve_labels`. Exact `sys_id` mode is also supported. | `full`, `readonly`, `core_readonly` |
 | `describe` | Describes fields, tables, or script fields. | Default table description; `action=list_tables` with optional `name_filter`; `action=list_script_fields` with `table`. Supports `fields`, `verbose`, `include_docs`, `field_offset`, and `field_limit`. | `full`, `readonly`, `core_readonly` |
 | `record_read` | Reads one record by `sys_id` or `name`. | `table` and exactly one selector. `fields` is optional; `*` requests all masked fields. Includes discovered `script_fields`. | `full`, `readonly` |
-| `record_write` | Creates, updates, or deletes a record. | `action=create|update|delete`, `table`, optional `sys_id`, JSON `data`, optional `script_path` and `script_field`, and `preview` (default `true`). | `full` |
+| `record_write` | Creates, updates, or deletes a record. | `action=create \| update \| delete`, `table`, optional `sys_id`, JSON `data`, optional `script_path` and `script_field`, and `preview` (default `true`). | `full` |
 | `record_apply` | Applies a record-write preview. | `preview_token` from `record_write`. The token is single-use. | `full` |
-| `attachment` | Reads attachment metadata and content. | `action=list|get|download|download_by_name`; list and name lookup use `table` and `table_sys_id`; direct actions use attachment `sys_id`. | `full`, `readonly`, `core_readonly` |
-| `attachment_write` | Uploads or deletes attachments. | `action=upload|delete`; upload uses parent table, record ID, file name, Base64 content, and MIME type; delete uses attachment `sys_id`. | `full` |
-| `investigate` | Runs or explains investigations. | `action=run|explain|describe`; run uses `name` and JSON `params`; explain uses `element_id=table:sys_id` and optional `name`. | `full`, `readonly` |
+| `attachment` | Reads attachment metadata and content. | `action=list \| get \| download \| download_by_name`; list and name lookup use `table` and `table_sys_id`; direct actions use attachment `sys_id`. | `full`, `readonly`, `core_readonly` |
+| `attachment_write` | Uploads or deletes attachments. | `action=upload \| delete`; upload uses parent table, record ID, file name, Base64 content, and MIME type; delete uses attachment `sys_id`. | `full` |
+| `investigate` | Runs or explains investigations. | `action=run \| explain \| describe`; run uses `name` and JSON `params`; explain uses `element_id=table:sys_id` and optional `name`. | `full`, `readonly` |
 | `resolve_choice` | Resolves choice labels. | `table`, `field`, and optional `label`. An empty label returns the full mapping. | `full`, `readonly` |
 | `service_catalog` | Reads catalogs and performs catalog/cart actions. | Actions are listed below. Reads use IDs, filters, and paging. `order_now` and `add_to_cart` accept a JSON `variables` object; all state-changing actions are gated. | `full` |
-| `audit` | Inspects audit posture and history. | `action=check_field|check_fields|check_table|history|describe`; table and field selectors are action-dependent. | `full`, `readonly` |
-| `flow` | Inspects Flow Designer data. | `action=contract|inspect|find_by_table|decode_values|list_triggers|describe`; flow selection uses `sys_id` or `name`. | `full`, `readonly` |
-| `code_search` | Searches ServiceNow script artifacts. | `action=search|list_tables|describe`; search needs `term` and accepts `table`, `search_group`, and `limit`. | `full`, `readonly` |
-| `analysis` | Composes RITM variables or reads journal history. | `action=ritm_variables|journal_history|describe`; inputs are detailed below. | `full`, `readonly` |
+| `audit` | Inspects audit posture and history. | `action=check_field \| check_fields \| check_table \| history \| describe`; table and field selectors are action-dependent. | `full`, `readonly` |
+| `flow` | Inspects Flow Designer data. | `action=contract \| inspect \| find_by_table \| decode_values \| list_triggers \| describe`; flow selection uses `sys_id` or `name`. | `full`, `readonly` |
+| `code_search` | Searches ServiceNow script artifacts. | `action=search \| list_tables \| describe`; search needs `term` and accepts `table`, `search_group`, and `limit`. | `full`, `readonly` |
+| `analysis` | Composes RITM variables or reads journal history. | `action=ritm_variables \| journal_history \| describe`; inputs are detailed below. | `full`, `readonly` |
 
 Use each tool's `describe` action where available for the runtime action
 registry. The public tool schemas are the authoritative input contract.

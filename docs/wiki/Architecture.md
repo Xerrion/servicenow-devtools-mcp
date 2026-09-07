@@ -104,7 +104,7 @@ The `@tool_handler` decorator (in `decorators.py`) wraps every tool invocation:
 
 ## Source Layout
 
-```
+```text
 src/servicenow_mcp/
     server.py              # Entry point, bootstrap
     client.py              # ServiceNow HTTP client (httpx)
@@ -132,6 +132,7 @@ src/servicenow_mcp/
 ## Client Retentions
 
 Per ADR §2.3, the core `ServiceNowClient` retains several specialized methods to support the unified dispatchers:
+
 - `list_reports` and `get_email`
 - `get_import_set_record`
 - Full `sc_*` method suite for Service Catalog

@@ -42,7 +42,7 @@ uv add servicenow-platform-mcp
 Set `SERVICENOW_INSTANCE_URL` and choose one authentication method. These variables are passed to the server by your MCP client configuration.
 
 | Variable | Required | Description |
-|---|---|---|
+| --- | --- | --- |
 | `SERVICENOW_INSTANCE_URL` | Yes | Full instance URL, must start with `https://` |
 | `SERVICENOW_API_KEY` | Conditional | ServiceNow API key. When set, it replaces Basic Auth. |
 | `SERVICENOW_USERNAME` | Conditional | ServiceNow username for Basic Auth; required when no API key is set |

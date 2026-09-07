@@ -12,15 +12,16 @@ For security guardrails that apply across all tools, see [[Safety-and-Policy]]. 
 
 The `list_tool_packages` tool is always available, regardless of which tool package is configured.
 
-| Tool | Description | Key Parameters |
-|---|---|---|
-| `list_tool_packages` | List available tool packages and their contents | - |
+| Tool                 | Description                                     | Key Parameters |
+| -------------------- | ----------------------------------------------- | -------------- |
+| `list_tool_packages` | List available tool packages and their contents | -              |
 
 ---
 
 ## Introspection Tools
 
 ### `query`
+
 Search and retrieve records from any table using ServiceNow encoded query strings.
 
 - **Purpose:** Primary tool for finding records, auditing history (`sys_audit`), or checking logs (`syslog`).
@@ -33,6 +34,7 @@ Search and retrieve records from any table using ServiceNow encoded query string
   - `display_values`: If `true`, returns human-readable labels in a `_display` object.
   - `limit`, `offset`, `order_by`: Pagination and sorting.
 - **Example:**
+
   ```python
   await query(table="incident", encoded_query="active=true^priority=1", fields="number,short_description")
   ```
@@ -40,6 +42,7 @@ Search and retrieve records from any table using ServiceNow encoded query string
 ServiceNow encoded queries are the only supported query construction interface. Copy a filter breadcrumb from a ServiceNow list, or construct the encoded query string directly, then pass it in `encoded_query`. Query safety still applies.
 
 ### `describe`
+
 Retrieve inherited schema and metadata for a table, or enumerate its script-bearing fields.
 
 - **Purpose:** Understand a table's structure before querying or writing; discover dictionary-driven script fields at runtime.
@@ -51,6 +54,7 @@ Retrieve inherited schema and metadata for a table, or enumerate its script-bear
   - `field_offset`: Offset for continuing the default field page.
   - `field_limit`: Page size from 1 to 100.
 - **Example:**
+
   ```python
   await describe(table="incident")
   await describe(action="list_script_fields", table="sys_script")
@@ -65,6 +69,7 @@ Ordinary field listing and explicit lookup walk the bounded `sys_db_object.super
 Record mutations use a two-stage preview/apply flow by default. A caller can explicitly set `preview=false` to request an immediate write.
 
 ### `record_write`
+
 Unified tool for staging `create`, `update`, or `delete` actions.
 
 - **Purpose:** Perform mutations with built-in safety checks and preview flow.
@@ -78,6 +83,7 @@ Unified tool for staging `create`, `update`, or `delete` actions.
   - `preview`: If `true` (default), stores the change in `PreviewTokenStore` and returns a `preview_token`.
 - **Notes:** When the resolved script field has `internal_type == 'xml'` (e.g. `sys_ui_macro.xml`), `record_write` validates the rendered XML (`xml.etree.ElementTree.fromstring`) before any platform call; malformed content is rejected with a structured error.
 - **Example:**
+
   ```python
   # Stage a create
   preview = await record_write(action="create", table="incident", data='{"short_description": "New issue"}')
@@ -85,6 +91,7 @@ Unified tool for staging `create`, `update`, or `delete` actions.
   ```
 
 ### `record_read`
+
 Read-only counterpart to `record_write` for any table.
 
 - **Purpose:** Inspect an existing record (and learn its script-bearing fields) before composing a multi-field update via `record_write` + `script_field`.
@@ -95,17 +102,20 @@ Read-only counterpart to `record_write` for any table.
 - **Response:** Masked record fields plus the `script_fields` list resolved from `sys_dictionary` for the table.
 - **Availability:** Included in both the `full` and `readonly` packages.
 - **Example:**
+
   ```python
   await record_read(table="sys_script", name="Validate priority on insert")
   ```
 
 ### `record_apply`
+
 Commits a write operation previously staged with `record_write(preview=true)`.
 
 - **Purpose:** Finalize a mutation after inspecting the preview.
 - **Key Parameters:**
   - `preview_token`: The token returned by `record_write`.
 - **Example:**
+
   ```python
   await record_apply(preview_token="uuid-token-here")
   ```
@@ -115,6 +125,7 @@ Commits a write operation previously staged with `record_write(preview=true)`.
 ## Specialized Dispatchers
 
 ### `attachment`
+
 Unified dispatcher for reading and downloading record attachments.
 
 - **Actions:**
@@ -122,11 +133,13 @@ Unified dispatcher for reading and downloading record attachments.
   - `get`: Fetch metadata for a specific attachment by sys_id.
   - `download`: Download attachment content as base64.
 - **Example:**
+
   ```python
   await attachment(action="list", table_name="incident", table_sys_id="...")
   ```
 
 ### `attachment_write`
+
 Dispatcher for attachment mutations. Included in `full` or available as the explicit `attachment_write` custom group. Runtime write gating applies to every action.
 
 - **Actions:**
@@ -134,6 +147,7 @@ Dispatcher for attachment mutations. Included in `full` or available as the expl
   - `delete`: Delete an attachment by sys_id.
 
 ### `investigate`
+
 Runs pre-defined diagnostic and health check modules.
 
 - **Actions:**
@@ -207,6 +221,7 @@ Inspect ServiceNow Flow Designer artifacts from documented Table API records.
   - `sections`: For `inspect` and `contract`, comma-separated sections to return. Empty selects `flow,published_state,structural_summary,warnings`; `*` selects every section.
   - `section_limit`: Maximum rows or nodes per selected section. The default is 100, capped by `MAX_ROW_LIMIT`.
 - **Examples:**
+
   ```python
   await flow(action="contract", name="Provision Entra ID Group Membership")
   await flow(action="inspect", sys_id="9e858befc3340f105cf89fcd2b01317d")
@@ -216,6 +231,7 @@ Inspect ServiceNow Flow Designer artifacts from documented Table API records.
   await flow(action="list_triggers", trigger_type="record_update", active="true", limit=50)
   await flow(action="describe")
   ```
+
 - **`inspect` response highlights:** The default `data` contains only `flow`, `published_state`, `structural_summary`, and `warnings`. Request other sections by name, or pass `sections="*"` for all inspect sections.
   - `flow`: Flow metadata (`sys_id`, `name`, `internal_name`, `type`, `active`, `description`, `sys_scope`).
   - `published_state`: `{master_snapshot, latest_snapshot, drift}`. `drift` is `true` when the published snapshot differs from the latest authored snapshot.
@@ -230,6 +246,7 @@ Inspect ServiceNow Flow Designer artifacts from documented Table API records.
 - **Selection metadata:** Successful `inspect` and `contract` responses disclose the selected sections and truncation metadata. Completeness includes bounded dependencies: for example, `warnings` reports saturated action, logic, or trigger probes, and `v1_variable_values` reports when its V1-action probe can omit later values. Below `MAX_ROW_LIMIT`, the continuation tells you to request a larger `section_limit`. At the configured maximum, no further continuation is available through `flow`; the metadata gives the complete direct-query sequence, field projections, and encoded-query filters needed to finish the selected analysis with `query`. Paginate those reads with `limit` and `offset`; normal query safety and row limits still apply.
 
 ### `resolve_choice`
+
 Resolves human-readable labels to underlying ServiceNow values using the `sys_choice` table.
 
 - **Key Parameters:**
@@ -237,15 +254,18 @@ Resolves human-readable labels to underlying ServiceNow values using the `sys_ch
   - `field`: Field name.
   - `label`: Human label (e.g., "In Progress"). If omitted, returns all choices for the field.
 - **Example:**
+
   ```python
   await resolve_choice(table="incident", field="state", label="New")
   ```
 
 ### `service_catalog`
+
 Unified dispatcher for Service Catalog operations.
 
 - **Actions:** `list_catalogs`, `get_catalog`, `list_categories`, `get_category`, `list_items`, `get_item`, `get_variables`, `order_now`, `add_to_cart`, `get_cart`, `submit_cart`, `checkout`.
 - **Example:**
+
   ```python
   await service_catalog(action="list_items", text="laptop")
   ```
@@ -255,6 +275,7 @@ Unified dispatcher for Service Catalog operations.
 ## Migration Note
 
 The following specialized tool families from v0.9.x have been **deleted** and replaced by the unified tools above:
+
 - ATF tools (Deleted entirely)
 - Specialized domain tools (`incident_*`, `change_*`, etc. — Use `query`, `record_write`, and `resolve_choice`)
 - Change Intelligence and Debug families (`changes_*`, `debug_*` — Use `query` against system tables like `sys_update_xml` or `syslog`)

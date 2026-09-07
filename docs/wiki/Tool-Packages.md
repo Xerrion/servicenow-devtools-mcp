@@ -9,7 +9,7 @@ The server has 13 tool groups and 4 focused presets. The public `full` surface c
 ## Preset Packages
 
 | Package | Total MCP Tools | Description |
-|---|---|---|
+| --- | --- | --- |
 | `full` (default) | 15 | All unified tools, including `analysis`, `audit`, `flow`, and `code_search` |
 | `readonly` | 11 | Includes `record_read`, `analysis`, `audit`, `flow`, `code_search`, and attachment reads |
 | `core_readonly` | 4 | Minimal read-only core: `query`, `describe`, `attachment`, `list_tool_packages` |

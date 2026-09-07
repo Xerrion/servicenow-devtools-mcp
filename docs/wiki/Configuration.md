@@ -7,7 +7,7 @@ All configuration is handled through environment variables, loaded via [pydantic
 ## Environment Variables
 
 | Variable | Required | Default | Description |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `SERVICENOW_INSTANCE_URL` | Yes | - | Full URL (must start with `https://`) |
 | `SERVICENOW_API_KEY` | Conditional | - | ServiceNow API key. When set, API-key authentication is used instead of Basic Auth. |
 | `SERVICENOW_USERNAME` | Conditional | - | ServiceNow username for Basic Auth. Required when `SERVICENOW_API_KEY` is not set. |
@@ -40,12 +40,14 @@ Keep credentials and API keys out of version control. Store local values in `.en
 The `MCP_TOOL_PACKAGE` variable controls the available tool surface.
 
 ### Presets
+
 - `full`: 15 total tools (14 package tools plus always-on `list_tool_packages`; includes `analysis` and `code_search`).
 - `readonly`: 11 total tools (excludes all write tools and `service_catalog`; includes `record_read`, `attachment`, `analysis`, `audit`, `flow`, and `code_search`).
 - `core_readonly`: 4 total tools (`query`, `describe`, `attachment`, `list_tool_packages`).
 - `none`: Only `list_tool_packages`.
 
 ### Custom Packages
+
 You can list specific tools: `MCP_TOOL_PACKAGE="query,describe,investigate"`. `build_query` is not a valid tool name.
 *Note: `service_catalog` and `record_write` are now tool names. `record_write` should typically be paired with `record_apply` for the preview flow.*
 The `attachment` group is read-only. Add `attachment_write` explicitly to opt in to attachment upload and delete.
@@ -61,6 +63,7 @@ The cache uses monotonic TTLs, synchronous reloads, same-key single-flight loadi
 ## Write Gating & Production Mode
 
 When `SERVICENOW_ENV` is `"prod"` or `"production"`:
+
 - `record_write`, `record_apply`, and `attachment_write` operations are rejected.
 - `service_catalog` order/cart operations are rejected.
 - All read operations (`query`, `describe`, `attachment` list/get) remain functional.
@@ -79,6 +82,7 @@ Example:
 ## File Loading
 
 The server automatically reads configuration from:
+
 1. `.env.local` (highest priority)
 2. `.env`
 3. Shell environment variables (override files)

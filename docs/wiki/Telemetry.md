@@ -27,7 +27,7 @@ The metadata cache covers choices, dictionary chain and field metadata, script-f
 ## Configuration
 
 | Variable | Default | Purpose |
-|---|---|---|
+| --- | --- | --- |
 | `SENTRY_DSN` | `""` (disabled) | Sentry Data Source Name - activates error tracking when set |
 | `SENTRY_ENVIRONMENT` | Falls back to `SERVICENOW_ENV` | Environment label shown in Sentry UI |
 
@@ -130,7 +130,7 @@ Captures persistent `sys_choice` fetch failures when the registry cannot load ch
 ## Public API
 
 | Function | Signature | Purpose |
-|---|---|---|
+| --- | --- | --- |
 | `setup_sentry` | `(settings: Settings) -> None` | Initialize SDK with DSN gating. No-ops on re-call. |
 | `capture_exception` | `(exc: BaseException \| None) -> None` | Capture exception (or current `sys.exc_info()` if `None`) |
 | `set_sentry_tag` | `(key: str, value: str) -> None` | Set indexed tag on current isolation scope |

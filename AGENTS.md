@@ -11,11 +11,11 @@
 
 ### Dependencies
 
-| Type          | Packages                                                                   |
-| ------------- | -------------------------------------------------------------------------- |
-| Core          | `mcp>=2.1.1`, `httpx`, `pydantic`, `pydantic-settings`, `python-dotenv`, `uvicorn`, `starlette` |
-| Sentry        | `sentry-sdk>=2.55.0`                                                              |
-| Dev           | `pytest`, `pytest-asyncio`, `respx`, `ruff`, `mypy`, `basedpyright`, `pytest-cov`          |
+| Type   | Packages                                                                                        |
+|--------|-------------------------------------------------------------------------------------------------|
+| Core   | `mcp>=2.1.1`, `httpx`, `pydantic`, `pydantic-settings`, `python-dotenv`, `uvicorn`, `starlette` |
+| Sentry | `sentry-sdk>=2.55.0`                                                                            |
+| Dev    | `pytest`, `pytest-asyncio`, `respx`, `ruff`, `mypy`, `basedpyright`, `pytest-cov`               |
 
 ## 🚀 Setup
 
@@ -28,26 +28,26 @@ No build step needed for development. `uv build` creates the distribution wheel.
 
 ## 🔧 Lint / Format / Type-check
 
-| Command                      | Purpose                                                                 |
+| Command | Purpose |
 | ---------------------------- | ----------------------------------------------------------------------- |
-| `uv run ruff check .`          | Lint (rules: E, F, W, I, UP, B, SIM, RUF, C4, DTZ, T20, PTH, TC, RET, PLW, PT, A, COM, PIE, ISC, G, INP, TID, ERA; E501/COM812/ISC001/TC001-3/RET504-5 ignored) |
-| `uv run ruff check --fix .`    | Auto-fix lint issues                                                    |
-| `uv run ruff format .`         | Format code                                                             |
-| `uv run ruff format --check .` | Verify formatting without changes                                       |
-| `uv run mypy src/`             | Type checking (`disallow_untyped_defs=true`, `ignore_missing_imports=true`) |
+| `uv run ruff check .` | Lint (rules: E, F, W, I, UP, B, SIM, RUF, C4, DTZ, T20, PTH, TC, RET, PLW, PT, A, COM, PIE, ISC, G, INP, TID, ERA; E501/COM812/ISC001/TC001-3/RET504-5 ignored) |
+| `uv run ruff check --fix .` | Auto-fix lint issues |
+| `uv run ruff format .` | Format code |
+| `uv run ruff format --check .` | Verify formatting without changes |
+| `uv run mypy src/` | Type checking (`disallow_untyped_defs=true`, `ignore_missing_imports=true`) |
 
 mypy override: `servicenow_mcp.server` has `call-arg` error code disabled.
 
 ## 🧪 Test Commands
 
-| Command                                                    | Purpose                                                        |
-| ---------------------------------------------------------- | -------------------------------------------------------------- |
+| Command                                                      | Purpose                                                          |
+|--------------------------------------------------------------|------------------------------------------------------------------|
 | `uv run pytest`                                              | All unit tests (integration excluded via `-m 'not integration'`) |
-| `uv run pytest tests/test_client.py`                         | Single file                                                    |
-| `uv run pytest tests/test_client.py::TestClass::test_method` | Single test                                                    |
-| `uv run pytest -k "keyword"`                                 | Keyword match                                                  |
+| `uv run pytest tests/test_client.py`                         | Single file                                                      |
+| `uv run pytest tests/test_client.py::TestClass::test_method` | Single test                                                      |
+| `uv run pytest -k "keyword"`                                 | Keyword match                                                    |
 | `uv run pytest -m integration`                               | Integration tests (requires `.env.local`)                        |
-| `uv run pytest --no-cov`                                     | Skip coverage for speed                                        |
+| `uv run pytest --no-cov`                                     | Skip coverage for speed                                          |
 
 - Default addopts: `-m 'not integration' --cov=servicenow_mcp --cov-report=xml --cov-report=term-missing`
 - `asyncio_mode = "auto"` - no manual event loop configuration needed.
@@ -79,15 +79,15 @@ mypy override: `servicenow_mcp.server` has `call-arg` error code disabled.
 
 ## 🏷 Naming Conventions
 
-| Category                    | Convention                 | Examples                                                            |
-| --------------------------- | -------------------------- | ------------------------------------------------------------------- |
-| Functions/methods/variables | `snake_case`                 | `check_table_access`, `gate_write`                                      |
-| Classes                     | `PascalCase`                 | `ServiceNowClient`, `BasicAuthProvider`, `ChoiceRegistry`                 |
+| Category                    | Convention                   | Examples                                                                    |
+|-----------------------------|------------------------------|-----------------------------------------------------------------------------|
+| Functions/methods/variables | `snake_case`                 | `check_table_access`, `gate_write`                                          |
+| Classes                     | `PascalCase`                 | `ServiceNowClient`, `BasicAuthProvider`, `ChoiceRegistry`                   |
 | Constants                   | `UPPER_SNAKE_CASE`           | `DENIED_TABLES`, `MASK_VALUE`, `PACKAGE_REGISTRY`, `INVESTIGATION_REGISTRY` |
-| Private                     | Single underscore `_` prefix | `_table_url`, `_http_client`, `_ensure_client`                            |
-| Logger                      | Module-level               | `logger = logging.getLogger(__name__)`                                |
-| Test classes                | `Test` prefix + feature      | `TestServiceNowClientGetRecord`, `TestTableDescribe`                    |
-| Test methods                | `test_` prefix + descriptive | `test_get_record_success`                                             |
+| Private                     | Single underscore `_` prefix | `_table_url`, `_http_client`, `_ensure_client`                              |
+| Logger                      | Module-level                 | `logger = logging.getLogger(__name__)`                                      |
+| Test classes                | `Test` prefix + feature      | `TestServiceNowClientGetRecord`, `TestTableDescribe`                        |
+| Test methods                | `test_` prefix + descriptive | `test_get_record_success`                                                   |
 
 ## 📝 Docstrings
 
@@ -112,8 +112,8 @@ ServiceNowMCPError(Exception)     # Root; has status_code attribute
 
 HTTP status mapping in `client.py:_raise_for_status()`:
 
-| HTTP Status  | Exception          |
-| ------------ | ------------------ |
+| HTTP Status  | Exception            |
+|--------------|----------------------|
 | 401          | `AuthError`          |
 | 403          | `ForbiddenError`     |
 | 404          | `NotFoundError`      |
@@ -307,8 +307,8 @@ Read-only counterpart. `record_read(table, sys_id=..., name=...)` returns the ma
 
 ### 6 Default Mappings
 
-| Table          | Field              |
-| -------------- | ------------------ |
+| Table            | Field                |
+|------------------|----------------------|
 | `incident`       | `state`              |
 | `change_request` | `state`              |
 | `problem`        | `state`              |
@@ -322,8 +322,8 @@ Dispatched via the `investigate` tool with `action='run'` or `action='explain'`.
 
 ### 7 Available Investigations
 
-| Investigation           | Purpose                                  |
-| ----------------------- | ---------------------------------------- |
+| Investigation             | Purpose                                  |
+|---------------------------|------------------------------------------|
 | `stale_automations`       | Find unused or stale automation rules    |
 | `deprecated_apis`         | Detect deprecated API usage              |
 | `table_health`            | Analyze table structure and data quality |
@@ -369,13 +369,13 @@ Dispatched via the read-only `audit` tool. Available in the `full` and `readonly
 
 ### 5 Audit Actions
 
-| Action | Purpose |
-| ------ | ------- |
-| `check_field` | Resolve the combined audit verdict for one `(table, field)` pair: chain-walked `sys_db_object.sys_audit`, chain-walked `sys_dictionary.audit`, `no_audit` attribute veto, and a positive-control count from `sys_audit`. |
-| `check_fields` | Batch variant of `check_field`. Accepts a comma-separated `fields_csv` (max 50) and returns one verdict per field plus a single shared `table_change_count`. |
-| `check_table` | Table-level posture: table default, super_class chain, and the list of fields whose resolved audit flag differs from that default. |
-| `history` | Masked, date-bounded audit trail for one record. Queries `sys_audit` with the real column names (`tablename`, `documentkey`, `fieldname`) and masks entries via `mask_audit_entry`. |
-| `describe` | Return the action registry without platform I/O. |
+| Action         | Purpose                                                                                                                                                                                                                  |
+|----------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `check_field`  | Resolve the combined audit verdict for one `(table, field)` pair: chain-walked `sys_db_object.sys_audit`, chain-walked `sys_dictionary.audit`, `no_audit` attribute veto, and a positive-control count from `sys_audit`. |
+| `check_fields` | Batch variant of `check_field`. Accepts a comma-separated `fields_csv` (max 50) and returns one verdict per field plus a single shared `table_change_count`.                                                             |
+| `check_table`  | Table-level posture: table default, super_class chain, and the list of fields whose resolved audit flag differs from that default.                                                                                       |
+| `history`      | Masked, date-bounded audit trail for one record. Queries `sys_audit` with the real column names (`tablename`, `documentkey`, `fieldname`) and masks entries via `mask_audit_entry`.                                      |
+| `describe`     | Return the action registry without platform I/O.                                                                                                                                                                         |
 
 - `verdict` enum: `audited`, `not_audited_field_flag` (with `reason` of `audit_flag` or `no_audit_attribute`), `not_audited_table_flag`, `audited_but_inactive`, `inconclusive`.
 - The `sys_audit` table is one of the largest tables on the platform. Every action that reads it applies a default 90-day window. Callers MAY override the window via `window_days` (or an explicit `since` on `history`) but SHOULD keep the default - wider windows cause slow queries and risk timeouts. Responses include both the `window_days` actually used and a `window_note` describing it.
@@ -405,21 +405,21 @@ Dispatched via the read-only `audit` tool. Available in the `full` and `readonly
 
 ## ⚙️ Configuration (Settings)
 
-| Field                   | Type      | Default                                              | Env Var                 |
+| Field | Type | Default | Env Var |
 | ----------------------- | --------- | ---------------------------------------------------- | ----------------------- |
-| `servicenow_instance_url` | `str`       | required                                             | `SERVICENOW_INSTANCE_URL` |
-| `servicenow_api_key`      | `SecretStr` | `""` (replaces Basic Auth when set)                  | `SERVICENOW_API_KEY`      |
-| `servicenow_username`     | `str`       | `""` (required without API key)                      | `SERVICENOW_USERNAME`     |
-| `servicenow_password`     | `SecretStr` | `""` (required without API key)                      | `SERVICENOW_PASSWORD`     |
-| `mcp_tool_package`        | `str`       | `"full"`                                               | `MCP_TOOL_PACKAGE`        |
-| `servicenow_env`          | `str`       | `"dev"`                                                | `SERVICENOW_ENV`          |
-| `max_row_limit`           | `int`       | `100` (range 1-10000)                                  | `MAX_ROW_LIMIT`           |
-| `large_table_names_csv`   | `str`       | `"syslog,sys_audit,sys_log_transaction,sys_email_log"` | `LARGE_TABLE_NAMES_CSV`   |
-| `script_allowed_root`     | `str`       | `""`                                                     | `SCRIPT_ALLOWED_ROOT`     |
-| `httpx_timeout_seconds`   | `float`     | `30.0` (range 1.0-600.0)                              | `HTTPX_TIMEOUT_SECONDS`   |
-| `metadata_cache_ttl_seconds` | `int`    | `300` (range 1-86400)                                  | `METADATA_CACHE_TTL_SECONDS` |
-| `sentry_dsn`              | `str`       | `""`                                                     | `SENTRY_DSN`              |
-| `sentry_environment`      | `str`       | `""`                                                     | `SENTRY_ENVIRONMENT`      |
+| `servicenow_instance_url` | `str` | required | `SERVICENOW_INSTANCE_URL` |
+| `servicenow_api_key` | `SecretStr` | `""` (replaces Basic Auth when set) | `SERVICENOW_API_KEY` |
+| `servicenow_username` | `str` | `""` (required without API key) | `SERVICENOW_USERNAME` |
+| `servicenow_password` | `SecretStr` | `""` (required without API key) | `SERVICENOW_PASSWORD` |
+| `mcp_tool_package` | `str` | `"full"` | `MCP_TOOL_PACKAGE` |
+| `servicenow_env` | `str` | `"dev"` | `SERVICENOW_ENV` |
+| `max_row_limit` | `int` | `100` (range 1-10000) | `MAX_ROW_LIMIT` |
+| `large_table_names_csv` | `str` | `"syslog,sys_audit,sys_log_transaction,sys_email_log"` | `LARGE_TABLE_NAMES_CSV` |
+| `script_allowed_root` | `str` | `""` | `SCRIPT_ALLOWED_ROOT` |
+| `httpx_timeout_seconds` | `float` | `30.0` (range 1.0-600.0) | `HTTPX_TIMEOUT_SECONDS` |
+| `metadata_cache_ttl_seconds` | `int` | `300` (range 1-86400) | `METADATA_CACHE_TTL_SECONDS` |
+| `sentry_dsn` | `str` | `""` | `SENTRY_DSN` |
+| `sentry_environment` | `str` | `""` | `SENTRY_ENVIRONMENT` |
 
 ## 📦 Packages & Tool Groups
 
@@ -428,7 +428,7 @@ The registry contains 4 preset packages and 13 tool groups. Tool groups are load
 ### Preset Packages
 
 | Package | Tools | Description |
-|---|---|---|
+| --- | --- | --- |
 | `full` | 15 | Every tool group |
 | `readonly` | 11 | Read tools + investigate + resolve_choice + analysis |
 | `core_readonly` | 4 | Query + describe + attachment only |
@@ -465,13 +465,13 @@ Opt-in error tracking. `tool.name` tag values were updated in v0.10.0 to reflect
 
 ### Key Functions
 
-| Function | Purpose |
-|---|---|
-| `setup_sentry(settings)` | Initializes Sentry SDK |
-| `capture_exception(exc)` | Captures exception |
-| `set_sentry_tag(key, value)` | Sets indexed tag |
-| `set_sentry_context(key, data)` | Sets structured context |
-| `shutdown_sentry()` | Flushes and closes client |
+| Function                        | Purpose                   |
+|---------------------------------|---------------------------|
+| `setup_sentry(settings)`        | Initializes Sentry SDK    |
+| `capture_exception(exc)`        | Captures exception        |
+| `set_sentry_tag(key, value)`    | Sets indexed tag          |
+| `set_sentry_context(key, data)` | Sets structured context   |
+| `shutdown_sentry()`             | Flushes and closes client |
 
 ## 🧪 Testing Patterns
 

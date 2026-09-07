@@ -30,7 +30,7 @@ The server runs locally via stdio transport and is launched by your MCP-compatib
 ## Quick Navigation
 
 | Page | Description |
-|---|---|
+| --- | --- |
 | [[Getting-Started]] | Installation, MCP client configuration, first steps |
 | [[Configuration]] | Environment variables, settings reference |
 | [[Tool-Reference]] | Complete tool reference with descriptions |
@@ -44,13 +44,13 @@ The server runs locally via stdio transport and is launched by your MCP-compatib
 
 ## Quick Start
 
-**1. Run the server**
+### 1. Run the server
 
 ```bash
 uvx servicenow-platform-mcp
 ```
 
-**2. Set environment variables**
+### 2. Set environment variables
 
 ```bash
 SERVICENOW_INSTANCE_URL=https://your-instance.service-now.com

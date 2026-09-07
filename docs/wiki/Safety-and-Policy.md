@@ -7,7 +7,7 @@ The server enforces multiple layers of safety guardrails to prevent accidental d
 ## Overview
 
 | Layer | Purpose |
-|---|---|
+| --- | --- |
 | Table access control | Blocks access to security-sensitive tables (e.g., `sys_credentials`) |
 | Sensitive field masking | Masks passwords, tokens, and secrets in responses |
 | Query safety | Enforces row limits and date-bounded filters on large tables |
@@ -37,7 +37,9 @@ The following security-sensitive tables are permanently blocked. Any attempt to 
 The `mask_record` (used by `query`) and `mask_sensitive_fields` (used by `record_write`) functions automatically replace sensitive values with `***MASKED***`.
 
 ### Masked Patterns
+
 Any field name matching these regex patterns is masked:
+
 - `password`, `token`, `secret`, `credential`, `api_key`, `private_key`.
 
 ---
@@ -47,11 +49,14 @@ Any field name matching these regex patterns is masked:
 Query safety prevents performance degradation on the ServiceNow instance.
 
 ### Row Limits
+
 - All queries are capped at `MAX_ROW_LIMIT` (default 100, max 10000).
 - If no limit is provided, the default is applied automatically.
 
 ### Large Table Protection
+
 The following tables require a date-bounded filter (e.g., `sys_created_on>=javascript:gs.daysAgo(1)`):
+
 - `syslog`, `sys_audit`, `sys_log_transaction`, `sys_email_log`.
 
 Failure to provide a date filter on these tables results in a `QuerySafetyError`.
@@ -63,12 +68,15 @@ Failure to provide a date filter on these tables results in a `QuerySafetyError`
 Mutations are controlled by the `write_gate` function.
 
 ### Production Blocking
+
 All write operations are blocked when `SERVICENOW_ENV` is set to `"prod"` or `"production"`. This affects:
+
 - `record_write` and `record_apply`
 - `attachment_write` (upload and delete)
 - `service_catalog` (order and cart mutations)
 
 ### Preview Pattern
+
 The system uses a mandatory preview/apply flow mediated by the `PreviewTokenStore`. You must first call `record_write` with `preview=true` (the default) to stage the change and receive a `preview_token`. The change is only committed when this token is passed to `record_apply`.
 
 ---
