@@ -10,7 +10,6 @@ import logging
 from importlib.metadata import version as pkg_version
 from typing import TYPE_CHECKING, Any
 
-
 if TYPE_CHECKING:
     from servicenow_mcp.config import Settings
 
@@ -21,31 +20,43 @@ logger = logging.getLogger(__name__)
 # Dynamic release version
 # ---------------------------------------------------------------------------
 
-try:
-    _RELEASE = f"servicenow-platform-mcp@{pkg_version('servicenow-platform-mcp')}"
-except Exception:
-    _RELEASE = "servicenow-platform-mcp@unknown"
+
+def _load_release() -> str:
+    try:
+        return f"servicenow-platform-mcp@{pkg_version('servicenow-platform-mcp')}"
+    except Exception:
+        return "servicenow-platform-mcp@unknown"
+
+
+_RELEASE = _load_release()
 
 # ---------------------------------------------------------------------------
 # Try-import sentry-sdk
 # ---------------------------------------------------------------------------
 
-HAS_SENTRY: bool
-try:
-    import sentry_sdk
 
-    HAS_SENTRY = True
-except ImportError:
-    HAS_SENTRY = False
+def _load_sentry_sdk() -> tuple[Any, bool]:
+    try:
+        import sentry_sdk
+    except ImportError:
+        return None, False
+    return sentry_sdk, True
 
-_HAS_MCP_INTEGRATION = False
-if HAS_SENTRY:
+
+sentry_sdk, HAS_SENTRY = _load_sentry_sdk()
+
+
+def _load_mcp_integration() -> tuple[Any, bool]:
+    if not HAS_SENTRY:
+        return None, False
     try:
         from sentry_sdk.integrations.mcp import MCPIntegration
-
-        _HAS_MCP_INTEGRATION = True
     except ImportError:
-        pass
+        return None, False
+    return MCPIntegration, True
+
+
+MCPIntegration, _HAS_MCP_INTEGRATION = _load_mcp_integration()
 
 # ---------------------------------------------------------------------------
 # Module-level state

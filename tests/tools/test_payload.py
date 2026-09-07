@@ -1,14 +1,14 @@
 """Tests for parse_payload_json shared helper."""
 
 import json
+from typing import Any
 
 from servicenow_mcp.tools._payload import MAX_JSON_DEPTH, parse_payload_json
-
 
 CID = "test-correlation-id"
 
 
-def _decode_error(envelope: str) -> dict:
+def _decode_error(envelope: str) -> dict[str, Any]:
     """Decode a JSON error envelope and return the parsed dict."""
     return json.loads(envelope)
 
