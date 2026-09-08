@@ -1,5 +1,6 @@
 """Async ServiceNow REST API client."""
 
+import json
 import logging
 import re
 import uuid
@@ -21,8 +22,13 @@ from servicenow_mcp.errors import (
 )
 from servicenow_mcp.policy import INTERNAL_QUERY_LIMIT
 from servicenow_mcp.sentry import set_sentry_context
-from servicenow_mcp.utils import ServiceNowQuery, sanitize_query_value, validate_identifier, validate_sys_id
-
+from servicenow_mcp.utils import (
+    ServiceNowQuery,
+    resolve_ref_value,
+    sanitize_query_value,
+    validate_identifier,
+    validate_sys_id,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +57,9 @@ class ServiceNowClient:
 
     async def __aenter__(self) -> "ServiceNowClient":
         if self._http_client is None:
-            self._http_client = httpx.AsyncClient(timeout=self._settings.httpx_timeout_seconds)
+            self._http_client = httpx.AsyncClient(
+                timeout=self._settings.httpx_timeout_seconds
+            )
         return self
 
     async def __aexit__(self, *exc: object) -> None:
@@ -64,7 +72,9 @@ class ServiceNowClient:
     def _ensure_client(self) -> httpx.AsyncClient:
         """Return the HTTP client, raising RuntimeError if not initialized."""
         if self._http_client is None:
-            raise RuntimeError("Client not initialized. Use 'async with ServiceNowClient(...)' as context manager.")
+            raise RuntimeError(
+                "Client not initialized. Use 'async with ServiceNowClient(...)' as context manager."
+            )
         return self._http_client
 
     def _extract_result(self, data: dict[str, Any]) -> Any:
@@ -72,7 +82,25 @@ class ServiceNowClient:
         try:
             return data["result"]
         except KeyError:
-            raise ServerError("Unexpected API response format: missing 'result' key") from None
+            raise ServerError(
+                "Unexpected API response format: missing 'result' key"
+            ) from None
+
+    def _extract_json_result(self, response: httpx.Response) -> Any:
+        """Parse JSON without disclosing response bodies or query values in errors."""
+        try:
+            payload = response.json()
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            raise ServerError(
+                f"Invalid JSON response from {response.request.method} {response.request.url.path} "
+                f"(HTTP {response.status_code}). Check the endpoint response and authentication; "
+                "this does not establish an ACL denial."
+            ) from None
+        if not isinstance(payload, dict):
+            raise ServerError(
+                f"Unexpected JSON response from {response.request.url.path}: expected an object with 'result'."
+            )
+        return self._extract_result(payload)
 
     def _table_url(self, table: str, sys_id: str | None = None) -> str:
         """Build the REST API URL for a table resource."""
@@ -104,7 +132,9 @@ class ServiceNowClient:
     def _attachment_file_by_name_url(self, table_sys_id: str, file_name: str) -> str:
         """Build the Attachment by-name download URL."""
         validate_sys_id(table_sys_id)
-        return f"{self._attachment_url()}/{table_sys_id}/{quote(file_name, safe='')}/file"
+        return (
+            f"{self._attachment_url()}/{table_sys_id}/{quote(file_name, safe='')}/file"
+        )
 
     async def _headers(self) -> dict[str, str]:
         """Build request headers including auth and correlation ID."""
@@ -163,7 +193,9 @@ class ServiceNowClient:
         try:
             payload = response.json()
         except Exception:
-            logger.debug("Could not parse ServiceNow error body for ACL detection", exc_info=True)
+            logger.debug(
+                "Could not parse ServiceNow error body for ACL detection", exc_info=True
+            )
             return False
 
         values: list[str] = []
@@ -334,7 +366,9 @@ class ServiceNowClient:
         self._raise_for_status(response)
         return response.content
 
-    async def download_attachment_by_name(self, table_sys_id: str, file_name: str) -> bytes:
+    async def download_attachment_by_name(
+        self, table_sys_id: str, file_name: str
+    ) -> bytes:
         """Download attachment content by record sys_id and file name."""
         http = self._ensure_client()
         response = await http.get(
@@ -429,7 +463,9 @@ class ServiceNowClient:
         self._raise_for_status(response)
         return self._extract_result(response.json())
 
-    async def update_record(self, table: str, sys_id: str, data: dict[str, Any]) -> dict[str, Any]:
+    async def update_record(
+        self, table: str, sys_id: str, data: dict[str, Any]
+    ) -> dict[str, Any]:
         """Update an existing record via PATCH."""
         http = self._ensure_client()
         response = await http.patch(
@@ -581,7 +617,10 @@ class ServiceNowClient:
     ) -> dict[str, Any]:
         """Search code across ServiceNow script tables."""
         http = self._ensure_client()
-        params: dict[str, str] = {"term": term}
+        params: dict[str, str] = {
+            "term": term,
+            "search_group": search_group or "sn_codesearch.Default Search Group",
+        }
         if table:
             params["table"] = table
         if search_group:
@@ -603,7 +642,9 @@ class ServiceNowClient:
     ) -> dict[str, Any]:
         """Get the list of tables that would be searched for a given search group."""
         http = self._ensure_client()
-        params: dict[str, str] = {}
+        params: dict[str, str] = {
+            "search_group": search_group or "sn_codesearch.Default Search Group"
+        }
         if search_group:
             params["search_group"] = search_group
 
@@ -628,7 +669,9 @@ class ServiceNowClient:
     def _cmdb_meta_url(self, class_name: str) -> str:
         """Build the CMDB Meta API URL."""
         validate_identifier(class_name)
-        return f"{self._settings.servicenow_instance_url}/api/now/cmdb/meta/{class_name}"
+        return (
+            f"{self._settings.servicenow_instance_url}/api/now/cmdb/meta/{class_name}"
+        )
 
     async def cmdb_query(
         self,
@@ -715,7 +758,9 @@ class ServiceNowClient:
             _sc_url("items", sys_id)       -> .../api/sn_sc/servicecatalog/items/{sys_id}
         """
         path = "/".join(segments)
-        return f"{self._settings.servicenow_instance_url}/api/sn_sc/servicecatalog/{path}"
+        return (
+            f"{self._settings.servicenow_instance_url}/api/sn_sc/servicecatalog/{path}"
+        )
 
     async def sc_get_catalogs(
         self,
@@ -829,7 +874,9 @@ class ServiceNowClient:
         self._raise_for_status(response)
         return self._extract_result(response.json())
 
-    async def sc_order_now(self, item_sys_id: str, variables: dict[str, Any] | None = None) -> Any:
+    async def sc_order_now(
+        self, item_sys_id: str, variables: dict[str, Any] | None = None
+    ) -> Any:
         """Order a catalog item immediately (skip cart).
 
         Args:
@@ -850,7 +897,9 @@ class ServiceNowClient:
         self._raise_for_status(response)
         return self._extract_result(response.json())
 
-    async def sc_add_to_cart(self, item_sys_id: str, variables: dict[str, Any] | None = None) -> Any:
+    async def sc_add_to_cart(
+        self, item_sys_id: str, variables: dict[str, Any] | None = None
+    ) -> Any:
         """Add a catalog item to the cart.
 
         Args:
@@ -917,12 +966,17 @@ class ServiceNowClient:
             self._raise_for_status(response)
         except NotFoundError:
             return None
-        return self._extract_result(response.json())
+        return self._extract_json_result(response)
 
     async def find_flows_by_name(self, name: str) -> list[dict[str, Any]]:
         """Find flows whose ``name`` or ``internal_name`` matches *name* (display values resolved)."""
         http = self._ensure_client()
-        query = ServiceNowQuery().equals("name", name).or_equals("internal_name", name).build()
+        query = (
+            ServiceNowQuery()
+            .equals("name", name)
+            .or_equals("internal_name", name)
+            .build()
+        )
         response = await http.get(
             self._table_url("sys_hub_flow"),
             headers=await self._headers(),
@@ -933,9 +987,11 @@ class ServiceNowClient:
             },
         )
         self._raise_for_status(response)
-        return self._extract_result(response.json())
+        return self._extract_json_result(response)
 
-    async def list_flow_inputs(self, flow_sys_id: str, limit: int | None = None) -> list[dict[str, Any]]:
+    async def list_flow_inputs(
+        self, flow_sys_id: str, limit: int | None = None
+    ) -> list[dict[str, Any]]:
         """List declared inputs for a flow (``sys_hub_flow_input``)."""
         http = self._ensure_client()
         response = await http.get(
@@ -948,9 +1004,11 @@ class ServiceNowClient:
             },
         )
         self._raise_for_status(response)
-        return self._extract_result(response.json())
+        return self._extract_json_result(response)
 
-    async def list_flow_outputs(self, flow_sys_id: str, limit: int | None = None) -> list[dict[str, Any]]:
+    async def list_flow_outputs(
+        self, flow_sys_id: str, limit: int | None = None
+    ) -> list[dict[str, Any]]:
         """List declared outputs for a flow (``sys_hub_flow_output``)."""
         http = self._ensure_client()
         response = await http.get(
@@ -963,9 +1021,11 @@ class ServiceNowClient:
             },
         )
         self._raise_for_status(response)
-        return self._extract_result(response.json())
+        return self._extract_json_result(response)
 
-    async def list_flow_variables(self, flow_sys_id: str, limit: int | None = None) -> list[dict[str, Any]]:
+    async def list_flow_variables(
+        self, flow_sys_id: str, limit: int | None = None
+    ) -> list[dict[str, Any]]:
         """List flow-scoped variables (``sys_hub_flow_variable``)."""
         http = self._ensure_client()
         response = await http.get(
@@ -978,9 +1038,11 @@ class ServiceNowClient:
             },
         )
         self._raise_for_status(response)
-        return self._extract_result(response.json())
+        return self._extract_json_result(response)
 
-    async def list_action_instances_v2(self, flow_sys_id: str, limit: int = 1000) -> list[dict[str, Any]]:
+    async def list_action_instances_v2(
+        self, flow_sys_id: str, limit: int = 1000
+    ) -> list[dict[str, Any]]:
         """List V2 action instances for a flow (``sys_hub_action_instance_v2``)."""
         http = self._ensure_client()
         response = await http.get(
@@ -993,9 +1055,11 @@ class ServiceNowClient:
             },
         )
         self._raise_for_status(response)
-        return self._extract_result(response.json())
+        return self._extract_json_result(response)
 
-    async def list_action_instances_v1(self, flow_sys_id: str, limit: int = 1000) -> list[dict[str, Any]]:
+    async def list_action_instances_v1(
+        self, flow_sys_id: str, limit: int = 1000
+    ) -> list[dict[str, Any]]:
         """List V1 action instances for a flow (``sys_hub_action_instance``)."""
         http = self._ensure_client()
         response = await http.get(
@@ -1008,9 +1072,11 @@ class ServiceNowClient:
             },
         )
         self._raise_for_status(response)
-        return self._extract_result(response.json())
+        return self._extract_json_result(response)
 
-    async def list_logic_instances_v2(self, flow_sys_id: str, limit: int = 1000) -> list[dict[str, Any]]:
+    async def list_logic_instances_v2(
+        self, flow_sys_id: str, limit: int = 1000
+    ) -> list[dict[str, Any]]:
         """List V2 flow-logic instances (``sys_hub_flow_logic_instance_v2``)."""
         http = self._ensure_client()
         response = await http.get(
@@ -1023,9 +1089,11 @@ class ServiceNowClient:
             },
         )
         self._raise_for_status(response)
-        return self._extract_result(response.json())
+        return self._extract_json_result(response)
 
-    async def list_logic_instances_v1(self, flow_sys_id: str, limit: int = 1000) -> list[dict[str, Any]]:
+    async def list_logic_instances_v1(
+        self, flow_sys_id: str, limit: int = 1000
+    ) -> list[dict[str, Any]]:
         """List V1 flow-logic instances (``sys_hub_flow_logic``)."""
         http = self._ensure_client()
         response = await http.get(
@@ -1038,9 +1106,11 @@ class ServiceNowClient:
             },
         )
         self._raise_for_status(response)
-        return self._extract_result(response.json())
+        return self._extract_json_result(response)
 
-    async def list_trigger_instances_v2(self, flow_sys_id: str, limit: int | None = None) -> list[dict[str, Any]]:
+    async def list_trigger_instances_v2(
+        self, flow_sys_id: str, limit: int | None = None
+    ) -> list[dict[str, Any]]:
         """List V2 trigger instances for a flow (``sys_hub_trigger_instance_v2``)."""
         http = self._ensure_client()
         response = await http.get(
@@ -1053,9 +1123,11 @@ class ServiceNowClient:
             },
         )
         self._raise_for_status(response)
-        return self._extract_result(response.json())
+        return self._extract_json_result(response)
 
-    async def list_trigger_instances_v1(self, flow_sys_id: str, limit: int | None = None) -> list[dict[str, Any]]:
+    async def list_trigger_instances_v1(
+        self, flow_sys_id: str, limit: int | None = None
+    ) -> list[dict[str, Any]]:
         """List V1 trigger instances for a flow (``sys_hub_trigger_instance``)."""
         http = self._ensure_client()
         response = await http.get(
@@ -1068,9 +1140,11 @@ class ServiceNowClient:
             },
         )
         self._raise_for_status(response)
-        return self._extract_result(response.json())
+        return self._extract_json_result(response)
 
-    async def list_record_triggers(self, remote_trigger_ids: list[str]) -> list[dict[str, Any]]:
+    async def list_record_triggers(
+        self, remote_trigger_ids: list[str]
+    ) -> list[dict[str, Any]]:
         """Bulk-fetch ``sys_flow_record_trigger`` rows for V2 record-trigger conditions."""
         if not remote_trigger_ids:
             return []
@@ -1087,9 +1161,11 @@ class ServiceNowClient:
             },
         )
         self._raise_for_status(response)
-        return self._extract_result(response.json())
+        return self._extract_json_result(response)
 
-    async def get_action_type_definitions(self, action_type_sys_ids: list[str]) -> list[dict[str, Any]]:
+    async def get_action_type_definitions(
+        self, action_type_sys_ids: list[str]
+    ) -> list[dict[str, Any]]:
         """Bulk-fetch action-type metadata from ``sys_hub_action_type_base``."""
         if not action_type_sys_ids:
             return []
@@ -1107,9 +1183,11 @@ class ServiceNowClient:
             },
         )
         self._raise_for_status(response)
-        return self._extract_result(response.json())
+        return self._extract_json_result(response)
 
-    async def list_action_input_definitions(self, action_type_sys_ids: list[str]) -> list[dict[str, Any]]:
+    async def list_action_input_definitions(
+        self, action_type_sys_ids: list[str]
+    ) -> list[dict[str, Any]]:
         """Bulk-fetch declared inputs from ``sys_hub_action_input`` for action types."""
         if not action_type_sys_ids:
             return []
@@ -1127,9 +1205,11 @@ class ServiceNowClient:
             },
         )
         self._raise_for_status(response)
-        return self._extract_result(response.json())
+        return self._extract_json_result(response)
 
-    async def list_action_output_definitions(self, action_type_sys_ids: list[str]) -> list[dict[str, Any]]:
+    async def list_action_output_definitions(
+        self, action_type_sys_ids: list[str]
+    ) -> list[dict[str, Any]]:
         """Bulk-fetch declared outputs from ``sys_hub_action_output`` for action types."""
         if not action_type_sys_ids:
             return []
@@ -1147,9 +1227,11 @@ class ServiceNowClient:
             },
         )
         self._raise_for_status(response)
-        return self._extract_result(response.json())
+        return self._extract_json_result(response)
 
-    async def list_v1_variable_values(self, action_instance_sys_ids: list[str]) -> list[dict[str, Any]]:
+    async def list_v1_variable_values(
+        self, action_instance_sys_ids: list[str]
+    ) -> list[dict[str, Any]]:
         """Bulk-fetch ``sys_variable_value`` rows for V1 action instance inputs."""
         if not action_instance_sys_ids:
             return []
@@ -1166,7 +1248,95 @@ class ServiceNowClient:
             },
         )
         self._raise_for_status(response)
-        return self._extract_result(response.json())
+        return self._extract_json_result(response)
+
+    async def _flow_lookup_page(
+        self, table: str, query: str, limit: int, fields: str = ""
+    ) -> tuple[list[dict[str, Any]], int | None]:
+        http = self._ensure_client()
+        params = {
+            "sysparm_query": query,
+            "sysparm_display_value": "all",
+            "sysparm_limit": str(limit),
+        }
+        if fields:
+            params["sysparm_fields"] = fields
+        response = await http.get(
+            self._table_url(table), headers=await self._headers(), params=params
+        )
+        self._raise_for_status(response)
+        rows = self._extract_json_result(response)
+        try:
+            total = int(response.headers["X-Total-Count"])
+        except (KeyError, ValueError):
+            total = None
+        if total is not None and total < len(rows):
+            total = None
+        return rows, total
+
+    @staticmethod
+    def _flow_id_queries(ids: list[str], relations: tuple[str, ...]) -> list[str]:
+        unique_ids = list(dict.fromkeys(ids))
+        for sys_id in unique_ids:
+            validate_sys_id(sys_id)
+        # Repeating IDs across snapshot relations can exceed HTTP URL limits.
+        return [
+            "^OR".join(
+                f"{relation}IN{','.join(unique_ids[start:start + 50])}"
+                for relation in relations
+            )
+            for start in range(0, len(unique_ids), 50)
+        ]
+
+    @staticmethod
+    def _merge_flow_lookup_page(
+        rows: list[dict[str, Any]],
+        page: list[dict[str, Any]],
+        seen_ids: set[str],
+        limit: int,
+    ) -> bool:
+        has_omitted_rows = False
+        for row in page:
+            sys_id = resolve_ref_value(row.get("sys_id", ""))
+            if sys_id and sys_id in seen_ids:
+                continue
+            if len(rows) >= limit:
+                has_omitted_rows = True
+                continue
+            rows.append(row)
+            if sys_id:
+                seen_ids.add(sys_id)
+        return has_omitted_rows
+
+    async def _flow_lookup_batches(
+        self, table: str, queries: list[str], limit: int, fields: str = ""
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        rows: list[dict[str, Any]] = []
+        seen_ids: set[str] = set()
+        truncation: list[dict[str, Any]] = []
+        for query in queries:
+            page, total = await self._flow_lookup_page(table, query, limit, fields)
+            previous_count = len(rows)
+            has_omitted_rows = self._merge_flow_lookup_page(rows, page, seen_ids, limit)
+            is_page_incomplete = (
+                total > len(page) if total is not None else len(page) >= limit
+            )
+            if has_omitted_rows or is_page_incomplete:
+                truncation.append(
+                    {
+                        "query": query,
+                        "returned": len(rows) - previous_count,
+                        "fetched": len(page),
+                        "total": total,
+                        "limit": limit,
+                        "continuation": (
+                            f"Use query(table='{table}', encoded_query='{query}^ORDERBYsys_id', "
+                            "fields='*', offset=0) and advance offset through all pages. "
+                            "Restart this batch because the merged limit can omit rows within it."
+                        ),
+                    }
+                )
+        return rows, truncation
 
     async def find_record_triggers_by_table(self, table: str) -> list[dict[str, Any]]:
         """Find ``sys_flow_record_trigger`` rows for a given table."""
@@ -1182,9 +1352,11 @@ class ServiceNowClient:
             },
         )
         self._raise_for_status(response)
-        return self._extract_result(response.json())
+        return self._extract_json_result(response)
 
-    async def list_v2_triggers_by_remote_ids(self, remote_trigger_ids: list[str]) -> list[dict[str, Any]]:
+    async def list_v2_triggers_by_remote_ids(
+        self, remote_trigger_ids: list[str]
+    ) -> list[dict[str, Any]]:
         """Find V2 trigger instances linked to the given record-trigger sys_ids.
 
         Some V2 trigger instances reference the record-trigger via
@@ -1193,36 +1365,28 @@ class ServiceNowClient:
         """
         if not remote_trigger_ids:
             return []
-        http = self._ensure_client()
-        ids_csv = ",".join(remote_trigger_ids)
-        limit = min(len(remote_trigger_ids), INTERNAL_QUERY_LIMIT)
-        response = await http.get(
-            self._table_url("sys_hub_trigger_instance_v2"),
-            headers=await self._headers(),
-            params={
-                "sysparm_query": f"remote_trigger_idIN{ids_csv}^ORsys_idIN{ids_csv}",
-                "sysparm_display_value": "all",
-                "sysparm_limit": str(limit),
-            },
+        rows, _ = await self._flow_lookup_batches(
+            "sys_hub_trigger_instance_v2",
+            self._flow_id_queries(remote_trigger_ids, ("remote_trigger_id", "sys_id")),
+            INTERNAL_QUERY_LIMIT,
         )
-        self._raise_for_status(response)
-        return self._extract_result(response.json())
+        return rows
 
     async def list_v1_triggers_by_table(self, table: str) -> list[dict[str, Any]]:
-        """Find V1 trigger instances directly bound to a given table."""
+        """Find V1 trigger instances through their remote record-trigger relation."""
         validate_identifier(table)
-        http = self._ensure_client()
-        response = await http.get(
-            self._table_url("sys_hub_trigger_instance"),
-            headers=await self._headers(),
-            params={
-                "sysparm_query": f"table={table}",
-                "sysparm_display_value": "all",
-                "sysparm_limit": str(INTERNAL_QUERY_LIMIT),
-            },
+        record_triggers = await self.find_record_triggers_by_table(table)
+        remote_ids = [
+            resolve_ref_value(row.get("sys_id", "")) for row in record_triggers
+        ]
+        if not remote_ids:
+            return []
+        rows, _ = await self._flow_lookup_batches(
+            "sys_hub_trigger_instance",
+            self._flow_id_queries(remote_ids, ("remote_sys_id",)),
+            INTERNAL_QUERY_LIMIT,
         )
-        self._raise_for_status(response)
-        return self._extract_result(response.json())
+        return rows
 
     async def list_triggers_filtered(
         self,
@@ -1236,9 +1400,9 @@ class ServiceNowClient:
 
         Returns a dict ``{"v2": [...], "v1": [...]}``. Each side is capped at
         *limit*. Display values are resolved so ``flow`` references include
-        the linked flow's name.
+        the linked flow's name. Optional ``truncation`` metadata identifies
+        incomplete source pages and batches with direct-query continuation.
         """
-        http = self._ensure_client()
         capped = max(1, min(limit, INTERNAL_QUERY_LIMIT))
 
         v2_parts: list[str] = []
@@ -1246,68 +1410,78 @@ class ServiceNowClient:
         if trigger_type:
             safe_type = sanitize_query_value(trigger_type)
             v2_parts.append(f"type={safe_type}")
-            v1_parts.append(f"type={safe_type}")
+            v1_parts.append(f"trigger_type={safe_type}")
         if active in {"true", "false"}:
             safe_active = sanitize_query_value(active)
             v2_parts.append(f"active={safe_active}")
-            v1_parts.append(f"active={safe_active}")
+            v1_parts.append(f"flow.active={safe_active}")
+
+        truncation: dict[str, Any] = {}
+        v2_relations = [""]
+        v1_relations = [""]
         if table:
-            # V1 trigger has ``table`` directly; V2 typically goes via
-            # sys_flow_record_trigger but we still allow a table filter on V2
-            # rows that store ``table`` (record-update/insert variants do).
-            # ``table`` is validated as an identifier upstream; safe to interpolate.
-            v2_parts.append(f"table={table}")
-            v1_parts.append(f"table={table}")
+            validate_identifier(table)
+            source_query = f"table={table}^ORDERBYsys_id"
+            record_triggers, total = await self._flow_lookup_page(
+                "sys_flow_record_trigger", source_query, INTERNAL_QUERY_LIMIT
+            )
+            is_source_incomplete = (
+                total > len(record_triggers)
+                if total is not None
+                else len(record_triggers) >= INTERNAL_QUERY_LIMIT
+            )
+            if is_source_incomplete:
+                truncation["sys_flow_record_trigger"] = {
+                    "returned": len(record_triggers),
+                    "total": total,
+                    "limit": INTERNAL_QUERY_LIMIT,
+                    "continuation": (
+                        f"Use query(table='sys_flow_record_trigger', encoded_query='{source_query}', "
+                        f"fields='sys_id', offset={len(record_triggers)}) and advance offset through all pages. "
+                        "Join remaining IDs in batches to sys_hub_trigger_instance.remote_sys_id and "
+                        "sys_hub_trigger_instance_v2.remote_trigger_id or sys_id, retaining the requested "
+                        "trigger_type and active filters. Query safety row limits still apply."
+                    ),
+                }
+            remote_ids = [
+                resolve_ref_value(row.get("sys_id", "")) for row in record_triggers
+            ]
+            v2_relations = self._flow_id_queries(
+                remote_ids, ("remote_trigger_id", "sys_id")
+            )
+            v1_relations = self._flow_id_queries(remote_ids, ("remote_sys_id",))
 
-        v2_query = "^".join(v2_parts)
-        v1_query = "^".join(v1_parts)
-
-        v2_response = await http.get(
-            self._table_url("sys_hub_trigger_instance_v2"),
-            headers=await self._headers(),
-            params={
-                "sysparm_query": v2_query,
-                "sysparm_display_value": "all",
-                "sysparm_limit": str(capped),
-            },
-        )
-        self._raise_for_status(v2_response)
-
-        v1_response = await http.get(
-            self._table_url("sys_hub_trigger_instance"),
-            headers=await self._headers(),
-            params={
-                "sysparm_query": v1_query,
-                "sysparm_display_value": "all",
-                "sysparm_limit": str(capped),
-            },
-        )
-        self._raise_for_status(v1_response)
-
-        return {
-            "v2": self._extract_result(v2_response.json()),
-            "v1": self._extract_result(v1_response.json()),
-        }
+        result: dict[str, Any] = {}
+        for version, source_table, parts, relations in (
+            ("v2", "sys_hub_trigger_instance_v2", v2_parts, v2_relations),
+            ("v1", "sys_hub_trigger_instance", v1_parts, v1_relations),
+        ):
+            queries = [
+                "^".join(part for part in [*parts, relation] if part)
+                for relation in relations
+            ]
+            result[version], batches = await self._flow_lookup_batches(
+                source_table, queries, capped
+            )
+            if batches:
+                truncation[source_table] = {"batches": batches}
+        if truncation:
+            result["truncation"] = truncation
+        return result
 
     async def get_flows_bulk(self, flow_sys_ids: list[str]) -> list[dict[str, Any]]:
-        """Bulk-fetch ``sys_hub_flow`` headers for a set of sys_ids."""
+        """Resolve flow headers by identity or their current snapshot references."""
         if not flow_sys_ids:
             return []
-        http = self._ensure_client()
-        ids_csv = ",".join(flow_sys_ids)
-        limit = min(len(flow_sys_ids), INTERNAL_QUERY_LIMIT)
-        response = await http.get(
-            self._table_url("sys_hub_flow"),
-            headers=await self._headers(),
-            params={
-                "sysparm_query": f"sys_idIN{ids_csv}",
-                "sysparm_fields": "sys_id,name,internal_name,type,active,sys_scope,description",
-                "sysparm_display_value": "all",
-                "sysparm_limit": str(limit),
-            },
+        rows, _ = await self._flow_lookup_batches(
+            "sys_hub_flow",
+            self._flow_id_queries(
+                flow_sys_ids, ("sys_id", "master_snapshot", "latest_snapshot")
+            ),
+            INTERNAL_QUERY_LIMIT,
+            "sys_id,name,internal_name,type,active,sys_scope,description,master_snapshot,latest_snapshot",
         )
-        self._raise_for_status(response)
-        return self._extract_result(response.json())
+        return rows
 
 
 class ServiceNowClientFactory:

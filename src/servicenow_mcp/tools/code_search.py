@@ -50,7 +50,9 @@ _ACTION_REGISTRY: Final[dict[str, dict[str, Any]]] = {
 
 def _error(correlation_id: str, message: str) -> str:
     """Serialize a standard error envelope."""
-    return format_response(data=None, correlation_id=correlation_id, status="error", error=message)
+    return format_response(
+        data=None, correlation_id=correlation_id, status="error", error=message
+    )
 
 
 def _effective_limit(limit: int, settings: Settings) -> tuple[int, list[str] | None]:
@@ -81,7 +83,9 @@ def register_tools(
 ) -> None:
     """Register the unified ``code_search`` tool on the MCP server."""
     del choices, dictionary  # unused; signature retained for loader parity
-    client_factory = client_factory or (lambda: ServiceNowClient(settings, auth_provider))
+    client_factory = client_factory or (
+        lambda: ServiceNowClient(settings, auth_provider)
+    )
 
     @mcp.tool()
     @tool_handler
@@ -100,19 +104,26 @@ def register_tools(
             action: One of 'search', 'list_tables', or 'describe'.
             term: Search term for action='search'.
             table: Optional table filter for action='search' (e.g. 'sys_script_include').
-            search_group: Optional ServiceNow Code Search group.
+            search_group: ServiceNow Code Search group; empty uses sn_codesearch.Default Search Group.
             limit: Max search results for action='search'. Default 20.
         """
         normalized_action = action.strip().lower()
         if normalized_action not in _VALID_ACTIONS:
-            return _error(correlation_id, f"Unknown action {action!r}. Available: {sorted(_VALID_ACTIONS)}")
+            return _error(
+                correlation_id,
+                f"Unknown action {action!r}. Available: {sorted(_VALID_ACTIONS)}",
+            )
 
         if normalized_action == "describe":
-            return format_response(data={"actions": _ACTION_REGISTRY}, correlation_id=correlation_id)
+            return format_response(
+                data={"actions": _ACTION_REGISTRY}, correlation_id=correlation_id
+            )
 
         async with client_factory() as client:
             if normalized_action == "list_tables":
-                result = await client.code_search_tables(search_group=search_group or None)
+                result = await client.code_search_tables(
+                    search_group=search_group or None
+                )
                 return format_response(data=result, correlation_id=correlation_id)
 
             stripped_term = term.strip()
@@ -127,4 +138,6 @@ def register_tools(
                 search_group=search_group or None,
                 limit=effective_limit,
             )
-            return format_response(data=result, correlation_id=correlation_id, warnings=warnings)
+            return format_response(
+                data=result, correlation_id=correlation_id, warnings=warnings
+            )
