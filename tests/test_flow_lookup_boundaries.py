@@ -44,9 +44,7 @@ async def test_large_lookup_batches_every_id(settings: Settings, method: str) ->
     }
     async with ServiceNowClient(settings, BasicAuthProvider(settings)) as client:
         if method == "list_triggers_filtered":
-            await client.list_triggers_filtered(
-                table="sc_task", trigger_type="record_update", active="true"
-            )
+            await client.list_triggers_filtered(table="sc_task", trigger_type="record_update", active="true")
         elif method == "list_v1_triggers_by_table":
             await client.list_v1_triggers_by_table("sc_task")
         else:
@@ -59,16 +57,12 @@ async def test_large_lookup_batches_every_id(settings: Settings, method: str) ->
         assert all(len(call.request.url.query) < 8000 for call in route.calls)
         assert all(any(value in query for query in queries) for value in ids)
         if method == "list_triggers_filtered":
-            assert all(
-                "record_update" in query and "active=true" in query for query in queries
-            )
+            assert all("record_update" in query and "active=true" in query for query in queries)
 
 
 @pytest.mark.parametrize("total", ["1001", None, "invalid", "-1", "0"])
 @respx.mock
-async def test_empty_join_reports_incomplete_source(
-    settings: Settings, total: str | None
-) -> None:
+async def test_empty_join_reports_incomplete_source(settings: Settings, total: str | None) -> None:
     """Zero matches from a capped source page cannot imply an exhaustive search."""
     respx.get(f"{BASE_URL}/sys_flow_record_trigger").respond(
         200,
@@ -79,9 +73,7 @@ async def test_empty_join_reports_incomplete_source(
         respx.get(f"{BASE_URL}/{table}").respond(200, json={"result": []})
     mcp = MCPServer("test")
     register_tools(mcp, settings, BasicAuthProvider(settings))
-    result = decode_response(
-        await get_tool_functions(mcp)["flow"](action="list_triggers", table="sc_task")
-    )
+    result = decode_response(await get_tool_functions(mcp)["flow"](action="list_triggers", table="sc_task"))
     assert result["status"] == "success"
     assert result["data"]["triggers"] == []
     assert result["data"]["is_complete"] is False
@@ -96,9 +88,7 @@ async def test_empty_join_reports_incomplete_source(
 @respx.mock
 async def test_known_total_reveals_server_short_page(settings: Settings) -> None:
     """A server returning fewer rows than requested can still truncate a source."""
-    respx.get(f"{BASE_URL}/sys_flow_record_trigger").respond(
-        200, json={"result": []}, headers={"X-Total-Count": "5"}
-    )
+    respx.get(f"{BASE_URL}/sys_flow_record_trigger").respond(200, json={"result": []}, headers={"X-Total-Count": "5"})
     async with ServiceNowClient(settings, BasicAuthProvider(settings)) as client:
         result = await client.list_triggers_filtered(table="sc_task")
     assert result["v1"] == result["v2"] == []
@@ -115,11 +105,7 @@ async def test_header_batches_deduplicate_and_reach_later_ids(
     later = {"sys_id": {"value": "e" * 32}}
 
     def respond(request: httpx.Request) -> httpx.Response:
-        rows = (
-            [shared, later]
-            if ids[-1] in request.url.params["sysparm_query"]
-            else [shared]
-        )
+        rows = [shared, later] if ids[-1] in request.url.params["sysparm_query"] else [shared]
         return httpx.Response(200, json={"result": rows})
 
     route = respx.get(f"{BASE_URL}/sys_hub_flow").mock(side_effect=respond)
@@ -144,14 +130,8 @@ async def test_later_trigger_batches_keep_limit_and_deduplicate(
     later = {"sys_id": "b" * 32}
 
     def respond(request: httpx.Request) -> httpx.Response:
-        rows = (
-            [shared, later]
-            if ids[-1] in request.url.params["sysparm_query"]
-            else [shared]
-        )
-        return httpx.Response(
-            200, json={"result": rows}, headers={"X-Total-Count": str(len(rows))}
-        )
+        rows = [shared, later] if ids[-1] in request.url.params["sysparm_query"] else [shared]
+        return httpx.Response(200, json={"result": rows}, headers={"X-Total-Count": str(len(rows))})
 
     respx.get(f"{BASE_URL}/sys_hub_trigger_instance_v2").mock(side_effect=respond)
     respx.get(f"{BASE_URL}/sys_hub_trigger_instance").respond(200, json={"result": []})
@@ -163,9 +143,7 @@ async def test_later_trigger_batches_keep_limit_and_deduplicate(
 
 @pytest.mark.parametrize("total", ["2", None, "1"])
 @respx.mock
-async def test_trigger_batch_reports_truncation(
-    settings: Settings, total: str | None
-) -> None:
+async def test_trigger_batch_reports_truncation(settings: Settings, total: str | None) -> None:
     """A full trigger page is incomplete unless a reliable total confirms its end."""
     respx.get(f"{BASE_URL}/sys_hub_trigger_instance_v2").respond(
         200,
@@ -174,9 +152,7 @@ async def test_trigger_batch_reports_truncation(
     )
     respx.get(f"{BASE_URL}/sys_hub_trigger_instance").respond(200, json={"result": []})
     async with ServiceNowClient(settings, BasicAuthProvider(settings)) as client:
-        result = await client.list_triggers_filtered(
-            limit=1, trigger_type="record_update", active="true"
-        )
+        result = await client.list_triggers_filtered(limit=1, trigger_type="record_update", active="true")
     if total == "1":
         assert not result.get("truncation")
         return
@@ -221,9 +197,7 @@ async def test_later_batch_failure_is_not_partial_success(settings: Settings) ->
 async def test_merged_cap_discloses_omitted_later_rows(settings: Settings) -> None:
     """A full earlier batch cannot hide unique rows fetched in a later batch."""
     ids = [f"{index:032x}" for index in range(51)]
-    respx.get(f"{BASE_URL}/sys_flow_record_trigger").respond(
-        200, json={"result": [{"sys_id": value} for value in ids]}
-    )
+    respx.get(f"{BASE_URL}/sys_flow_record_trigger").respond(200, json={"result": [{"sys_id": value} for value in ids]})
     respx.get(f"{BASE_URL}/sys_hub_trigger_instance_v2").mock(
         side_effect=[
             httpx.Response(

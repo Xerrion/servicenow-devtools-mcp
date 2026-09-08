@@ -79,8 +79,10 @@ def register_tools(
         warnings: list[str] | None = None
         if value == label and not label.isdigit():
             warnings = [
-                (f"resolve_choice: '{field}={label}' did not resolve via ChoiceRegistry; "
-                f"returning the label verbatim as the value."),
+                (
+                    f"resolve_choice: '{field}={label}' did not resolve via ChoiceRegistry; "
+                    f"returning the label verbatim as the value."
+                ),
             ]
         return format_response(
             data={"table": table, "field": field, "label": label, "value": value},

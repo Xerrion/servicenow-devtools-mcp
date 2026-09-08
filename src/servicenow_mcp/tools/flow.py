@@ -162,9 +162,7 @@ _ACTION_REGISTRY: Final[dict[str, dict[str, Any]]] = {
 
 def _error(correlation_id: str, message: str) -> str:
     """Serialize a standard error envelope."""
-    return format_response(
-        data=None, correlation_id=correlation_id, status="error", error=message
-    )
+    return format_response(data=None, correlation_id=correlation_id, status="error", error=message)
 
 
 def _v(field: Any) -> str:
@@ -375,12 +373,8 @@ def _build_inspect_warnings(
             f"snapshot drift: master_snapshot={master!r} differs from latest_snapshot={latest!r}; "
             "the runtime engine and the latest design may not agree."
         )
-    if (actions_v1 or logic_v1 or triggers_v1) and (
-        actions_v2 or logic_v2 or triggers_v2
-    ):
-        warnings.append(
-            "V1 and V2 Flow Designer artifacts coexist on this flow; canvas omits V1 nodes."
-        )
+    if (actions_v1 or logic_v1 or triggers_v1) and (actions_v2 or logic_v2 or triggers_v2):
+        warnings.append("V1 and V2 Flow Designer artifacts coexist on this flow; canvas omits V1 nodes.")
     if actions_v1:
         warnings.append(
             f"{len(actions_v1)} V1 action instance(s) present; their configured bindings are not represented as contract steps."
@@ -392,8 +386,7 @@ def _build_inspect_warnings(
     spoke_actions = [
         meta
         for meta in action_type_lookup.values()
-        if "spoke" in _v(meta.get("category")).lower()
-        or "spoke" in _v(meta.get("sys_scope")).lower()
+        if "spoke" in _v(meta.get("category")).lower() or "spoke" in _v(meta.get("sys_scope")).lower()
     ]
     if spoke_actions:
         warnings.append(
@@ -419,9 +412,7 @@ def _contract_field(row: dict[str, Any]) -> dict[str, Any]:
     return field
 
 
-def _action_definition_field(
-    row: dict[str, Any], *, has_default: bool
-) -> dict[str, Any]:
+def _action_definition_field(row: dict[str, Any], *, has_default: bool) -> dict[str, Any]:
     """Project one declared action field without exposing its source record."""
     name = _v(row.get("name"))
     field: dict[str, Any] = {
@@ -454,9 +445,7 @@ def _index_action_definition_fields(
     for row in rows:
         action_type_id = _v(row.get("action_type"))
         if action_type_id:
-            indexed.setdefault(action_type_id, []).append(
-                _action_definition_field(row, has_default=has_default)
-            )
+            indexed.setdefault(action_type_id, []).append(_action_definition_field(row, has_default=has_default))
     return indexed
 
 
@@ -544,9 +533,7 @@ def _contract_steps(
                 step["logic"] = {"name": definition["name"]}
                 step["conditions"] = [_contract_binding(value) for value in inputs]
             if assignments:
-                step["output_assignments"] = [
-                    _contract_binding(value) for value in assignments
-                ]
+                step["output_assignments"] = [_contract_binding(value) for value in assignments]
             if "decode_error" in node:
                 step["decode_error"] = node["decode_error"]
             steps.append(step)
@@ -601,18 +588,14 @@ def _build_flow_contract(
     }
 
 
-def _parse_sections(
-    sections: str, *, is_contract: bool
-) -> tuple[list[str], str | None]:
+def _parse_sections(sections: str, *, is_contract: bool) -> tuple[list[str], str | None]:
     available = _CONTRACT_SECTIONS if is_contract else _INSPECT_SECTIONS
     if not sections.strip():
         return list(_DEFAULT_FLOW_SECTIONS), None
     if sections.strip() == "*":
         return list(available), None
 
-    requested = list(
-        dict.fromkeys(part.strip() for part in sections.split(",") if part.strip())
-    )
+    requested = list(dict.fromkeys(part.strip() for part in sections.split(",") if part.strip()))
     unknown = [section for section in requested if section not in available]
     if unknown:
         return (
@@ -649,9 +632,7 @@ def _continuation(
     )
 
 
-def _warning_continuation(
-    *, section_limit: int, max_row_limit: int, flow_sys_id: str
-) -> str:
+def _warning_continuation(*, section_limit: int, max_row_limit: int, flow_sys_id: str) -> str:
     if section_limit < max_row_limit:
         return f"Re-run with section_limit greater than {section_limit}."
     return (
@@ -669,9 +650,7 @@ def _warning_continuation(
     )
 
 
-def _v1_variable_value_continuation(
-    *, section_limit: int, max_row_limit: int, flow_sys_id: str
-) -> str:
+def _v1_variable_value_continuation(*, section_limit: int, max_row_limit: int, flow_sys_id: str) -> str:
     next_step = (
         f"Re-run with section_limit greater than {section_limit}. "
         if section_limit < max_row_limit
@@ -695,8 +674,7 @@ def _saturated_datasets(
     return sorted(
         name
         for name in names
-        if requested_limits.get(name, 0) > 0
-        and len(datasets.get(name, [])) >= requested_limits[name]
+        if requested_limits.get(name, 0) > 0 and len(datasets.get(name, [])) >= requested_limits[name]
     )
 
 
@@ -719,19 +697,9 @@ def _bounded_rows(
     return returned
 
 
-def _structural_summary(
-    datasets: dict[str, list[dict[str, Any]]], section_limit: int
-) -> dict[str, Any]:
-    counts = {
-        name: min(len(datasets.get(name, [])), section_limit)
-        for name in sorted(_STRUCTURAL_DATASETS)
-    }
-    total_nodes = (
-        counts["actions_v2"]
-        + counts["actions_v1"]
-        + counts["logic_v2"]
-        + counts["logic_v1"]
-    )
+def _structural_summary(datasets: dict[str, list[dict[str, Any]]], section_limit: int) -> dict[str, Any]:
+    counts = {name: min(len(datasets.get(name, [])), section_limit) for name in sorted(_STRUCTURAL_DATASETS)}
+    total_nodes = counts["actions_v2"] + counts["actions_v1"] + counts["logic_v2"] + counts["logic_v1"]
     return {
         "counts": counts,
         "count_semantics": "exact unless truncated=true; truncated dataset counts are lower bounds",
@@ -740,13 +708,9 @@ def _structural_summary(
         "versions": [
             version
             for version in ("v1", "v2")
-            if any(
-                counts[f"{kind}_{version}"] for kind in ("actions", "logic", "triggers")
-            )
+            if any(counts[f"{kind}_{version}"] for kind in ("actions", "logic", "triggers"))
         ],
-        "truncated": any(
-            len(datasets.get(name, [])) > section_limit for name in _STRUCTURAL_DATASETS
-        ),
+        "truncated": any(len(datasets.get(name, [])) > section_limit for name in _STRUCTURAL_DATASETS),
         "per_dataset_limit": section_limit,
     }
 
@@ -770,25 +734,15 @@ async def _fetch_flow_datasets(
     }
     names = sorted(required)
     direct_names = [name for name in names if name != "v1_variable_values"]
-    rows = await asyncio.gather(
-        *(fetchers[name](resolved_sys_id, section_limit + 1) for name in direct_names)
-    )
+    rows = await asyncio.gather(*(fetchers[name](resolved_sys_id, section_limit + 1) for name in direct_names))
     datasets = dict(zip(direct_names, rows, strict=True))
     requested_limits = dict.fromkeys(direct_names, section_limit + 1)
     if "v1_variable_values" in required:
         v1_action_ids = sorted(
-            {
-                _v(action.get("sys_id"))
-                for action in datasets.get("actions_v1", [])
-                if _v(action.get("sys_id"))
-            }
+            {_v(action.get("sys_id")) for action in datasets.get("actions_v1", []) if _v(action.get("sys_id"))}
         )
-        datasets["v1_variable_values"] = (
-            await client.list_v1_variable_values(v1_action_ids) if v1_action_ids else []
-        )
-        requested_limits["v1_variable_values"] = (
-            min(len(v1_action_ids) * 10, 5000) if v1_action_ids else 0
-        )
+        datasets["v1_variable_values"] = await client.list_v1_variable_values(v1_action_ids) if v1_action_ids else []
+        requested_limits["v1_variable_values"] = min(len(v1_action_ids) * 10, 5000) if v1_action_ids else 0
     return datasets, requested_limits
 
 
@@ -805,16 +759,12 @@ async def _action_inspect(
     is_contract: bool = False,
 ) -> str:
     if sys_id and name:
-        return _error(
-            correlation_id, "Provide exactly one of sys_id or name (not both)."
-        )
+        return _error(correlation_id, "Provide exactly one of sys_id or name (not both).")
     if not sys_id and not name:
         return _error(correlation_id, "Either sys_id or name is required.")
     if sys_id:
         validate_sys_id(sys_id)
-    selected_sections, section_error = _parse_sections(
-        sections, is_contract=is_contract
-    )
+    selected_sections, section_error = _parse_sections(sections, is_contract=is_contract)
     if section_error is not None:
         return _error(correlation_id, section_error)
     effective_limit = max(
@@ -827,9 +777,7 @@ async def _action_inspect(
     required = _required_datasets(selected_sections)
 
     async with client_factory() as client:
-        resolved_sys_id, err = await _resolve_inspect_sys_id(
-            client, sys_id, name, correlation_id
-        )
+        resolved_sys_id, err = await _resolve_inspect_sys_id(client, sys_id, name, correlation_id)
         if err is not None:
             return err
 
@@ -837,9 +785,7 @@ async def _action_inspect(
         if header is None:
             return _error(correlation_id, f"Flow {resolved_sys_id} not found.")
 
-        datasets, requested_limits = await _fetch_flow_datasets(
-            client, resolved_sys_id, required, effective_limit
-        )
+        datasets, requested_limits = await _fetch_flow_datasets(client, resolved_sys_id, required, effective_limit)
         truncation: dict[str, dict[str, Any]] = {}
         inputs = _bounded_rows(
             datasets.get("inputs", []),
@@ -888,9 +834,7 @@ async def _action_inspect(
         returned_triggers_v2 = triggers_v2
         returned_triggers_v1 = triggers_v1
         if "structural_summary" in selected_sections:
-            truncated_datasets = _saturated_datasets(
-                datasets, requested_limits, _STRUCTURAL_DATASETS
-            )
+            truncated_datasets = _saturated_datasets(datasets, requested_limits, _STRUCTURAL_DATASETS)
             if truncated_datasets:
                 truncation["structural_summary"] = {
                     "datasets": truncated_datasets,
@@ -904,9 +848,7 @@ async def _action_inspect(
                 }
 
         if "warnings" in selected_sections:
-            saturated_dependencies = _saturated_datasets(
-                datasets, requested_limits, _STRUCTURAL_DATASETS
-            )
+            saturated_dependencies = _saturated_datasets(datasets, requested_limits, _STRUCTURAL_DATASETS)
             if saturated_dependencies:
                 truncation["warnings"] = {
                     "datasets": saturated_dependencies,
@@ -921,8 +863,7 @@ async def _action_inspect(
         selected_node_section = "steps" if is_contract else "canvas"
         if selected_node_section in selected_sections:
             combined_nodes = sorted(
-                [("action", row) for row in actions_v2]
-                + [("logic", row) for row in logic_v2],
+                [("action", row) for row in actions_v2] + [("logic", row) for row in logic_v2],
                 key=lambda item: _safe_int(_v(item[1].get("order"))),
             )
             bounded_nodes = combined_nodes[:effective_limit]
@@ -942,9 +883,7 @@ async def _action_inspect(
             node_logic_v2 = [row for kind, row in bounded_nodes if kind == "logic"]
 
         if "triggers" in selected_sections:
-            all_triggers = [("v2", row) for row in triggers_v2] + [
-                ("v1", row) for row in triggers_v1
-            ]
+            all_triggers = [("v2", row) for row in triggers_v2] + [("v1", row) for row in triggers_v1]
             bounded_triggers = all_triggers[:effective_limit]
             if len(all_triggers) > effective_limit:
                 truncation["triggers"] = {
@@ -958,24 +897,14 @@ async def _action_inspect(
                         source_datasets=("triggers_v2", "triggers_v1"),
                     ),
                 }
-            returned_triggers_v2 = [
-                row for version, row in bounded_triggers if version == "v2"
-            ]
-            returned_triggers_v1 = [
-                row for version, row in bounded_triggers if version == "v1"
-            ]
+            returned_triggers_v2 = [row for version, row in bounded_triggers if version == "v2"]
+            returned_triggers_v1 = [row for version, row in bounded_triggers if version == "v1"]
 
         remote_ids = sorted(
-            {
-                _v(t.get("remote_trigger_id"))
-                for t in returned_triggers_v2
-                if _v(t.get("remote_trigger_id"))
-            }
+            {_v(t.get("remote_trigger_id")) for t in returned_triggers_v2 if _v(t.get("remote_trigger_id"))}
         )
         record_triggers = (
-            await client.list_record_triggers(remote_ids)
-            if "triggers" in selected_sections and remote_ids
-            else []
+            await client.list_record_triggers(remote_ids) if "triggers" in selected_sections and remote_ids else []
         )
         if "triggers" in selected_sections and len(remote_ids) > INTERNAL_QUERY_LIMIT:
             trigger_truncation = truncation.setdefault(
@@ -996,36 +925,22 @@ async def _action_inspect(
                 "still apply."
             )
 
-        node_action_type_ids = {
-            _v(a.get("action_type"))
-            for a in node_actions_v2
-            if _v(a.get("action_type"))
-        }
-        warning_action_type_ids = {
-            _v(a.get("action_type")) for a in actions_v2 if _v(a.get("action_type"))
-        }
+        node_action_type_ids = {_v(a.get("action_type")) for a in node_actions_v2 if _v(a.get("action_type"))}
+        warning_action_type_ids = {_v(a.get("action_type")) for a in actions_v2 if _v(a.get("action_type"))}
         required_action_type_ids: set[str] = set()
         if selected_node_section in selected_sections:
             required_action_type_ids.update(node_action_type_ids)
         if "warnings" in selected_sections:
             required_action_type_ids.update(warning_action_type_ids)
         action_type_ids = sorted(required_action_type_ids)
-        action_type_rows = (
-            await client.get_action_type_definitions(action_type_ids)
-            if action_type_ids
-            else []
-        )
-        returned_action_type_ids = {
-            _v(row.get("sys_id")) for row in action_type_rows if _v(row.get("sys_id"))
-        }
+        action_type_rows = await client.get_action_type_definitions(action_type_ids) if action_type_ids else []
+        returned_action_type_ids = {_v(row.get("sys_id")) for row in action_type_rows if _v(row.get("sys_id"))}
         section_action_type_ids = {
             selected_node_section: node_action_type_ids,
             "warnings": warning_action_type_ids,
         }
         for section, section_type_ids in section_action_type_ids.items():
-            missing_action_type_ids = sorted(
-                section_type_ids - returned_action_type_ids
-            )
+            missing_action_type_ids = sorted(section_type_ids - returned_action_type_ids)
             if section not in selected_sections or not missing_action_type_ids:
                 continue
             section_truncation = truncation.setdefault(
@@ -1040,9 +955,7 @@ async def _action_inspect(
                     ),
                 },
             )
-            section_truncation["missing_action_type_metadata"] = len(
-                missing_action_type_ids
-            )
+            section_truncation["missing_action_type_metadata"] = len(missing_action_type_ids)
             section_truncation["limitation"] = (
                 f"{section} covers only probed structural rows and returned action-type metadata."
             )
@@ -1058,21 +971,13 @@ async def _action_inspect(
         node_action_type_id_list = sorted(node_action_type_ids)
         if is_contract and "steps" in selected_sections and node_action_type_id_list:
             try:
-                action_input_rows = await client.list_action_input_definitions(
-                    node_action_type_id_list
-                )
+                action_input_rows = await client.list_action_input_definitions(node_action_type_id_list)
             except Exception as exc:
-                schema_limitations.append(
-                    f"Action input definitions are unavailable: {exc}"
-                )
+                schema_limitations.append(f"Action input definitions are unavailable: {exc}")
             try:
-                action_output_rows = await client.list_action_output_definitions(
-                    node_action_type_id_list
-                )
+                action_output_rows = await client.list_action_output_definitions(node_action_type_id_list)
             except Exception as exc:
-                schema_limitations.append(
-                    f"Action output definitions are unavailable: {exc}"
-                )
+                schema_limitations.append(f"Action output definitions are unavailable: {exc}")
 
         v1_variable_values = datasets.get("v1_variable_values", [])
         v1_variable_values = _bounded_rows(
@@ -1105,17 +1010,14 @@ async def _action_inspect(
     # Build lookups.
     action_type_lookup = _index_by_sys_id(action_type_rows)
     condition_lookup: dict[str, str] = {
-        _v(row.get("sys_id")): _v(row.get("condition"))
-        for row in record_triggers
-        if _v(row.get("sys_id"))
+        _v(row.get("sys_id")): _v(row.get("condition")) for row in record_triggers if _v(row.get("sys_id"))
     }
 
     # Build canvas nodes (actions + logic, both V2), sorted by ``order``.
     canvas: list[dict[str, Any]] = []
     if selected_node_section in selected_sections:
         nodes: list[dict[str, Any]] = [
-            _build_v2_node(row, kind="action", action_type_lookup=action_type_lookup)
-            for row in node_actions_v2
+            _build_v2_node(row, kind="action", action_type_lookup=action_type_lookup) for row in node_actions_v2
         ]
         nodes.extend(_build_v2_node(row, kind="logic") for row in node_logic_v2)
         nodes.sort(key=lambda n: _safe_int(n["order"]))
@@ -1124,10 +1026,7 @@ async def _action_inspect(
     # Triggers - V2 first (stitched), then V1.
     triggers: list[dict[str, Any]] = []
     if "triggers" in selected_sections:
-        triggers = [
-            _v2_trigger_entry(row, condition_lookup=condition_lookup)
-            for row in returned_triggers_v2
-        ]
+        triggers = [_v2_trigger_entry(row, condition_lookup=condition_lookup) for row in returned_triggers_v2]
         triggers.extend(_v1_trigger_entry(row) for row in returned_triggers_v1)
 
     master = _v(header.get("master_snapshot"))
@@ -1189,12 +1088,8 @@ async def _action_inspect(
         "v1_variable_values": [_flatten_record(row) for row in v1_variable_values],
         "warnings": warnings,
     }
-    action_input_definitions = _index_action_definition_fields(
-        action_input_rows, has_default=True
-    )
-    action_output_definitions = _index_action_definition_fields(
-        action_output_rows, has_default=False
-    )
+    action_input_definitions = _index_action_definition_fields(action_input_rows, has_default=True)
+    action_output_definitions = _index_action_definition_fields(action_output_rows, has_default=False)
     assembled = (
         _build_flow_contract(
             full_payload,
@@ -1205,9 +1100,9 @@ async def _action_inspect(
         if is_contract
         else full_payload
     )
-    if "v1_variable_values" in selected_sections and requested_limits.get(
-        "v1_variable_values"
-    ) == len(v1_variable_values):
+    if "v1_variable_values" in selected_sections and requested_limits.get("v1_variable_values") == len(
+        v1_variable_values
+    ):
         truncation.setdefault(
             "v1_variable_values",
             {
@@ -1223,33 +1118,19 @@ async def _action_inspect(
     assembled["structural_summary"] = _structural_summary(datasets, effective_limit)
     data = {section: assembled[section] for section in selected_sections}
     available_sections = _CONTRACT_SECTIONS if is_contract else _INSPECT_SECTIONS
-    mode = (
-        "all"
-        if sections.strip() == "*"
-        else "explicit" if sections.strip() else "compact"
-    )
+    mode = "all" if sections.strip() == "*" else "explicit" if sections.strip() else "compact"
     selection = {
         "mode": mode,
-        "requested_sections": (
-            ["*"]
-            if mode == "all"
-            else selected_sections if mode == "explicit" else None
-        ),
+        "requested_sections": (["*"] if mode == "all" else selected_sections if mode == "explicit" else None),
         "default_sections": list(_DEFAULT_FLOW_SECTIONS),
         "returned_sections": selected_sections,
-        "omitted_sections": [
-            section
-            for section in available_sections
-            if section not in selected_sections
-        ],
+        "omitted_sections": [section for section in available_sections if section not in selected_sections],
         "section_limit": effective_limit,
         "truncated": bool(truncation),
         "truncation": truncation,
         "dataset_probe_limits": requested_limits,
     }
-    return format_response(
-        data=data, correlation_id=correlation_id, selection=selection
-    )
+    return format_response(data=data, correlation_id=correlation_id, selection=selection)
 
 
 def _safe_int(value: str) -> int:
@@ -1295,14 +1176,8 @@ async def _action_find_by_table(
 
     async with client_factory() as client:
         record_triggers = await client.find_record_triggers_by_table(table)
-        remote_ids = sorted(
-            {_v(r.get("sys_id")) for r in record_triggers if _v(r.get("sys_id"))}
-        )
-        v2_triggers = (
-            await client.list_v2_triggers_by_remote_ids(remote_ids)
-            if remote_ids
-            else []
-        )
+        remote_ids = sorted({_v(r.get("sys_id")) for r in record_triggers if _v(r.get("sys_id"))})
+        v2_triggers = await client.list_v2_triggers_by_remote_ids(remote_ids) if remote_ids else []
         v1_triggers = await client.list_v1_triggers_by_table(table)
 
         flow_versions = _collect_flow_versions(v2_triggers, v1_triggers)
@@ -1323,20 +1198,14 @@ async def _action_find_by_table(
     flow_versions = canonical_versions
     v1_unique = {fid for fid, versions in flow_versions.items() if "v1" in versions}
     v2_unique = {fid for fid, versions in flow_versions.items() if "v2" in versions}
-    flows = [
-        _find_by_table_entry(fid, versions, canonical_meta[fid])
-        for fid, versions in flow_versions.items()
-    ]
+    flows = [_find_by_table_entry(fid, versions, canonical_meta[fid]) for fid, versions in flow_versions.items()]
     warnings = []
     if unresolved_ids:
         warnings.append(
             "Some trigger flow references could not be resolved to current flow headers. "
             "They may refer to older snapshots or inaccessible records; active state is unknown."
         )
-    if any(
-        len(rows) >= INTERNAL_QUERY_LIMIT
-        for rows in (record_triggers, v1_triggers, v2_triggers)
-    ):
+    if any(len(rows) >= INTERNAL_QUERY_LIMIT for rows in (record_triggers, v1_triggers, v2_triggers)):
         warnings.append(
             "Trigger discovery reached its internal row limit; results may be incomplete. "
             "Use query with explicit fields and offset pagination on the trigger tables."
@@ -1350,9 +1219,7 @@ async def _action_find_by_table(
         "flows": flows,
         "unresolved_flow_ids": unresolved_ids,
     }
-    return format_response(
-        data=payload, correlation_id=correlation_id, warnings=warnings or None
-    )
+    return format_response(data=payload, correlation_id=correlation_id, warnings=warnings or None)
 
 
 def _collect_flow_versions(
@@ -1383,9 +1250,7 @@ def _find_by_table_entry(
         "name": _d(meta.get("name")) if meta else "",
         "internal_name": _v(meta.get("internal_name")) if meta else "",
         "type": _v(meta.get("type")) if meta else "",
-        "active": (
-            _v(meta.get("active")) == "true" if meta and "active" in meta else None
-        ),
+        "active": (_v(meta.get("active")) == "true" if meta and "active" in meta else None),
         "metadata_resolved": bool(meta),
         "sys_scope": _d(meta.get("sys_scope")) if meta else "",
         "version": "+".join(sorted(versions)),
@@ -1450,16 +1315,12 @@ async def _action_list_triggers(
         v2_rows = list(filtered.get("v2") or [])
         v1_rows = list(filtered.get("v1") or [])
 
-        flow_ids = {
-            _v(row.get("flow")) for row in v2_rows + v1_rows if _v(row.get("flow"))
-        }
+        flow_ids = {_v(row.get("flow")) for row in v2_rows + v1_rows if _v(row.get("flow"))}
         flows_meta = await client.get_flows_bulk(sorted(flow_ids)) if flow_ids else []
 
     meta_by_id = _index_flow_headers(flows_meta)
 
-    triggers: list[dict[str, Any]] = [
-        _trigger_with_flow(row, "v2", meta_by_id) for row in v2_rows
-    ]
+    triggers: list[dict[str, Any]] = [_trigger_with_flow(row, "v2", meta_by_id) for row in v2_rows]
     triggers.extend(_trigger_with_flow(row, "v1", meta_by_id) for row in v1_rows)
 
     payload: dict[str, Any] = {
@@ -1548,9 +1409,7 @@ def register_tools(
     across tool groups.
     """
     del choices, dictionary  # unused; signature retained for loader parity
-    client_factory = client_factory or (
-        lambda: ServiceNowClient(settings, auth_provider)
-    )
+    client_factory = client_factory or (lambda: ServiceNowClient(settings, auth_provider))
 
     @mcp.tool()
     @tool_handler

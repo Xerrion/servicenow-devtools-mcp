@@ -36,9 +36,7 @@ logger = logging.getLogger(__name__)
 
 TOOL_NAMES: list[str] = ["query"]
 
-_VALID_AGGREGATE_OPS: Final[frozenset[str]] = frozenset(
-    {"count", "avg", "sum", "min", "max"}
-)
+_VALID_AGGREGATE_OPS: Final[frozenset[str]] = frozenset({"count", "avg", "sum", "min", "max"})
 
 # Universal system fields present on every table. Never warn on these even if a
 # dictionary fetch comes back incomplete.
@@ -65,9 +63,7 @@ _ORDER_PREFIXES: Final[tuple[str, ...]] = ("ORDERBYDESC", "ORDERBY")
 # dot-walked. Element names are always lowercase, so this naturally stops at
 # uppercase textual operators (LIKE, STARTSWITH, ISEMPTY, ...) and at symbolic
 # operators (=, !=, >, <).
-_FIELD_TOKEN_RE: Final[re.Pattern[str]] = re.compile(
-    r"^[a-z][a-z0-9_]*(?:\.[a-z0-9_]+)*"
-)
+_FIELD_TOKEN_RE: Final[re.Pattern[str]] = re.compile(r"^[a-z][a-z0-9_]*(?:\.[a-z0-9_]+)*")
 
 _COMPACT_RECORD_FIELDS: Final[tuple[str, ...]] = ("sys_id", "sys_updated_on")
 
@@ -89,13 +85,7 @@ class _AggregatePlan:
 
     @property
     def is_empty(self) -> bool:
-        return not (
-            self.count
-            or self.avg_fields
-            or self.sum_fields
-            or self.min_fields
-            or self.max_fields
-        )
+        return not (self.count or self.avg_fields or self.sum_fields or self.min_fields or self.max_fields)
 
 
 @dataclass(frozen=True)
@@ -186,9 +176,7 @@ def _parse_csv(spec: str) -> list[str]:
     return [item.strip() for item in spec.split(",") if item.strip()]
 
 
-def _parse_projection(
-    fields: str, *, compact_default: bool
-) -> tuple[list[str] | None, dict[str, object]] | str:
+def _parse_projection(fields: str, *, compact_default: bool) -> tuple[list[str] | None, dict[str, object]] | str:
     """Parse a field projection and describe its response contract."""
     if fields.strip() == "*":
         return None, {
@@ -224,9 +212,7 @@ def _parse_projection(
     }
 
 
-def _project_record(
-    record: dict[str, object], fields: list[str] | None
-) -> dict[str, object]:
+def _project_record(record: dict[str, object], fields: list[str] | None) -> dict[str, object]:
     """Apply the requested projection defensively to a ServiceNow record."""
     if fields is None:
         return record
@@ -339,11 +325,7 @@ async def _validate_query_fields(
     if not known_names:
         return []
 
-    unknown = [
-        name
-        for name in candidates
-        if name not in known_names and name not in _UNIVERSAL_FIELDS
-    ]
+    unknown = [name for name in candidates if name not in known_names and name not in _UNIVERSAL_FIELDS]
     if not unknown:
         return []
 
@@ -410,9 +392,7 @@ async def _run_sys_id_mode(
     field_list, selection = parsed
 
     async with client_factory() as client:
-        record = await client.get_record(
-            table, sys_id, fields=field_list, display_values=display_values
-        )
+        record = await client.get_record(table, sys_id, fields=field_list, display_values=display_values)
 
     masked = mask_record(table, record)
     if field_list is None:
@@ -451,9 +431,7 @@ async def _run_aggregate_mode(
             max_fields=plan.max_fields or None,
         )
 
-    return format_response(
-        data=result, correlation_id=correlation_id, warnings=warnings or None
-    )
+    return format_response(data=result, correlation_id=correlation_id, warnings=warnings or None)
 
 
 async def _run_query_mode(
@@ -495,14 +473,9 @@ async def _run_query_mode(
             display_values=display_values,
         )
 
-    masked = [
-        _project_record(mask_record(table, record), field_list)
-        for record in result["records"]
-    ]
+    masked = [_project_record(mask_record(table, record), field_list) for record in result["records"]]
     if field_list is None:
-        selection["returned_fields"] = sorted(
-            {name for record in masked for name in record}
-        )
+        selection["returned_fields"] = sorted({name for record in masked for name in record})
     return format_response(
         data=masked,
         correlation_id=correlation_id,
@@ -523,14 +496,10 @@ async def _run_query_mode(
 
 def _err(correlation_id: str, message: str) -> str:
     """Return a serialized error envelope with the given message."""
-    return format_response(
-        data=None, correlation_id=correlation_id, status="error", error=message
-    )
+    return format_response(data=None, correlation_id=correlation_id, status="error", error=message)
 
 
-def _check_mode_conflicts(
-    sys_id: str, aggregate: str, group_by: str, correlation_id: str
-) -> str | None:
+def _check_mode_conflicts(sys_id: str, aggregate: str, group_by: str, correlation_id: str) -> str | None:
     """Validate that the requested mode combination is legal.
 
     Three modes are mutually exclusive: sys_id-fetch, aggregate, and default
@@ -592,9 +561,7 @@ async def _apply_resolve_labels_block(
     return augmented, label_warnings
 
 
-def _validate_aggregate_block(
-    aggregate: str, correlation_id: str
-) -> _AggregatePlan | str:
+def _validate_aggregate_block(aggregate: str, correlation_id: str) -> _AggregatePlan | str:
     """Parse and validate the ``aggregate`` spec.
 
     Returns the parsed ``_AggregatePlan`` on success or an error envelope
@@ -633,9 +600,7 @@ def register_tools(
     fields referenced in ``encoded_query``.
     """
 
-    client_factory = client_factory or (
-        lambda: ServiceNowClient(settings, auth_provider)
-    )
+    client_factory = client_factory or (lambda: ServiceNowClient(settings, auth_provider))
 
     @mcp.tool()
     @tool_handler
@@ -707,9 +672,7 @@ def register_tools(
         warnings: list[str] = []
         augmented_query = encoded_query
         if resolve_labels:
-            result = await _apply_resolve_labels_block(
-                table, augmented_query, resolve_labels, choices, correlation_id
-            )
+            result = await _apply_resolve_labels_block(table, augmented_query, resolve_labels, choices, correlation_id)
             if isinstance(result, str):
                 return result
             augmented_query, label_warnings = result
@@ -717,9 +680,7 @@ def register_tools(
 
         # --- advisory field validation (catches silently-dropped filters) -
         if dictionary is not None:
-            warnings.extend(
-                await _validate_query_fields(table, augmented_query, dictionary)
-            )
+            warnings.extend(await _validate_query_fields(table, augmented_query, dictionary))
 
         # --- aggregate mode -----------------------------------------------
         if aggregate:

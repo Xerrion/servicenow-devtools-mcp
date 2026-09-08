@@ -51,9 +51,7 @@ class TestQueryMode:
 
     @pytest.mark.asyncio()
     @respx.mock
-    async def test_query_mode_returns_records(
-        self, settings: Settings, auth_provider: BasicAuthProvider
-    ) -> None:
+    async def test_query_mode_returns_records(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Returns matching records with pagination, sensitive fields masked."""
         route = respx.get(f"{BASE_URL}/api/now/table/incident").mock(
             return_value=httpx.Response(
@@ -73,18 +71,13 @@ class TestQueryMode:
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["query"](
-            table="incident", encoded_query="active=true", fields="number,password"
-        )
+        raw = await tools["query"](table="incident", encoded_query="active=true", fields="number,password")
         result = decode_response(raw)
 
         assert result["status"] == "success"
         assert len(result["data"]) == 2
         assert result["data"][0]["password"] == "***MASKED***"
-        assert (
-            route.calls.last.request.url.params["sysparm_fields"]
-            == "sys_id,number,password"
-        )
+        assert route.calls.last.request.url.params["sysparm_fields"] == "sys_id,number,password"
         assert result["pagination"] == {"offset": 0, "limit": 20, "total": 2}
         assert result["selection"] == {
             "mode": "explicit",
@@ -100,9 +93,7 @@ class TestQueryMode:
         self, settings: Settings, auth_provider: BasicAuthProvider
     ) -> None:
         tools = _register_and_get_tools(settings, auth_provider)
-        result = decode_response(
-            await tools["query"](table="incident", encoded_query="active=true")
-        )
+        result = decode_response(await tools["query"](table="incident", encoded_query="active=true"))
 
         assert result["status"] == "error"
         assert "fields is required" in result["error"]["message"]
@@ -110,9 +101,7 @@ class TestQueryMode:
 
     @pytest.mark.asyncio()
     @respx.mock
-    async def test_star_requests_all_masked_fields(
-        self, settings: Settings, auth_provider: BasicAuthProvider
-    ) -> None:
+    async def test_star_requests_all_masked_fields(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         route = respx.get(f"{BASE_URL}/api/now/table/incident").mock(
             return_value=httpx.Response(
                 200,
@@ -129,9 +118,7 @@ class TestQueryMode:
         assert result["selection"]["mode"] == "all"
 
     @pytest.mark.asyncio()
-    async def test_denied_table_returns_error(
-        self, settings: Settings, auth_provider: BasicAuthProvider
-    ) -> None:
+    async def test_denied_table_returns_error(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """Denied table is rejected with a policy error envelope."""
         denied = next(iter(DENIED_TABLES))
         tools = _register_and_get_tools(settings, auth_provider)
@@ -148,9 +135,7 @@ class TestQueryMode:
         """enforce_query_safety still gates large tables in unified query mode."""
         settings.large_table_names_csv = "syslog,sys_audit"
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["query"](
-            table="syslog", encoded_query="level=error", fields="message"
-        )
+        raw = await tools["query"](table="syslog", encoded_query="level=error", fields="message")
         result = decode_response(raw)
 
         assert result["status"] == "error"
@@ -215,16 +200,12 @@ class TestSysIdMode:
         respx.get(f"{BASE_URL}/api/now/table/incident/{sys_id}").mock(
             return_value=httpx.Response(
                 200,
-                json={
-                    "result": {"sys_id": sys_id, "number": "INC0001", "secret": "shh"}
-                },
+                json={"result": {"sys_id": sys_id, "number": "INC0001", "secret": "shh"}},
             )
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["query"](
-            table="incident", sys_id=sys_id, fields="number,secret"
-        )
+        raw = await tools["query"](table="incident", sys_id=sys_id, fields="number,secret")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -240,18 +221,13 @@ class TestSysIdMode:
     ) -> None:
         sys_id = "a" * 32
         route = respx.get(f"{BASE_URL}/api/now/table/incident/{sys_id}").mock(
-            return_value=httpx.Response(
-                200, json={"result": {"sys_id": sys_id, "sys_updated_on": "now"}}
-            )
+            return_value=httpx.Response(200, json={"result": {"sys_id": sys_id, "sys_updated_on": "now"}})
         )
         tools = _register_and_get_tools(settings, auth_provider)
         result = decode_response(await tools["query"](table="incident", sys_id=sys_id))
 
         assert result["status"] == "success"
-        assert (
-            route.calls.last.request.url.params["sysparm_fields"]
-            == "sys_id,sys_updated_on"
-        )
+        assert route.calls.last.request.url.params["sysparm_fields"] == "sys_id,sys_updated_on"
         assert result["selection"]["mode"] == "compact"
 
     @pytest.mark.asyncio()
@@ -259,9 +235,7 @@ class TestSysIdMode:
         self, settings: Settings, auth_provider: BasicAuthProvider
     ) -> None:
         tools = _register_and_get_tools(settings, auth_provider)
-        result = decode_response(
-            await tools["query"](table="incident", fields="number,bad-field")
-        )
+        result = decode_response(await tools["query"](table="incident", fields="number,bad-field"))
 
         assert result["status"] == "error"
         assert "Invalid identifier" in result["error"]["message"]
@@ -287,9 +261,7 @@ class TestSysIdMode:
 class TestAggregateMode:
     """Stats API mode."""
 
-    @pytest.mark.parametrize(
-        "group_by", ["state,active", " state , active ", "request_item.state,active"]
-    )
+    @pytest.mark.parametrize("group_by", ["state,active", " state , active ", "request_item.state,active"])
     @respx.mock
     async def test_multiple_group_fields(
         self, settings: Settings, auth_provider: BasicAuthProvider, group_by: str
@@ -299,34 +271,24 @@ class TestAggregateMode:
             return_value=httpx.Response(200, json={"result": []})
         )
         tools = _register_and_get_tools(settings, auth_provider)
-        result = decode_response(
-            await tools["query"](table="sc_task", aggregate="count", group_by=group_by)
-        )
+        result = decode_response(await tools["query"](table="sc_task", aggregate="count", group_by=group_by))
         assert result["status"] == "success"
-        assert route.calls.last.request.url.params[
-            "sysparm_group_by"
-        ] == group_by.replace(" ", "")
+        assert route.calls.last.request.url.params["sysparm_group_by"] == group_by.replace(" ", "")
 
-    @pytest.mark.parametrize(
-        "group_by", ["state,active^ORstate=3", "state,,active", ",", "state,"]
-    )
+    @pytest.mark.parametrize("group_by", ["state,active^ORstate=3", "state,,active", ",", "state,"])
     @respx.mock
     async def test_invalid_group_fields_fail_before_io(
         self, settings: Settings, auth_provider: BasicAuthProvider, group_by: str
     ) -> None:
         """Malformed grouping fields must not reach the platform."""
         tools = _register_and_get_tools(settings, auth_provider)
-        result = decode_response(
-            await tools["query"](table="sc_task", aggregate="count", group_by=group_by)
-        )
+        result = decode_response(await tools["query"](table="sc_task", aggregate="count", group_by=group_by))
         assert result["status"] == "error"
         assert not respx.calls
 
     @pytest.mark.asyncio()
     @respx.mock
-    async def test_aggregate_mode_count(
-        self, settings: Settings, auth_provider: BasicAuthProvider
-    ) -> None:
+    async def test_aggregate_mode_count(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """`aggregate='count'` calls the Stats endpoint and returns the result dict."""
         route = respx.get(f"{BASE_URL}/api/now/stats/incident").mock(
             return_value=httpx.Response(
@@ -346,23 +308,17 @@ class TestAggregateMode:
 
     @pytest.mark.asyncio()
     @respx.mock
-    async def test_aggregate_mode_avg_with_group_by(
-        self, settings: Settings, auth_provider: BasicAuthProvider
-    ) -> None:
+    async def test_aggregate_mode_avg_with_group_by(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """`aggregate='avg:priority'` + `group_by='state'` is forwarded to Stats."""
         route = respx.get(f"{BASE_URL}/api/now/stats/incident").mock(
             return_value=httpx.Response(
                 200,
-                json={
-                    "result": [{"groupby_fields": [{"field": "state", "value": "1"}]}]
-                },
+                json={"result": [{"groupby_fields": [{"field": "state", "value": "1"}]}]},
             )
         )
 
         tools = _register_and_get_tools(settings, auth_provider)
-        raw = await tools["query"](
-            table="incident", aggregate="avg:priority", group_by="state"
-        )
+        raw = await tools["query"](table="incident", aggregate="avg:priority", group_by="state")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -414,9 +370,7 @@ class TestResolveLabels:
     ) -> None:
         """Each resolved label is ANDed into encoded_query as `field=value`."""
         route = respx.get(f"{BASE_URL}/api/now/table/incident").mock(
-            return_value=httpx.Response(
-                200, json={"result": []}, headers={"X-Total-Count": "0"}
-            )
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
         )
 
         choices = ChoiceRegistry(settings, auth_provider)
@@ -442,18 +396,14 @@ class TestResolveLabels:
     ) -> None:
         """A non-numeric label that resolves to itself triggers a warning."""
         respx.get(f"{BASE_URL}/api/now/table/incident").mock(
-            return_value=httpx.Response(
-                200, json={"result": []}, headers={"X-Total-Count": "0"}
-            )
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
         )
 
         choices = ChoiceRegistry(settings, auth_provider)
         choices.resolve = AsyncMock(side_effect=lambda _t, _f, label: label)  # type: ignore[method-assign]
 
         tools = _register_and_get_tools(settings, auth_provider, choices=choices)
-        raw = await tools["query"](
-            table="incident", fields="number", resolve_labels="state=mystery"
-        )
+        raw = await tools["query"](table="incident", fields="number", resolve_labels="state=mystery")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -507,9 +457,7 @@ class TestExtractQueryFields:
             ("state=1^priority=2^state=3", ["state", "priority"]),
         ],
     )
-    def test_extracts_root_fields(
-        self, encoded_query: str, expected: list[str]
-    ) -> None:
+    def test_extracts_root_fields(self, encoded_query: str, expected: list[str]) -> None:
         """Root field names are pulled out, deduped, and order-preserved."""
         from servicenow_mcp.tools.query import _extract_query_fields
 
@@ -534,9 +482,7 @@ class TestFieldValidation:
 
         dictionary = DictionaryRegistry(settings, auth_provider)
         fields = [
-            DictionaryField(
-                name=name, internal_type="string", attributes="", inherited_from=None
-            )
+            DictionaryField(name=name, internal_type="string", attributes="", inherited_from=None)
             for name in field_names
         ]
         dictionary.get_all_fields = AsyncMock(return_value=fields)  # type: ignore[method-assign]
@@ -544,23 +490,15 @@ class TestFieldValidation:
 
     @pytest.mark.asyncio()
     @respx.mock
-    async def test_unknown_field_warns(
-        self, settings: Settings, auth_provider: BasicAuthProvider
-    ) -> None:
+    async def test_unknown_field_warns(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """A filter on a non-existent column warns that results are unfiltered."""
         respx.get(f"{BASE_URL}/api/now/table/u_custom").mock(
-            return_value=httpx.Response(
-                200, json={"result": []}, headers={"X-Total-Count": "0"}
-            )
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
         )
-        dictionary = self._stub_dictionary(
-            settings, auth_provider, ["u_samaccountname", "u_member"]
-        )
+        dictionary = self._stub_dictionary(settings, auth_provider, ["u_samaccountname", "u_member"])
 
         tools = _register_and_get_tools(settings, auth_provider, dictionary=dictionary)
-        raw = await tools["query"](
-            table="u_custom", encoded_query="name=Vinklubben", fields="u_member"
-        )
+        raw = await tools["query"](table="u_custom", encoded_query="name=Vinklubben", fields="u_member")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -569,23 +507,15 @@ class TestFieldValidation:
 
     @pytest.mark.asyncio()
     @respx.mock
-    async def test_known_field_no_warning(
-        self, settings: Settings, auth_provider: BasicAuthProvider
-    ) -> None:
+    async def test_known_field_no_warning(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """A filter on a real column produces no field-validation warning."""
         respx.get(f"{BASE_URL}/api/now/table/u_custom").mock(
-            return_value=httpx.Response(
-                200, json={"result": []}, headers={"X-Total-Count": "0"}
-            )
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
         )
-        dictionary = self._stub_dictionary(
-            settings, auth_provider, ["u_samaccountname", "u_member"]
-        )
+        dictionary = self._stub_dictionary(settings, auth_provider, ["u_samaccountname", "u_member"])
 
         tools = _register_and_get_tools(settings, auth_provider, dictionary=dictionary)
-        raw = await tools["query"](
-            table="u_custom", encoded_query="u_samaccountname=ACL_X", fields="u_member"
-        )
+        raw = await tools["query"](table="u_custom", encoded_query="u_samaccountname=ACL_X", fields="u_member")
         result = decode_response(raw)
 
         assert result["status"] == "success"
@@ -593,14 +523,10 @@ class TestFieldValidation:
 
     @pytest.mark.asyncio()
     @respx.mock
-    async def test_lookup_failure_skips_validation(
-        self, settings: Settings, auth_provider: BasicAuthProvider
-    ) -> None:
+    async def test_lookup_failure_skips_validation(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
         """A dictionary lookup error is swallowed; the query still succeeds."""
         respx.get(f"{BASE_URL}/api/now/table/u_custom").mock(
-            return_value=httpx.Response(
-                200, json={"result": []}, headers={"X-Total-Count": "0"}
-            )
+            return_value=httpx.Response(200, json={"result": []}, headers={"X-Total-Count": "0"})
         )
         from servicenow_mcp.tools._dictionary import DictionaryRegistry
 
@@ -608,9 +534,7 @@ class TestFieldValidation:
         dictionary.get_all_fields = AsyncMock(side_effect=RuntimeError("boom"))  # type: ignore[method-assign]
 
         tools = _register_and_get_tools(settings, auth_provider, dictionary=dictionary)
-        raw = await tools["query"](
-            table="u_custom", encoded_query="name=Vinklubben", fields="u_member"
-        )
+        raw = await tools["query"](table="u_custom", encoded_query="name=Vinklubben", fields="u_member")
         result = decode_response(raw)
 
         assert result["status"] == "success"

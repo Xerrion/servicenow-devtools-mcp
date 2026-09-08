@@ -50,9 +50,7 @@ _ACTION_REGISTRY: Final[dict[str, dict[str, Any]]] = {
 
 def _error(correlation_id: str, message: str) -> str:
     """Serialize a standard error envelope."""
-    return format_response(
-        data=None, correlation_id=correlation_id, status="error", error=message
-    )
+    return format_response(data=None, correlation_id=correlation_id, status="error", error=message)
 
 
 def _effective_limit(limit: int, settings: Settings) -> tuple[int, list[str] | None]:
@@ -83,9 +81,7 @@ def register_tools(
 ) -> None:
     """Register the unified ``code_search`` tool on the MCP server."""
     del choices, dictionary  # unused; signature retained for loader parity
-    client_factory = client_factory or (
-        lambda: ServiceNowClient(settings, auth_provider)
-    )
+    client_factory = client_factory or (lambda: ServiceNowClient(settings, auth_provider))
 
     @mcp.tool()
     @tool_handler
@@ -115,15 +111,11 @@ def register_tools(
             )
 
         if normalized_action == "describe":
-            return format_response(
-                data={"actions": _ACTION_REGISTRY}, correlation_id=correlation_id
-            )
+            return format_response(data={"actions": _ACTION_REGISTRY}, correlation_id=correlation_id)
 
         async with client_factory() as client:
             if normalized_action == "list_tables":
-                result = await client.code_search_tables(
-                    search_group=search_group or None
-                )
+                result = await client.code_search_tables(search_group=search_group or None)
                 return format_response(data=result, correlation_id=correlation_id)
 
             stripped_term = term.strip()
@@ -138,6 +130,4 @@ def register_tools(
                 search_group=search_group or None,
                 limit=effective_limit,
             )
-            return format_response(
-                data=result, correlation_id=correlation_id, warnings=warnings
-            )
+            return format_response(data=result, correlation_id=correlation_id, warnings=warnings)
