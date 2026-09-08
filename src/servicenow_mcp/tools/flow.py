@@ -38,7 +38,14 @@ from servicenow_mcp.utils import format_response, validate_identifier, validate_
 TOOL_NAMES: list[str] = ["flow"]
 
 _VALID_ACTIONS: Final[frozenset[str]] = frozenset(
-    {"contract", "inspect", "find_by_table", "decode_values", "list_triggers", "describe"}
+    {
+        "contract",
+        "inspect",
+        "find_by_table",
+        "decode_values",
+        "list_triggers",
+        "describe",
+    }
 )
 
 _DEFAULT_TRIGGER_LIMIT: Final[int] = 100
@@ -98,7 +105,12 @@ _CONTRACT_SECTIONS: Final[tuple[str, ...]] = (
     "steps",
     "warnings",
 )
-_DEFAULT_FLOW_SECTIONS: Final[tuple[str, ...]] = ("flow", "published_state", "structural_summary", "warnings")
+_DEFAULT_FLOW_SECTIONS: Final[tuple[str, ...]] = (
+    "flow",
+    "published_state",
+    "structural_summary",
+    "warnings",
+)
 
 _ACTION_REGISTRY: Final[dict[str, dict[str, Any]]] = {
     "contract": {
@@ -460,7 +472,9 @@ def _contract_binding(value: dict[str, Any]) -> dict[str, Any]:
     return binding
 
 
-def _contract_node_bindings(decoded: Any) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+def _contract_node_bindings(
+    decoded: Any,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Extract configured inputs and output assignments from decoded node values."""
     if isinstance(decoded, list):
         return [item for item in decoded if isinstance(item, dict)], []
@@ -584,7 +598,10 @@ def _parse_sections(sections: str, *, is_contract: bool) -> tuple[list[str], str
     requested = list(dict.fromkeys(part.strip() for part in sections.split(",") if part.strip()))
     unknown = [section for section in requested if section not in available]
     if unknown:
-        return [], f"Unknown section(s): {', '.join(unknown)}. Available: {', '.join(available)}, *."
+        return (
+            [],
+            f"Unknown section(s): {', '.join(unknown)}. Available: {', '.join(available)}, *.",
+        )
     return requested, None
 
 
@@ -751,7 +768,11 @@ async def _action_inspect(
     if section_error is not None:
         return _error(correlation_id, section_error)
     effective_limit = max(
-        1, min(section_limit if section_limit > 0 else _DEFAULT_SECTION_LIMIT, settings.max_row_limit)
+        1,
+        min(
+            section_limit if section_limit > 0 else _DEFAULT_SECTION_LIMIT,
+            settings.max_row_limit,
+        ),
     )
     required = _required_datasets(selected_sections)
 
@@ -1070,7 +1091,12 @@ async def _action_inspect(
     action_input_definitions = _index_action_definition_fields(action_input_rows, has_default=True)
     action_output_definitions = _index_action_definition_fields(action_output_rows, has_default=False)
     assembled = (
-        _build_flow_contract(full_payload, action_input_definitions, action_output_definitions, schema_limitations)
+        _build_flow_contract(
+            full_payload,
+            action_input_definitions,
+            action_output_definitions,
+            schema_limitations,
+        )
         if is_contract
         else full_payload
     )
@@ -1095,7 +1121,7 @@ async def _action_inspect(
     mode = "all" if sections.strip() == "*" else "explicit" if sections.strip() else "compact"
     selection = {
         "mode": mode,
-        "requested_sections": ["*"] if mode == "all" else selected_sections if mode == "explicit" else None,
+        "requested_sections": (["*"] if mode == "all" else selected_sections if mode == "explicit" else None),
         "default_sections": list(_DEFAULT_FLOW_SECTIONS),
         "returned_sections": selected_sections,
         "omitted_sections": [section for section in available_sections if section not in selected_sections],
@@ -1125,6 +1151,17 @@ def _flatten_record(row: dict[str, Any]) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
+def _index_flow_headers(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Index flow headers by canonical identity and current snapshot aliases."""
+    indexed = _index_by_sys_id(rows)
+    for row in rows:
+        for field in ("master_snapshot", "latest_snapshot"):
+            snapshot_id = _v(row.get(field))
+            if snapshot_id:
+                indexed.setdefault(snapshot_id, row)
+    return indexed
+
+
 async def _action_find_by_table(
     *,
     table: str,
@@ -1147,10 +1184,32 @@ async def _action_find_by_table(
         flow_sys_ids = sorted(flow_versions.keys())
         flows_meta = await client.get_flows_bulk(flow_sys_ids) if flow_sys_ids else []
 
-    meta_by_id = _index_by_sys_id(flows_meta)
+    meta_by_id = _index_flow_headers(flows_meta)
+    canonical_versions: dict[str, set[str]] = {}
+    canonical_meta: dict[str, dict[str, Any]] = {}
+    unresolved_ids: list[str] = []
+    for reference_id, versions in flow_versions.items():
+        meta = meta_by_id.get(reference_id, {})
+        canonical_id = _v(meta.get("sys_id")) or reference_id
+        canonical_versions.setdefault(canonical_id, set()).update(versions)
+        canonical_meta[canonical_id] = meta
+        if not meta:
+            unresolved_ids.append(reference_id)
+    flow_versions = canonical_versions
     v1_unique = {fid for fid, versions in flow_versions.items() if "v1" in versions}
     v2_unique = {fid for fid, versions in flow_versions.items() if "v2" in versions}
-    flows = [_find_by_table_entry(fid, versions, meta_by_id.get(fid, {})) for fid, versions in flow_versions.items()]
+    flows = [_find_by_table_entry(fid, versions, canonical_meta[fid]) for fid, versions in flow_versions.items()]
+    warnings = []
+    if unresolved_ids:
+        warnings.append(
+            "Some trigger flow references could not be resolved to current flow headers. "
+            "They may refer to older snapshots or inaccessible records; active state is unknown."
+        )
+    if any(len(rows) >= INTERNAL_QUERY_LIMIT for rows in (record_triggers, v1_triggers, v2_triggers)):
+        warnings.append(
+            "Trigger discovery reached its internal row limit; results may be incomplete. "
+            "Use query with explicit fields and offset pagination on the trigger tables."
+        )
 
     payload: dict[str, Any] = {
         "table": table,
@@ -1158,8 +1217,9 @@ async def _action_find_by_table(
         "v2_count": len(v2_unique),
         "total": len(flow_versions),
         "flows": flows,
+        "unresolved_flow_ids": unresolved_ids,
     }
-    return format_response(data=payload, correlation_id=correlation_id)
+    return format_response(data=payload, correlation_id=correlation_id, warnings=warnings or None)
 
 
 def _collect_flow_versions(
@@ -1190,7 +1250,8 @@ def _find_by_table_entry(
         "name": _d(meta.get("name")) if meta else "",
         "internal_name": _v(meta.get("internal_name")) if meta else "",
         "type": _v(meta.get("type")) if meta else "",
-        "active": _v(meta.get("active")) == "true" if meta else False,
+        "active": (_v(meta.get("active")) == "true" if meta and "active" in meta else None),
+        "metadata_resolved": bool(meta),
         "sys_scope": _d(meta.get("sys_scope")) if meta else "",
         "version": "+".join(sorted(versions)),
     }
@@ -1257,12 +1318,13 @@ async def _action_list_triggers(
         flow_ids = {_v(row.get("flow")) for row in v2_rows + v1_rows if _v(row.get("flow"))}
         flows_meta = await client.get_flows_bulk(sorted(flow_ids)) if flow_ids else []
 
-    meta_by_id = _index_by_sys_id(flows_meta)
+    meta_by_id = _index_flow_headers(flows_meta)
 
     triggers: list[dict[str, Any]] = [_trigger_with_flow(row, "v2", meta_by_id) for row in v2_rows]
     triggers.extend(_trigger_with_flow(row, "v1", meta_by_id) for row in v1_rows)
 
     payload: dict[str, Any] = {
+        "is_complete": not filtered.get("truncation"),
         "v1_count": len(v1_rows),
         "v2_count": len(v2_rows),
         "triggers": triggers,
@@ -1271,6 +1333,20 @@ async def _action_list_triggers(
         data=payload,
         correlation_id=correlation_id,
         pagination={"limit": effective_limit, "offset": 0, "total": len(triggers)},
+        warnings=(
+            [
+                (
+                    "Trigger search is incomplete. Counts describe returned matches only; zero does not prove absence. "
+                    "Follow selection.truncation for source queries and continuation."
+                )
+            ]
+            if filtered.get("truncation")
+            else None
+        ),
+        selection={
+            "total_kind": "returned_matches",
+            "truncation": filtered.get("truncation", {}),
+        },
     )
 
 
@@ -1285,11 +1361,11 @@ def _trigger_with_flow(
     entry: dict[str, Any] = {
         "version": version,
         "sys_id": _v(row.get("sys_id")),
-        "type": _v(row.get("type")),
-        "active": _v(row.get("active")) == "true",
+        "type": _v(row.get("trigger_type" if version == "v1" else "type")),
+        "active": _v(row.get("active")) == "true" if "active" in row else None,
         "table": _v(row.get("table")),
         "flow": {
-            "sys_id": flow_id,
+            "sys_id": _v(meta.get("sys_id")) or flow_id,
             "name": _d(meta.get("name")) if meta else _d(row.get("flow")),
         },
     }

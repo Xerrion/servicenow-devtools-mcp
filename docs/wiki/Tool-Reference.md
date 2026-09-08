@@ -205,7 +205,7 @@ Inspect ServiceNow Flow Designer artifacts from documented Table API records.
 - **Actions:**
   - `contract`: Return an agent-oriented data contract for one flow/subflow. Requires exactly one of `sys_id` or `name`.
   - `inspect`: Assemble one flow/subflow. Requires exactly one of `sys_id` or `name`.
-  - `find_by_table`: Find flows with a record trigger on `table`.
+  - `find_by_table`: Find flows with a record trigger on `table`. Resolves current snapshot references to canonical flow IDs. Unresolved headers are listed in `unresolved_flow_ids` with `metadata_resolved=false` and `active=null`; they are not confirmed inactive flows.
   - `decode_values`: Decode a gzip+base64+JSON `values` blob from a `sys_hub_*_v2` row. Requires `value`.
   - `list_triggers`: List record triggers across flows. Optional filters: `table`, `trigger_type`, `active` (`true`/`false`), `limit`.
   - `describe`: Return the action registry with names, descriptions, and parameters.

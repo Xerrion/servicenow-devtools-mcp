@@ -1578,7 +1578,9 @@ class TestServiceNowClientFlowDesigner:
             await client.get_flows_bulk(ids)
 
         query = route.calls.last.request.url.params["sysparm_query"]
-        assert query == f"sys_idIN{','.join(ids)}"
+        ids_csv = ",".join(ids)
+        assert query == f"sys_idIN{ids_csv}^ORmaster_snapshotIN{ids_csv}^ORlatest_snapshotIN{ids_csv}"
+        assert "master_snapshot" in route.calls.last.request.url.params["sysparm_fields"]
 
     @pytest.mark.asyncio()
     async def test_get_flows_bulk_empty_input_no_http_call(

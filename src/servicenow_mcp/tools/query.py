@@ -314,7 +314,11 @@ async def _validate_query_fields(
     try:
         known = await dictionary.get_all_fields(table)
     except Exception:  # advisory only; a lookup failure must not fail the query
-        logger.warning("field validation skipped for table=%s: dictionary lookup failed", table, exc_info=True)
+        logger.warning(
+            "field validation skipped for table=%s: dictionary lookup failed",
+            table,
+            exc_info=True,
+        )
         return []
 
     known_names = {entry.name for entry in known}
@@ -327,9 +331,11 @@ async def _validate_query_fields(
 
     field_list = ", ".join(unknown)
     return [
-        (f"Query references field(s) not found on table '{table}': {field_list}. "
-        "ServiceNow silently ignores conditions on unknown fields, so the result is "
-        "NOT filtered by them. Verify the field names against the table dictionary.")
+        (
+            f"Query references field(s) not found on table '{table}': {field_list}. "
+            "ServiceNow silently ignores conditions on unknown fields, so the result is "
+            "NOT filtered by them. Verify the field names against the table dictionary."
+        )
     ]
 
 
@@ -409,15 +415,16 @@ async def _run_aggregate_mode(
     correlation_id: str,
     warnings: list[str],
 ) -> str:
-    if group_by:
-        validate_identifier(group_by)
+    group_fields = [item.strip() for item in group_by.split(",")] if group_by else []
+    for group_field in group_fields:
+        validate_identifier(group_field)
     enforce_query_safety(table, encoded_query, None, settings)
 
     async with client_factory() as client:
         result = await client.aggregate(
             table,
             encoded_query,
-            group_by=group_by or None,
+            group_by=",".join(group_fields) or None,
             avg_fields=plan.avg_fields or None,
             sum_fields=plan.sum_fields or None,
             min_fields=plan.min_fields or None,
@@ -472,7 +479,11 @@ async def _run_query_mode(
     return format_response(
         data=masked,
         correlation_id=correlation_id,
-        pagination={"offset": offset, "limit": effective_limit, "total": result["count"]},
+        pagination={
+            "offset": offset,
+            "limit": effective_limit,
+            "total": result["count"],
+        },
         warnings=warnings or None,
         selection=selection,
     )
@@ -497,11 +508,20 @@ def _check_mode_conflicts(sys_id: str, aggregate: str, group_by: str, correlatio
     a bad combination surfaces as a mode error, not a table error.
     """
     if sys_id and aggregate:
-        return _err(correlation_id, "Cannot combine sys_id with aggregate; sys_id mode fetches a single record.")
+        return _err(
+            correlation_id,
+            "Cannot combine sys_id with aggregate; sys_id mode fetches a single record.",
+        )
     if sys_id and group_by:
-        return _err(correlation_id, "Cannot combine sys_id with group_by; sys_id mode fetches a single record.")
+        return _err(
+            correlation_id,
+            "Cannot combine sys_id with group_by; sys_id mode fetches a single record.",
+        )
     if group_by and not aggregate:
-        return _err(correlation_id, "group_by requires aggregate to be set (aggregate mode only).")
+        return _err(
+            correlation_id,
+            "group_by requires aggregate to be set (aggregate mode only).",
+        )
     return None
 
 
@@ -616,7 +636,7 @@ def register_tools(
             display_values: True returns display_value form for reference and choice fields.
             aggregate: Comma-separated aggregations: 'count', 'avg:<field>', 'sum:<field>',
                 'min:<field>', 'max:<field>'. When set, returns aggregate result instead of rows.
-            group_by: Field to group aggregate results by (aggregate mode only).
+            group_by: Comma-separated fields to group by, e.g. state,active (aggregate mode only).
             resolve_labels: Comma-separated 'field=label' pairs (e.g. 'state=open,priority=high').
                 Each label is resolved via ChoiceRegistry to its underlying value, then ANDed
                 into encoded_query as 'field=value'.

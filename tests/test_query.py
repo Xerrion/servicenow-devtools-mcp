@@ -261,6 +261,31 @@ class TestSysIdMode:
 class TestAggregateMode:
     """Stats API mode."""
 
+    @pytest.mark.parametrize("group_by", ["state,active", " state , active ", "request_item.state,active"])
+    @respx.mock
+    async def test_multiple_group_fields(
+        self, settings: Settings, auth_provider: BasicAuthProvider, group_by: str
+    ) -> None:
+        """Validate each grouping field and preserve the Stats API CSV contract."""
+        route = respx.get(f"{BASE_URL}/api/now/stats/sc_task").mock(
+            return_value=httpx.Response(200, json={"result": []})
+        )
+        tools = _register_and_get_tools(settings, auth_provider)
+        result = decode_response(await tools["query"](table="sc_task", aggregate="count", group_by=group_by))
+        assert result["status"] == "success"
+        assert route.calls.last.request.url.params["sysparm_group_by"] == group_by.replace(" ", "")
+
+    @pytest.mark.parametrize("group_by", ["state,active^ORstate=3", "state,,active", ",", "state,"])
+    @respx.mock
+    async def test_invalid_group_fields_fail_before_io(
+        self, settings: Settings, auth_provider: BasicAuthProvider, group_by: str
+    ) -> None:
+        """Malformed grouping fields must not reach the platform."""
+        tools = _register_and_get_tools(settings, auth_provider)
+        result = decode_response(await tools["query"](table="sc_task", aggregate="count", group_by=group_by))
+        assert result["status"] == "error"
+        assert not respx.calls
+
     @pytest.mark.asyncio()
     @respx.mock
     async def test_aggregate_mode_count(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:

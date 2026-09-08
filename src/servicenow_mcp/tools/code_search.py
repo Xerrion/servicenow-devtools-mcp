@@ -100,12 +100,15 @@ def register_tools(
             action: One of 'search', 'list_tables', or 'describe'.
             term: Search term for action='search'.
             table: Optional table filter for action='search' (e.g. 'sys_script_include').
-            search_group: Optional ServiceNow Code Search group.
+            search_group: ServiceNow Code Search group; empty uses sn_codesearch.Default Search Group.
             limit: Max search results for action='search'. Default 20.
         """
         normalized_action = action.strip().lower()
         if normalized_action not in _VALID_ACTIONS:
-            return _error(correlation_id, f"Unknown action {action!r}. Available: {sorted(_VALID_ACTIONS)}")
+            return _error(
+                correlation_id,
+                f"Unknown action {action!r}. Available: {sorted(_VALID_ACTIONS)}",
+            )
 
         if normalized_action == "describe":
             return format_response(data={"actions": _ACTION_REGISTRY}, correlation_id=correlation_id)

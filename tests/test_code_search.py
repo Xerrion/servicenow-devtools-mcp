@@ -86,6 +86,7 @@ async def test_search_calls_code_search_api(settings: Settings, auth_provider: B
     assert "term=AbstractAjaxProcessor" in url
     assert "table=sys_script_include" in url
     assert "limit=5" in url
+    assert route.calls.last.request.url.params["search_group"] == "sn_codesearch.Default Search Group"
 
 
 @pytest.mark.asyncio()
@@ -124,6 +125,7 @@ async def test_list_tables_calls_tables_api(settings: Settings, auth_provider: B
     assert result["status"] == "success"
     assert result["data"]["tables"][0]["name"] == "sys_script_include"
     assert route.called
+    assert route.calls.last.request.url.params["search_group"] == "sn_codesearch.Default Search Group"
 
 
 @pytest.mark.asyncio()

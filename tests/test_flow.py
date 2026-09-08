@@ -86,7 +86,14 @@ async def test_describe_returns_all_action_keys(settings: Settings, auth_provide
 
     assert result["status"] == "success"
     actions = result["data"]["actions"]
-    for name in ("contract", "inspect", "find_by_table", "decode_values", "list_triggers", "describe"):
+    for name in (
+        "contract",
+        "inspect",
+        "find_by_table",
+        "decode_values",
+        "list_triggers",
+        "describe",
+    ):
         assert name in actions
     assert "sections" in actions["inspect"]["params"]
     assert "section_limit" in actions["contract"]["params"]
@@ -223,7 +230,12 @@ async def test_inspect_compact_default_omits_optional_detail_requests(
     result = decode_response(raw)
 
     assert result["status"] == "success"
-    assert list(result["data"]) == ["flow", "published_state", "structural_summary", "warnings"]
+    assert list(result["data"]) == [
+        "flow",
+        "published_state",
+        "structural_summary",
+        "warnings",
+    ]
     assert result["selection"]["mode"] == "compact"
     for method_name in (
         "list_flow_inputs",
@@ -281,7 +293,10 @@ async def test_selected_warnings_disclose_spoke_beyond_probe(
 ) -> None:
     """Warning selection discloses when a later spoke action is outside its bounded probe."""
     actions = [
-        {"sys_id": _ref(f"a{index}"), "action_type": _ref("atype_spoke" if index == 101 else "atype_core")}
+        {
+            "sys_id": _ref(f"a{index}"),
+            "action_type": _ref("atype_spoke" if index == 101 else "atype_core"),
+        }
         for index in range(102)
     ]
     kwargs = _empty_inspect_kwargs()
@@ -430,7 +445,9 @@ async def test_node_section_discloses_missing_action_type_metadata(
 
 
 @pytest.mark.asyncio()
-async def test_trigger_section_discloses_record_condition_dependency_cap(settings: Settings) -> None:
+async def test_trigger_section_discloses_record_condition_dependency_cap(
+    settings: Settings,
+) -> None:
     """Trigger output reports when the condition join exceeds its internal query cap."""
     larger_settings = settings.model_copy(update={"max_row_limit": 2000})
     triggers = [{"sys_id": _ref(f"t{index}"), "remote_trigger_id": _ref(f"rt{index}")} for index in range(1001)]
@@ -741,7 +758,11 @@ async def test_warning_truncation_at_max_names_complete_direct_query_sequence(
     ("section", "client_method", "source_path"),
     [
         ("inputs", "list_flow_inputs", "sys_hub_flow_input (encoded_query=model="),
-        ("triggers", "list_trigger_instances_v2", "sys_hub_trigger_instance_v2 (encoded_query=flow="),
+        (
+            "triggers",
+            "list_trigger_instances_v2",
+            "sys_hub_trigger_instance_v2 (encoded_query=flow=",
+        ),
     ],
 )
 @pytest.mark.asyncio()
@@ -1168,14 +1189,22 @@ async def test_contract_returns_concise_configured_bindings(
                             {
                                 "name": "condition",
                                 "value": "{{lookup.__action_status__.code}}>0",
-                                "parameter": {"label": "Condition", "type": "string", "mandatory": True},
+                                "parameter": {
+                                    "label": "Condition",
+                                    "type": "string",
+                                    "mandatory": True,
+                                },
                             },
                         ],
                         "outputsToAssign": [
                             {
                                 "name": "message",
                                 "value": "Unable to look up {{subflow.user}}",
-                                "parameter": {"label": "message", "type": "string", "mandatory": False},
+                                "parameter": {
+                                    "label": "message",
+                                    "type": "string",
+                                    "mandatory": False,
+                                },
                             },
                         ],
                     },
@@ -1390,7 +1419,11 @@ async def test_contract_limits_action_definition_lookup_failures_to_schema_warni
                         {
                             "name": "record",
                             "value": "{{flow.record}}",
-                            "parameter": {"label": "Record", "type": "reference", "mandatory": True},
+                            "parameter": {
+                                "label": "Record",
+                                "type": "reference",
+                                "mandatory": True,
+                            },
                         },
                     ]
                 )
@@ -1539,6 +1572,48 @@ async def test_find_by_table_happy_path(settings: Settings, auth_provider: Basic
     assert data["total"] == 2
     versions = sorted(f["version"] for f in data["flows"])
     assert versions == ["v1", "v2"]
+
+
+@pytest.mark.asyncio()
+async def test_find_by_table_resolves_snapshot_and_deduplicates(
+    settings: Settings, auth_provider: BasicAuthProvider
+) -> None:
+    """Current snapshot and canonical references must resolve to one real flow."""
+    tools = _register_and_get_tools(settings, auth_provider)
+    header = _minimal_flow_header()
+    header["master_snapshot"] = _ref("s" * 32)
+    client = _make_client_mock(
+        find_record_triggers_by_table=[{"sys_id": _ref("r" * 32)}],
+        list_v2_triggers_by_remote_ids=[{"flow": _ref("s" * 32)}],
+        list_v1_triggers_by_table=[{"flow": _ref(SYS_ID_FLOW)}],
+        get_flows_bulk=[header],
+    )
+    with _patch_client(client):
+        result = decode_response(await tools["flow"](action="find_by_table", table="sc_task"))
+    assert result["status"] == "success"
+    assert result["data"]["total"] == 1
+    assert result["data"]["flows"][0]["sys_id"] == SYS_ID_FLOW
+    assert result["data"]["flows"][0]["version"] == "v1+v2"
+    assert result["data"]["flows"][0]["metadata_resolved"] is True
+    assert result["data"]["unresolved_flow_ids"] == []
+
+
+@pytest.mark.asyncio()
+async def test_find_by_table_missing_header_is_unknown(settings: Settings, auth_provider: BasicAuthProvider) -> None:
+    """Missing headers cannot be reported as inactive flows."""
+    tools = _register_and_get_tools(settings, auth_provider)
+    client = _make_client_mock(
+        find_record_triggers_by_table=[],
+        list_v1_triggers_by_table=[{"flow": _ref(SYS_ID_FLOW)}],
+        get_flows_bulk=[],
+    )
+    with _patch_client(client):
+        result = decode_response(await tools["flow"](action="find_by_table", table="sc_task"))
+    assert result["status"] == "success"
+    assert result["data"]["flows"][0]["active"] is None
+    assert result["data"]["flows"][0]["metadata_resolved"] is False
+    assert result["data"]["unresolved_flow_ids"] == [SYS_ID_FLOW]
+    assert "could not be resolved" in " ".join(result["warnings"])
 
 
 @pytest.mark.asyncio()
