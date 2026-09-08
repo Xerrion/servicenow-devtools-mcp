@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.1](https://github.com/Xerrion/servicenow-platform-mcp/compare/v0.12.0...v0.12.1) (2026-09-08)
+
+
+### Bug Fixes
+
+* harden ServiceNow introspection lookups ([#158](https://github.com/Xerrion/servicenow-platform-mcp/issues/158)) ([5438171](https://github.com/Xerrion/servicenow-platform-mcp/commit/5438171c17e92dad486a2772a5b576b2d93074d7))
+
 ## [0.12.0](https://github.com/Xerrion/servicenow-platform-mcp/compare/v0.11.0...v0.12.0) (2026-09-01)
 
 ### Features
