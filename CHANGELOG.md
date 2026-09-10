@@ -22,6 +22,17 @@
   still depends on ServiceNow ACLs. Script discovery through `record_read` and
   `describe`, preview/apply safety, and masking remain unchanged.
 
+## [1.0.0](https://github.com/Xerrion/servicenow-platform-mcp/compare/v0.12.1...v1.0.0) (2026-09-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* migrate scripts to record_write.data; remove script_path/script_field and SCRIPT_ALLOWED_ROOT; retain XML validation ([#160](https://github.com/Xerrion/servicenow-platform-mcp/issues/160))
+
+### Features
+
+* migrate scripts to record_write.data; remove script_path/script_field and SCRIPT_ALLOWED_ROOT; retain XML validation ([#160](https://github.com/Xerrion/servicenow-platform-mcp/issues/160)) ([21aa006](https://github.com/Xerrion/servicenow-platform-mcp/commit/21aa00685c58f283711a368cc6075eefa224d092))
+
 ## [0.12.1](https://github.com/Xerrion/servicenow-platform-mcp/compare/v0.12.0...v0.12.1) (2026-09-08)
 
 
