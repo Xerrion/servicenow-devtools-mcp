@@ -150,7 +150,9 @@ def format_response(
     """Build and serialize a standardized response envelope.
 
     The *error* field accepts a plain string (for backward compatibility)
-    or a structured dict (preferred: ``{"message": "..."}``)."""
+    or a structured dict (preferred: ``{"message": "..."}``). Empty warning
+    lists are omitted; data and supplied pagination/selection are preserved.
+    """
     response: dict[str, Any] = {
         "correlation_id": correlation_id,
         "status": status,
@@ -160,7 +162,7 @@ def format_response(
         response["error"] = {"message": error} if isinstance(error, str) else error
     if pagination is not None:
         response["pagination"] = pagination
-    if warnings is not None:
+    if warnings:
         response["warnings"] = warnings
     if selection is not None:
         response["selection"] = selection

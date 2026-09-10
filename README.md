@@ -344,6 +344,18 @@ an explicit `fields` projection. Use
 included. Exact-record mode defaults to `sys_id,sys_updated_on` and accepts an
 explicit projection or `*`.
 
+`query` and `code_search` report the effective row cap in `pagination.limit`,
+without a redundant limit-cap warning. Query offsets, totals, and selection
+metadata remain available for continuing bounded reads. Empty warning lists
+are omitted from response envelopes; non-empty warnings are preserved.
+
+`code_search` defaults to `extended_matching=false` to avoid additional
+context fields from the search group's configuration. Set
+`extended_matching=true` to request that context. Search result fields and
+platform metadata are otherwise passed through unchanged. Its `pagination`
+reports only the effective limit; it does not imply offset support or a known
+total. Keep platform completeness signals and narrow the search when needed.
+
 `record_read` with empty `fields` returns compact identity and update fields
 plus all discovered script-bearing fields. `fields="*"` returns the full
 masked record. `record_read` always includes `script_fields` and `sys_id`.

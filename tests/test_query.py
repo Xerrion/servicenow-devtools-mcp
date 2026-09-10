@@ -49,6 +49,30 @@ def _register_and_get_tools(
 class TestQueryMode:
     """Default mode: paginated record query."""
 
+    @pytest.mark.parametrize("total", [3, 50])
+    @respx.mock
+    async def test_capped_limit_uses_pagination_not_warning(
+        self, settings: Settings, auth_provider: BasicAuthProvider, total: int
+    ) -> None:
+        settings.max_row_limit = 5
+        route = respx.get(f"{BASE_URL}/api/now/table/incident").mock(
+            return_value=httpx.Response(
+                200,
+                json={"result": [{"sys_id": "1", "number": "INC0001", "description": "unrequested"}]},
+                headers={"X-Total-Count": str(total)},
+            )
+        )
+        tools = _register_and_get_tools(settings, auth_provider)
+        result = decode_response(await tools["query"](table="incident", fields="number", limit=100, offset=2))
+
+        assert result["status"] == "success"
+        assert result["correlation_id"]
+        assert "warnings" not in result
+        assert result["pagination"] == {"offset": 2, "limit": 5, "total": total}
+        assert result["selection"]["returned_fields"] == ["sys_id", "number"]
+        assert result["data"] == [{"sys_id": "1", "number": "INC0001"}]
+        assert route.calls.last.request.url.params["sysparm_limit"] == "5"
+
     @pytest.mark.asyncio()
     @respx.mock
     async def test_query_mode_returns_records(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
@@ -116,6 +140,22 @@ class TestQueryMode:
         assert result["data"][0]["password"] == "***MASKED***"
         assert "sysparm_fields" not in route.calls.last.request.url.params
         assert result["selection"]["mode"] == "all"
+
+    @pytest.mark.parametrize("fields", ["description,active,sys_mod_count,sys_tags", "*"])
+    @respx.mock
+    async def test_explicit_fields_preserve_empty_and_system_values(
+        self, settings: Settings, auth_provider: BasicAuthProvider, fields: str
+    ) -> None:
+        record = {"sys_id": "1", "description": "", "active": False, "sys_mod_count": 0, "sys_tags": None}
+        respx.get(f"{BASE_URL}/api/now/table/incident").mock(
+            return_value=httpx.Response(200, json={"result": [record]}, headers={"X-Total-Count": "1"})
+        )
+        tools = _register_and_get_tools(settings, auth_provider)
+        result = decode_response(await tools["query"](table="incident", fields=fields))
+
+        assert result["status"] == "success"
+        assert result["data"] == [record]
+        assert set(result["selection"]["returned_fields"]) == set(record)
 
     @pytest.mark.asyncio()
     async def test_denied_table_returns_error(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
@@ -221,7 +261,10 @@ class TestSysIdMode:
     ) -> None:
         sys_id = "a" * 32
         route = respx.get(f"{BASE_URL}/api/now/table/incident/{sys_id}").mock(
-            return_value=httpx.Response(200, json={"result": {"sys_id": sys_id, "sys_updated_on": "now"}})
+            return_value=httpx.Response(
+                200,
+                json={"result": {"sys_id": sys_id, "sys_updated_on": "now", "description": "unrequested"}},
+            )
         )
         tools = _register_and_get_tools(settings, auth_provider)
         result = decode_response(await tools["query"](table="incident", sys_id=sys_id))
@@ -229,6 +272,7 @@ class TestSysIdMode:
         assert result["status"] == "success"
         assert route.calls.last.request.url.params["sysparm_fields"] == "sys_id,sys_updated_on"
         assert result["selection"]["mode"] == "compact"
+        assert result["data"] == {"sys_id": sys_id, "sys_updated_on": "now"}
 
     @pytest.mark.asyncio()
     async def test_invalid_projection_returns_error_without_io(
@@ -498,12 +542,15 @@ class TestFieldValidation:
         dictionary = self._stub_dictionary(settings, auth_provider, ["u_samaccountname", "u_member"])
 
         tools = _register_and_get_tools(settings, auth_provider, dictionary=dictionary)
-        raw = await tools["query"](table="u_custom", encoded_query="name=Vinklubben", fields="u_member")
+        raw = await tools["query"](
+            table="u_custom", encoded_query="name=Vinklubben", fields="u_member", limit=settings.max_row_limit + 1
+        )
         result = decode_response(raw)
 
         assert result["status"] == "success"
         warnings = result.get("warnings", [])
         assert any("name" in w and "not found" in w for w in warnings)
+        assert len(warnings) == 1
 
     @pytest.mark.asyncio()
     @respx.mock

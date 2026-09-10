@@ -601,8 +601,10 @@ class ServiceNowClient:
         table: str | None = None,
         search_group: str | None = None,
         limit: int | None = None,
+        *,
+        extended_matching: bool | None = None,
     ) -> dict[str, Any]:
-        """Search code across ServiceNow script tables."""
+        """Search script tables; None keeps the search group's context default."""
         http = self._ensure_client()
         params: dict[str, str] = {
             "term": term,
@@ -614,6 +616,8 @@ class ServiceNowClient:
             params["search_group"] = search_group
         if limit is not None:
             params["limit"] = str(limit)
+        if extended_matching is not None:
+            params["extended_matching"] = str(extended_matching).lower()
 
         response = await http.get(
             self._code_search_url(),

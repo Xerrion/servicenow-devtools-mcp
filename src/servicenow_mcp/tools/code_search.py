@@ -35,6 +35,7 @@ _ACTION_REGISTRY: Final[dict[str, dict[str, Any]]] = {
             "table": "str (optional)",
             "search_group": "str (optional)",
             "limit": "int (default 20)",
+            "extended_matching": "bool (default false; include additional context fields)",
         },
     },
     "list_tables": {
@@ -53,13 +54,11 @@ def _error(correlation_id: str, message: str) -> str:
     return format_response(data=None, correlation_id=correlation_id, status="error", error=message)
 
 
-def _effective_limit(limit: int, settings: Settings) -> tuple[int, list[str] | None]:
+def _effective_limit(limit: int, settings: Settings) -> int:
     """Validate and cap the requested result limit."""
     if limit <= 0:
         raise ValueError("limit must be greater than 0.")
-    if limit <= settings.max_row_limit:
-        return limit, None
-    return settings.max_row_limit, [f"Limit capped at {settings.max_row_limit}"]
+    return min(limit, settings.max_row_limit)
 
 
 def _validate_table_filter(table: str) -> str | None:
@@ -92,6 +91,7 @@ def register_tools(
         search_group: str = "",
         limit: int = 20,
         *,
+        extended_matching: bool = False,
         correlation_id: str = "",
     ) -> str:
         """Search ServiceNow code or inspect Code Search table coverage.
@@ -102,6 +102,8 @@ def register_tools(
             table: Optional table filter for action='search' (e.g. 'sys_script_include').
             search_group: ServiceNow Code Search group; empty uses sn_codesearch.Default Search Group.
             limit: Max search results for action='search'. Default 20.
+            extended_matching: Include additional Code Search context fields. Default false.
+                Set true when the extra context is needed.
         """
         normalized_action = action.strip().lower()
         if normalized_action not in _VALID_ACTIONS:
@@ -123,11 +125,12 @@ def register_tools(
                 return _error(correlation_id, "'term' is required for action='search'.")
 
             table_filter = _validate_table_filter(table)
-            effective_limit, warnings = _effective_limit(limit, settings)
+            effective_limit = _effective_limit(limit, settings)
             result = await client.code_search(
                 stripped_term,
                 table=table_filter,
                 search_group=search_group or None,
                 limit=effective_limit,
+                extended_matching=extended_matching,
             )
-            return format_response(data=result, correlation_id=correlation_id, warnings=warnings)
+            return format_response(data=result, correlation_id=correlation_id, pagination={"limit": effective_limit})

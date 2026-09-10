@@ -51,6 +51,7 @@ async def test_schema_exposes_agent_callable_parameters(settings: Settings, auth
     assert "table" in properties
     assert "search_group" in properties
     assert "limit" in properties
+    assert properties["extended_matching"]["default"] is False
     assert "correlation_id" not in properties
 
 
@@ -87,6 +88,32 @@ async def test_search_calls_code_search_api(settings: Settings, auth_provider: B
     assert "table=sys_script_include" in url
     assert "limit=5" in url
     assert route.calls.last.request.url.params["search_group"] == "sn_codesearch.Default Search Group"
+    assert route.calls.last.request.url.params["extended_matching"] == "false"
+
+
+@pytest.mark.parametrize("extended_matching", [False, True])
+@respx.mock
+async def test_search_context_opt_in_preserves_platform_metadata(
+    settings: Settings, auth_provider: BasicAuthProvider, extended_matching: bool
+) -> None:
+    """Context is opt-in; limit metadata and platform completeness signals survive."""
+    settings.max_row_limit = 5
+    payload = {
+        "search_results": [{"className": "sys_script_include", "name": "TestUtil", "match": "foo"}],
+        "warnings": ["Results truncated; narrow the table filter."],
+        "has_more": True,
+    }
+    route = respx.get(SEARCH_URL).mock(return_value=httpx.Response(200, json={"result": payload}))
+    tools = _register_and_get_tools(settings, auth_provider)
+    result = decode_response(await tools["code_search"](term="foo", limit=100, extended_matching=extended_matching))
+
+    assert result["status"] == "success"
+    assert result["correlation_id"]
+    assert result["data"] == payload
+    assert "warnings" not in result
+    assert result["pagination"] == {"limit": 5}
+    assert route.calls.last.request.url.params["limit"] == "5"
+    assert route.calls.last.request.url.params["extended_matching"] == str(extended_matching).lower()
 
 
 @pytest.mark.asyncio()

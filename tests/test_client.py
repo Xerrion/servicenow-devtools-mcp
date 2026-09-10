@@ -987,6 +987,7 @@ class TestServiceNowClientCodeSearch:
         assert route.calls.last is not None
         url = str(route.calls.last.request.url)
         assert "limit=50" in url
+        assert "extended_matching" not in route.calls.last.request.url.params
 
     @pytest.mark.asyncio()
     @respx.mock
