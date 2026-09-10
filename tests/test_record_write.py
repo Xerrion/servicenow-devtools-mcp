@@ -13,6 +13,7 @@ import respx
 from servicenow_mcp.auth import BasicAuthProvider
 from servicenow_mcp.config import Settings
 from servicenow_mcp.policy import DENIED_TABLES
+from servicenow_mcp.state import PreviewTokenStore
 from servicenow_mcp.tools._artifact import validate_ui_macro_xml
 from servicenow_mcp.tools._dictionary import DictionaryRegistry
 from servicenow_mcp.tools._payload import MAX_JSON_PAYLOAD_BYTES
@@ -46,6 +47,7 @@ def _register_and_get_tools(settings: Settings, auth_provider: BasicAuthProvider
     mcp = MCPServer("test")
     dictionary = AsyncMock(spec=DictionaryRegistry)
     dictionary.get_fields.return_value = []
+    dictionary.get_chain.side_effect = lambda table: [table]
     register_tools(mcp, settings, auth_provider, dictionary=dictionary)
     return get_tool_functions(mcp)
 
@@ -282,6 +284,176 @@ class TestStandardRecordWrite:
         result = decode_response(raw)
         assert result["status"] == "error"
         assert "Invalid or expired" in result["error"]["message"]
+
+
+class TestMandatoryFieldValues:
+    """Mandatory checks distinguish missing values from supplied false and zero."""
+
+    @pytest.mark.parametrize("preview", [True, False])
+    @respx.mock
+    async def test_false_and_zero_are_supplied(
+        self, settings: Settings, auth_provider: BasicAuthProvider, preview: bool
+    ) -> None:
+        payload = {"active": False, "order": 0}
+        respx.get(METADATA_URL).respond(
+            200, json={"result": [{"element": name, "mandatory": "true"} for name in payload]}
+        )
+        mutation = respx.post(f"{BASE_URL}/api/now/table/incident").respond(
+            201, json={"result": {"sys_id": SYS_ID_INC001, **payload}}
+        )
+        tools = _register_and_get_tools(settings, auth_provider)
+        result = decode_response(
+            await tools["record_write"](action="create", table="incident", data=json.dumps(payload), preview=preview)
+        )
+        assert result["status"] == "success"
+        if preview:
+            assert result["data"]["preview"]["data"]["active"] is False
+            assert result["data"]["preview"]["data"]["order"] == 0
+            assert not mutation.called
+            raw = await tools["record_apply"](preview_token=result["data"]["preview_token"])
+            assert decode_response(raw)["status"] == "success"
+        assert mutation.call_count == 1
+        submitted = json.loads(mutation.calls[0].request.content)
+        assert submitted["active"] is False
+        assert submitted["order"] == 0
+        assert type(submitted["order"]) is int
+
+    @pytest.mark.parametrize("preview", [True, False])
+    @pytest.mark.parametrize("payload", [{}, {"name": None}, {"name": ""}], ids=["absent", "null", "empty"])
+    @respx.mock
+    async def test_missing_values_block_create(
+        self, settings: Settings, auth_provider: BasicAuthProvider, preview: bool, payload: dict[str, Any]
+    ) -> None:
+        respx.get(METADATA_URL).respond(200, json={"result": [{"element": "name", "mandatory": "true"}]})
+        tools = _register_and_get_tools(settings, auth_provider)
+        with patch.object(PreviewTokenStore, "create", new_callable=AsyncMock) as create_token:
+            result = decode_response(
+                await tools["record_write"](
+                    action="create", table="incident", data=json.dumps(payload), preview=preview
+                )
+            )
+        assert result["status"] == "error"
+        assert result["data"]["missing_fields"] == ["name"]
+        create_token.assert_not_awaited()
+        assert all(call.request.method == "GET" for call in respx.calls)
+
+
+class TestInheritedMandatoryFields:
+    """Create checks resolve mandatory fields child-first before any write."""
+
+    @pytest.mark.parametrize("preview", [True, False])
+    @pytest.mark.parametrize("child_mandatory", [None, "false", "true"])
+    @respx.mock
+    async def test_inherited_mandatory_and_child_overrides(
+        self, settings: Settings, auth_provider: BasicAuthProvider, preview: bool, child_mandatory: str | None
+    ) -> None:
+        from mcp.server import MCPServer
+
+        from servicenow_mcp.tools.record_write import register_tools
+
+        def objects(request: httpx.Request) -> httpx.Response:
+            parent = "u_parent" if request.url.params["sysparm_query"] == "name=u_child" else ""
+            return httpx.Response(200, json={"result": [{"super_class.name": parent}]})
+
+        def fields(request: httpx.Request) -> httpx.Response:
+            if request.url.params.get("sysparm_fields") == "element,internal_type.name":
+                return httpx.Response(200, json={"result": [{"element": "script", "internal_type.name": "script"}]})
+            is_child = request.url.params["sysparm_query"].startswith("name=u_child^")
+            rows = (
+                []
+                if is_child and child_mandatory is None
+                else [{"element": "name", "mandatory": child_mandatory if is_child else "true"}]
+            )
+            return httpx.Response(200, json={"result": rows})
+
+        respx.get(f"{BASE_URL}/api/now/table/sys_db_object").mock(side_effect=objects)
+        respx.get(METADATA_URL).mock(side_effect=fields)
+        mutation = respx.post(f"{BASE_URL}/api/now/table/u_child").respond(
+            201, json={"result": {"sys_id": SYS_ID_INC001}}
+        )
+        mcp = MCPServer("test")
+        register_tools(mcp, settings, auth_provider)
+        with patch.object(PreviewTokenStore, "create", new_callable=AsyncMock, return_value="preview") as create_token:
+            result = decode_response(
+                await get_tool_functions(mcp)["record_write"](
+                    action="create", table="u_child", data='{"script":"run();"}', preview=preview
+                )
+            )
+        if child_mandatory == "false":
+            assert result["status"] == "success"
+            assert create_token.await_count == int(preview)
+            assert mutation.call_count == int(not preview)
+        else:
+            assert result["status"] == "error"
+            assert result["data"]["missing_fields"] == ["name"]
+            create_token.assert_not_awaited()
+            assert not mutation.called
+
+    @pytest.mark.parametrize("preview", [True, False])
+    @pytest.mark.parametrize("status_code", [401, 403, 404, 500])
+    @respx.mock
+    async def test_parent_metadata_error_blocks_create(
+        self, settings: Settings, auth_provider: BasicAuthProvider, preview: bool, status_code: int
+    ) -> None:
+        from mcp.server import MCPServer
+
+        from servicenow_mcp.tools.record_write import register_tools
+
+        def objects(request: httpx.Request) -> httpx.Response:
+            parent = "u_parent" if request.url.params["sysparm_query"] == "name=u_child" else ""
+            return httpx.Response(200, json={"result": [{"super_class.name": parent}]})
+
+        def fields(request: httpx.Request) -> httpx.Response:
+            if request.url.params["sysparm_query"].startswith("name=u_parent^"):
+                return httpx.Response(status_code, json={"error": {"message": "Unavailable"}})
+            return httpx.Response(200, json={"result": [{"element": "script", "internal_type.name": "script"}]})
+
+        respx.get(f"{BASE_URL}/api/now/table/sys_db_object").mock(side_effect=objects)
+        respx.get(METADATA_URL).mock(side_effect=fields)
+        mcp = MCPServer("test")
+        register_tools(mcp, settings, auth_provider)
+        with patch.object(PreviewTokenStore, "create", new_callable=AsyncMock) as create_token:
+            result = decode_response(
+                await get_tool_functions(mcp)["record_write"](
+                    action="create", table="u_child", data='{"script":"run();"}', preview=preview
+                )
+            )
+        assert result["status"] == "error"
+        create_token.assert_not_awaited()
+        assert all(call.request.method == "GET" for call in respx.calls)
+
+    @respx.mock
+    async def test_apply_rechecks_inherited_mandatory_fields(
+        self, settings: Settings, auth_provider: BasicAuthProvider
+    ) -> None:
+        from mcp.server import MCPServer
+
+        from servicenow_mcp.tools.record_write import register_tools
+
+        def objects(request: httpx.Request) -> httpx.Response:
+            parent = "u_parent" if request.url.params["sysparm_query"] == "name=u_child" else ""
+            return httpx.Response(200, json={"result": [{"super_class.name": parent}]})
+
+        respx.get(f"{BASE_URL}/api/now/table/sys_db_object").mock(side_effect=objects)
+        metadata = respx.get(METADATA_URL).respond(200, json={"result": []})
+        mcp = MCPServer("test")
+        register_tools(mcp, settings, auth_provider)
+        tools = get_tool_functions(mcp)
+        preview = decode_response(await tools["record_write"](action="create", table="u_child", data="{}"))
+
+        def fields(request: httpx.Request) -> httpx.Response:
+            rows = (
+                [{"element": "name", "mandatory": "true"}]
+                if request.url.params["sysparm_query"].startswith("name=u_parent^")
+                else []
+            )
+            return httpx.Response(200, json={"result": rows})
+
+        metadata.mock(side_effect=fields)
+        result = decode_response(await tools["record_apply"](preview_token=preview["data"]["preview_token"]))
+        assert result["status"] == "error"
+        assert result["data"]["missing_fields"] == ["name"]
+        assert all(call.request.method == "GET" for call in respx.calls)
 
 
 # ---------------------------------------------------------------------------

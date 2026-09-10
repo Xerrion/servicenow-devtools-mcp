@@ -7,54 +7,40 @@ and the unified ``record_write`` / ``record_apply`` tools.
 
 from __future__ import annotations
 
-import logging
 from typing import Any
 
-import httpx
-
 from servicenow_mcp.client import ServiceNowClient
-from servicenow_mcp.errors import ForbiddenError, NotFoundError, ServerError
 from servicenow_mcp.policy import MASK_VALUE, is_sensitive_field
+from servicenow_mcp.tools._dictionary import DictionaryRegistry
 from servicenow_mcp.utils import ServiceNowQuery, format_response, validate_sys_id
-
-
-logger = logging.getLogger(__name__)
 
 
 async def _check_mandatory_fields(
     client: ServiceNowClient,
     table: str,
     data: dict[str, Any],
+    dictionary: DictionaryRegistry,
 ) -> list[str]:
-    """Return list of mandatory field names missing from *data*.
+    """Return missing mandatory fields, resolving child declarations first.
 
-    Best-effort: if metadata fetch fails, logs a warning and returns
-    an empty list so the create can proceed (ServiceNow will still
-    validate server-side).
+    Absent keys, None, and empty strings are missing; false and zero are supplied.
+    Metadata errors propagate so a failed lookup cannot bypass write checks.
     """
-    try:
+    chain = await dictionary.get_chain(table)
+    mandatory_fields: dict[str, bool] = {}
+    for current in chain:
         result = await client.query_records(
             table="sys_dictionary",
-            query=ServiceNowQuery().equals("name", table).equals("mandatory", "true").build(),
+            query=ServiceNowQuery().equals("name", current).is_not_empty("element").equals("active", "true").build(),
             fields=["element", "mandatory"],
             limit=1000,
         )
-        metadata = result.get("records", [])
-    except (NotFoundError, ForbiddenError, ServerError, httpx.HTTPError):
-        # Metadata genuinely unavailable for this table or the instance is
-        # unreachable; defer to ServiceNow's own server-side validation.
-        # AuthError and other ServiceNowMCPError subclasses propagate so
-        # genuine misconfiguration surfaces to the caller.
-        logger.warning(
-            "Metadata not available for table '%s'; skipping mandatory check",
-            table,
-            exc_info=True,
-        )
-        return []
-    mandatory_fields = [
-        entry["element"] for entry in metadata if entry.get("mandatory") == "true" and entry.get("element")
-    ]
-    return [f for f in mandatory_fields if not data.get(f)]
+        for entry in result.get("records", []):
+            name = str(entry.get("element") or "").strip()
+            if not name or name in mandatory_fields:
+                continue
+            mandatory_fields[name] = entry.get("mandatory") in ("true", True)
+    return [name for name, is_mandatory in mandatory_fields.items() if is_mandatory and data.get(name) in (None, "")]
 
 
 async def _check_mandatory_or_error(
@@ -62,9 +48,10 @@ async def _check_mandatory_or_error(
     table: str,
     data: dict[str, Any],
     correlation_id: str,
+    dictionary: DictionaryRegistry,
 ) -> str | None:
     """Check for missing mandatory fields and return error response if any, else None."""
-    missing = await _check_mandatory_fields(client, table, data)
+    missing = await _check_mandatory_fields(client, table, data, dictionary)
     if missing:
         return format_response(
             data={"table": table, "missing_fields": missing},

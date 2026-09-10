@@ -79,7 +79,7 @@ Unified tool for staging `create`, `update`, or `delete` actions.
   - `sys_id`: Required for `update` and `delete`.
   - `data`: JSON string of field-value pairs for `create`/`update`, including complete script or markup values. Maximum 256 KiB of UTF-8 JSON, including field names and escaping. Omitted fields stay unchanged on update. Multiple script fields can be supplied together.
   - `preview`: If `true` (default), stores the change in `PreviewTokenStore` and returns a `preview_token`.
-- **Notes:** No local script-file loading. Dictionary metadata is queried only for supplied fields, with child-first inheritance. Fields with `internal_type == 'xml'` require string values containing well-formed XML before staging or mutation. Empty, null, and malformed values are rejected. Metadata request errors block writes; fields hidden by dictionary ACLs cannot receive local type validation. Script syntax is not checked.
+- **Notes:** No local script-file loading. Dictionary types are queried only for supplied fields, with child-first inheritance. Fields resolved as `internal_type == 'xml'` require string values containing well-formed XML before staging or mutation; empty, null, and malformed values are rejected for these XML fields. Non-XML fields are not subject to XML validation. Creates also check mandatory fields across the bounded `sys_db_object.super_class` chain before preview creation or direct mutation, and again on apply. Child declarations take precedence, including non-mandatory overrides. Metadata request errors block writes; fields hidden by dictionary ACLs cannot receive local validation. Script syntax is not checked.
 - **Example:**
 
   ```python

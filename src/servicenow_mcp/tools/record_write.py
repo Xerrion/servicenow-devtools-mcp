@@ -122,9 +122,10 @@ async def _run_create(
     preview_store: PreviewTokenStore,
     correlation_id: str,
     extra_data: dict[str, Any],
+    dictionary: DictionaryRegistry,
 ) -> str:
     """Run a create action in either preview or direct mode."""
-    err = await _check_mandatory_or_error(client, table, parsed_data, correlation_id)
+    err = await _check_mandatory_or_error(client, table, parsed_data, correlation_id, dictionary)
     if err:
         return err
 
@@ -276,10 +277,13 @@ async def _dispatch_record_write(
     preview_store: PreviewTokenStore,
     correlation_id: str,
     extra_data: dict[str, Any],
+    dictionary: DictionaryRegistry,
 ) -> str:
     """Route a validated ``record_write`` request to its ``_run_*`` helper."""
     if action == "create":
-        return await _run_create(client, table, parsed_data, preview, preview_store, correlation_id, extra_data)
+        return await _run_create(
+            client, table, parsed_data, preview, preview_store, correlation_id, extra_data, dictionary
+        )
     if action == "update":
         return await _run_update(client, table, sys_id, parsed_data, preview, preview_store, correlation_id, extra_data)
     # delete - membership in _VALID_ACTIONS narrows the action enum.
@@ -296,12 +300,13 @@ async def _apply_payload(
     payload: dict[str, Any],
     table: str,
     correlation_id: str,
+    dictionary: DictionaryRegistry,
 ) -> str:
     """Execute a previously previewed action."""
     action = payload["action"]
 
     if action == "create":
-        err = await _check_mandatory_or_error(client, table, payload["data"], correlation_id)
+        err = await _check_mandatory_or_error(client, table, payload["data"], correlation_id, dictionary)
         if err:
             return err
         result = await client.create_record(table, payload["data"])
@@ -380,6 +385,8 @@ def register_tools(
         in ``data``. Omitted fields stay unchanged on update. Dictionary
         metadata identifies supplied XML fields, including inherited fields;
         malformed XML is rejected before preview creation or mutation.
+        Creates also check inherited mandatory fields, with child declarations
+        taking precedence. Metadata request errors block writes.
 
         Args:
             action: 'create' | 'update' | 'delete'.
@@ -433,6 +440,7 @@ def register_tools(
                 preview_store,
                 correlation_id,
                 extra_data,
+                dict_registry,
             )
 
     @mcp.tool()
@@ -461,4 +469,4 @@ def register_tools(
             return blocked
 
         async with client_factory() as client:
-            return await _apply_payload(client, payload, table, correlation_id)
+            return await _apply_payload(client, payload, table, correlation_id, dict_registry)
