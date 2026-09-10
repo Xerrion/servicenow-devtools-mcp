@@ -23,7 +23,7 @@ The server runs locally via stdio transport and is launched by your MCP-compatib
 - **Documentation generation** - Generate automation maps, artifact summaries, test scenarios, and code review notes
 - **Workflow and Flow Designer analysis** - Map workflow structures, inspect executions, analyze migration readiness
 - **ITSM domain tools** - Full lifecycle management for Incidents, Changes, Problems, Requests, Knowledge, CMDB, and Service Catalog
-- **Artifact write** - Create and update platform artifacts (business rules, script includes, client scripts, etc.) with optional local script file injection
+- **Artifact write** - Create and update platform artifacts (business rules, script includes, client scripts, etc.) with complete inline field values in `record_write.data`
 
 ---
 

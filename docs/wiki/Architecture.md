@@ -28,7 +28,7 @@ The current `full` preset exposes 15 tools, including the always-available `list
 - **Encoded Queries:** The `query` tool accepts ServiceNow encoded query strings directly. Callers can copy filter breadcrumbs from ServiceNow or construct encoded query strings directly. Query safety remains enforced by `query`.
 - **Two-Stage Writes:** `record_write` (stage) and `record_apply` (commit) implement the default safety flow for record mutations. `record_write(preview=false)` explicitly requests an immediate write.
 - **Helper Modules:** Shared logic is extracted into specialized helpers:
-  - `_artifact.py`: Handles secure script file reads (path containment, UTF-8 decode, 1 MB cap) and the `xml` well-formedness check.
+  - `_artifact.py`: Checks XML well-formedness for inline writes. `DictionaryRegistry.get_fields` resolves types for supplied fields only, with child-first inheritance and narrow queries. It does not load the full script-field list.
   - `_dictionary.py`: `DictionaryRegistry` — runtime discovery of script-bearing fields per table by walking `sys_db_object.super_class` and filtering `sys_dictionary` rows. Replaces the previous hardcoded artifact catalog.
   - `_describe_helpers.py`: Manages slim vs. verbose schema building.
   - `_record_helpers.py`: Handles mandatory field validation and diff generation.

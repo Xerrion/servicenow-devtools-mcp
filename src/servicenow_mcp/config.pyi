@@ -17,7 +17,6 @@ class Settings(BaseSettings):
     servicenow_env: str
     max_row_limit: int
     large_table_names_csv: str
-    script_allowed_root: str
     httpx_timeout_seconds: float
     metadata_cache_ttl_seconds: int
     sentry_dsn: str
@@ -33,7 +32,6 @@ class Settings(BaseSettings):
         servicenow_env: str = ...,
         max_row_limit: int = ...,
         large_table_names_csv: str = ...,
-        script_allowed_root: str = ...,
         httpx_timeout_seconds: float = ...,
         metadata_cache_ttl_seconds: int = ...,
         sentry_dsn: str = ...,

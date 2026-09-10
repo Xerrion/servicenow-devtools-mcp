@@ -7,10 +7,8 @@ surface:
 
 * ``record_write(action, table, ...)`` - dispatches on ``action``
   (create/update/delete). ``preview=True`` (default) returns a single-use
-  token; ``preview=False`` commits immediately. Script-bearing fields are
-  discovered dynamically via ``DictionaryRegistry``; ``script_path`` reads a
-  local file into the resolved field and validates XML when the field's
-  ``internal_type`` is ``xml``.
+  token; ``preview=False`` commits immediately. All field values are supplied
+  inline in ``data``. Dictionary metadata identifies XML fields for validation.
 * ``record_apply(preview_token)`` - commits a previously previewed write.
 """
 
@@ -32,8 +30,8 @@ from servicenow_mcp.policy import (
     write_gate,
 )
 from servicenow_mcp.state import PreviewTokenStore
-from servicenow_mcp.tools._artifact import _read_script_file, validate_ui_macro_xml
-from servicenow_mcp.tools._dictionary import DictionaryRegistry, ScriptField
+from servicenow_mcp.tools._artifact import validate_ui_macro_xml
+from servicenow_mcp.tools._dictionary import DictionaryRegistry
 from servicenow_mcp.tools._payload import parse_payload_json
 from servicenow_mcp.tools._record_helpers import _build_update_diff, _check_mandatory_or_error
 from servicenow_mcp.utils import format_response, validate_identifier, validate_sys_id
@@ -42,18 +40,6 @@ from servicenow_mcp.utils import format_response, validate_identifier, validate_
 TOOL_NAMES: list[str] = ["record_write", "record_apply"]
 
 _VALID_ACTIONS: Final[frozenset[str]] = frozenset({"create", "update", "delete"})
-
-# Hard cap on the raw byte length of the ``data`` argument accepted by
-# ``record_write``. Mirrors ``MAX_SCRIPT_FILE_BYTES`` (1 MiB) so JSON
-# payloads and script files share the same ceiling. Bounding here keeps
-# ``PreviewTokenStore`` from being pinned by oversized payloads
-# (1000-token cap * payload size = total memory exposure).
-#
-# ``parse_payload_json`` applies a tighter 256 KiB cap downstream; this
-# constant is the defence-in-depth ceiling at the tool entry point and
-# also fires before any JSON parsing work.
-MAX_PAYLOAD_BYTES: Final[int] = 1 * 1024 * 1024
-
 
 # ---------------------------------------------------------------------------
 # Error helpers
@@ -102,8 +88,6 @@ def _validate_action_args(
     table: str,
     sys_id: str,
     data: str,
-    script_path: str,
-    script_field: str,
     correlation_id: str,
 ) -> str | None:
     """Validate the cross-argument constraints. Returns error envelope or None."""
@@ -116,17 +100,6 @@ def _validate_action_args(
     if not table:
         return _err(correlation_id, "table is required.")
 
-    if script_field and not script_path:
-        return _err(correlation_id, "script_field requires script_path to be set.")
-
-    # Cap the raw byte length of ``data`` (which doubles as ``changes`` on
-    # update) before any parsing work or token allocation. Mirrors the
-    # ``script_path`` 1 MiB ceiling. ``parse_payload_json`` enforces a
-    # tighter cap downstream; this fires first and at the entry point so
-    # the ``PreviewTokenStore`` is never asked to retain >1 MiB per entry.
-    if data and len(data.encode("utf-8")) > MAX_PAYLOAD_BYTES:
-        return _err(correlation_id, "payload exceeds maximum allowed size of 1 MiB")
-
     # Per-action argument checks delegated to focused validators.
     if action == "create":
         return _validate_create_args(sys_id, data, correlation_id)
@@ -134,92 +107,6 @@ def _validate_action_args(
         return _validate_update_args(sys_id, data, correlation_id)
     # delete (membership in _VALID_ACTIONS narrows the action enum).
     return _validate_delete_args(sys_id, data, correlation_id)
-
-
-# ---------------------------------------------------------------------------
-# Script-path injection (dictionary-driven)
-# ---------------------------------------------------------------------------
-
-
-def _pick_target_field(
-    detected: list[ScriptField],
-    requested: str,
-    table: str,
-    correlation_id: str,
-) -> ScriptField | str:
-    """Resolve which detected script field receives the ``script_path`` content.
-
-    Returns the chosen ``ScriptField`` on success or a serialized error envelope.
-    The default (empty ``requested``) is the first detected field; the registry
-    already orders child-first and sys_dictionary row order within a table.
-    """
-    if not detected:
-        return _err(
-            correlation_id,
-            f"Table {table!r} has no script-bearing fields detectable from sys_dictionary.",
-        )
-
-    if not requested:
-        return detected[0]
-
-    for field in detected:
-        if field.name == requested:
-            return field
-
-    allowed = ", ".join(f.name for f in detected)
-    return _err(
-        correlation_id,
-        f"Invalid script_field {requested!r} for table {table!r}. Detected script fields: [{allowed}].",
-    )
-
-
-async def _inject_script_path(
-    parsed: dict[str, Any],
-    table: str,
-    script_path: str,
-    script_field: str,
-    allowed_root: str,
-    dictionary: DictionaryRegistry,
-    correlation_id: str,
-) -> tuple[dict[str, Any], list[str]] | str:
-    """Read ``script_path`` and inject content into the resolved script field.
-
-    Discovers script fields via ``DictionaryRegistry``. When ``script_field``
-    is empty, writes to the first detected field. When the resolved field has
-    ``internal_type == 'xml'``, the content is validated as well-formed XML
-    before any platform call. Returns ``(updated_payload, warnings)`` on
-    success, or a serialized error envelope.
-    """
-    detected = await dictionary.get_script_fields(table)
-    pick = _pick_target_field(detected, script_field, table, correlation_id)
-    if isinstance(pick, str):
-        return pick
-    target = pick
-
-    try:
-        content = _read_script_file(script_path, allowed_root)
-    except UnicodeDecodeError as exc:
-        # UnicodeDecodeError is a subclass of ValueError; catch it first so the
-        # caller gets the UTF-8-specific message instead of the generic one.
-        return _err(correlation_id, f"script_path is not valid UTF-8: {exc}")
-    except ValueError as exc:
-        return _err(correlation_id, f"Invalid script_path: {exc}")
-    except (FileNotFoundError, PermissionError):
-        # Collapsed on purpose: both arms return the SAME opaque message so a
-        # caller cannot enumerate the host filesystem by observing which error
-        # comes back (see SECURITY in _artifact._read_script_file).
-        return _err(correlation_id, "script_path is not readable or is outside the allowed root")
-
-    if target.internal_type == "xml":
-        xml_error = validate_ui_macro_xml(content)
-        if xml_error:
-            return _err(correlation_id, xml_error)
-
-    warnings: list[str] = []
-    if target.name in parsed:
-        warnings.append(f"'{target.name}' field in data was overridden by script_path content.")
-    parsed[target.name] = content
-    return parsed, warnings
 
 
 # ---------------------------------------------------------------------------
@@ -234,7 +121,6 @@ async def _run_create(
     preview: bool,
     preview_store: PreviewTokenStore,
     correlation_id: str,
-    warnings: list[str],
     extra_data: dict[str, Any],
 ) -> str:
     """Run a create action in either preview or direct mode."""
@@ -254,7 +140,6 @@ async def _run_create(
                 "preview": {"data": mask_sensitive_fields(parsed_data), **extra_data},
             },
             correlation_id=correlation_id,
-            warnings=warnings or None,
         )
 
     created = await client.create_record(table, parsed_data)
@@ -267,7 +152,6 @@ async def _run_create(
             **extra_data,
         },
         correlation_id=correlation_id,
-        warnings=warnings or None,
     )
 
 
@@ -279,7 +163,6 @@ async def _run_update(
     preview: bool,
     preview_store: PreviewTokenStore,
     correlation_id: str,
-    warnings: list[str],
     extra_data: dict[str, Any],
 ) -> str:
     """Run an update action in either preview or direct mode."""
@@ -298,7 +181,6 @@ async def _run_update(
                 "preview": {"diff": diff, **extra_data},
             },
             correlation_id=correlation_id,
-            warnings=warnings or None,
         )
 
     updated = await client.update_record(table, sys_id, parsed_data)
@@ -311,7 +193,6 @@ async def _run_update(
             **extra_data,
         },
         correlation_id=correlation_id,
-        warnings=warnings or None,
     )
 
 
@@ -362,45 +243,27 @@ async def _prepare_payload(
     action: str,
     data: str,
     table: str,
-    script_path: str,
-    script_field: str,
-    allowed_root: str,
     dictionary: DictionaryRegistry,
     correlation_id: str,
-) -> tuple[dict[str, Any], list[str]] | str:
-    """Parse JSON payload and optionally inject ``script_path`` content.
-
-    Returns ``(parsed_data, warnings)`` on success or a serialized error
-    envelope on failure (parse error or script-injection error). For
-    ``action='delete'`` returns ``({}, [])`` - delete has no payload to
-    prepare. Mirrors the prior inlined logic exactly so existing error
-    envelopes (from ``parse_payload_json`` and ``_inject_script_path``)
-    propagate unchanged.
-    """
+) -> dict[str, Any] | str:
+    """Parse the bounded field map and reject invalid XML before staging a write."""
     if action == "delete":
-        return {}, []
+        return {}
 
     parsed = parse_payload_json(data, field_name="data", correlation_id=correlation_id)
     if isinstance(parsed, str):
         return parsed
-    parsed_data = parsed
-    warnings: list[str] = []
-
-    if script_path:
-        injected = await _inject_script_path(
-            parsed_data,
-            table,
-            script_path,
-            script_field,
-            allowed_root,
-            dictionary,
-            correlation_id,
-        )
-        if isinstance(injected, str):
-            return injected
-        parsed_data, warnings = injected
-
-    return parsed_data, warnings
+    fields = await dictionary.get_fields(table, list(parsed))
+    for field in fields:
+        if field.internal_type != "xml":
+            continue
+        content = parsed[field.name]
+        if not isinstance(content, str):
+            return _err(correlation_id, f"XML field {field.name!r} must be a string.")
+        xml_error = validate_ui_macro_xml(content)
+        if xml_error:
+            return _err(correlation_id, f"Field {field.name!r}: {xml_error}")
+    return parsed
 
 
 async def _dispatch_record_write(
@@ -412,18 +275,13 @@ async def _dispatch_record_write(
     preview: bool,
     preview_store: PreviewTokenStore,
     correlation_id: str,
-    warnings: list[str],
     extra_data: dict[str, Any],
 ) -> str:
     """Route a validated ``record_write`` request to its ``_run_*`` helper."""
     if action == "create":
-        return await _run_create(
-            client, table, parsed_data, preview, preview_store, correlation_id, warnings, extra_data
-        )
+        return await _run_create(client, table, parsed_data, preview, preview_store, correlation_id, extra_data)
     if action == "update":
-        return await _run_update(
-            client, table, sys_id, parsed_data, preview, preview_store, correlation_id, warnings, extra_data
-        )
+        return await _run_update(client, table, sys_id, parsed_data, preview, preview_store, correlation_id, extra_data)
     # delete - membership in _VALID_ACTIONS narrows the action enum.
     return await _run_delete(client, table, sys_id, preview, preview_store, correlation_id, extra_data)
 
@@ -512,47 +370,30 @@ def register_tools(
         table: str = "",
         sys_id: str = "",
         data: str = "",
-        script_path: str = "",
-        script_field: str = "",
         preview: bool = True,
         *,
         correlation_id: str = "",
     ) -> str:
         """Create, update, or delete a record. Defaults to preview mode.
 
-        Script-bearing tables (Business Rules, Script Includes, widgets, etc.)
-        are not special-cased - script-field discovery happens at runtime via
-        ``sys_dictionary`` and the table's super_class chain. ``script_path``
-        loads a local file into the resolved target field; ``script_field``
-        names the destination column when more than one script-bearing field
-        is detected.
+        Supply all field values, including complete script or markup strings,
+        in ``data``. Omitted fields stay unchanged on update. Dictionary
+        metadata identifies supplied XML fields, including inherited fields;
+        malformed XML is rejected before preview creation or mutation.
 
         Args:
             action: 'create' | 'update' | 'delete'.
             table: Target table. Required.
             sys_id: Required for 'update' and 'delete'.
-            data: JSON string of field values. Required for 'create' and
-                'update'.
-            script_path: Optional absolute path to a local script file. Content
-                is read (UTF-8, max 1 MB) and stored under the resolved
-                target script field. Path resolved with strict=True;
-                constrained to ``settings.script_allowed_root``. When the
-                resolved field has ``internal_type == 'xml'``, the content is
-                validated as well-formed XML before any platform call.
-            script_field: Optional override for the destination script field.
-                When empty (default), the first detected script field is used
-                (child-first, ``sys_dictionary`` row order within a table).
-                When set, must match one of the script-bearing fields detected
-                from ``sys_dictionary``; otherwise the call returns a
-                structured error listing the detected fields. Use
-                ``describe(action='list_script_fields', table=...)`` to
-                discover script fields for a table.
+            data: JSON string mapping field names to values, including any
+                script fields. Required for 'create' and 'update'. Maximum
+                256 KiB of UTF-8 JSON, including escaping and field names.
             preview: When True (default) returns a preview_token; caller
                 invokes record_apply to commit. When False, write commits
                 immediately.
         """
         # --- 1. Cross-argument validation (early exit) -------------------
-        err = _validate_action_args(action, table, sys_id, data, script_path, script_field, correlation_id)
+        err = _validate_action_args(action, table, sys_id, data, correlation_id)
         if err:
             return err
 
@@ -567,20 +408,17 @@ def register_tools(
         if sys_id:
             validate_sys_id(sys_id)
 
-        # --- 4. Payload prep (parse JSON + optional script-path inject) --
+        # --- 4. Payload prep ---------------------------------------------
         prepared = await _prepare_payload(
             action,
             data,
             table,
-            script_path,
-            script_field,
-            settings.script_allowed_root,
             dict_registry,
             correlation_id,
         )
         if isinstance(prepared, str):
             return prepared
-        parsed_data, warnings = prepared
+        parsed_data = prepared
 
         # --- 5. Dispatch -------------------------------------------------
         extra_data: dict[str, Any] = {}
@@ -594,7 +432,6 @@ def register_tools(
                 preview,
                 preview_store,
                 correlation_id,
-                warnings,
                 extra_data,
             )
 

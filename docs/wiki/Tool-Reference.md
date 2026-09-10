@@ -77,11 +77,9 @@ Unified tool for staging `create`, `update`, or `delete` actions.
   - `action`: One of `create`, `update`, or `delete`.
   - `table`: Target table name.
   - `sys_id`: Required for `update` and `delete`.
-  - `data`: JSON string of field-value pairs for `create`/`update`.
-  - `script_path`: Local path to a script file. Allowed on any table that has at least one script-bearing field (resolved via `DictionaryRegistry` from `sys_dictionary`). Resolved strictly under `SCRIPT_ALLOWED_ROOT`; capped at 1 MB; UTF-8.
-  - `script_field`: Optional. Target a specific script-bearing field on tables with more than one (e.g. `sys_ui_policy.script_true`/`script_false`, `sp_widget.client_script`/`template`/`css`, `sys_ui_page.html`/`processing_script`). Defaults to the first field returned by `DictionaryRegistry.get_script_fields(table)`. Setting `script_field` without `script_path` is rejected.
+  - `data`: JSON string of field-value pairs for `create`/`update`, including complete script or markup values. Maximum 256 KiB of UTF-8 JSON, including field names and escaping. Omitted fields stay unchanged on update. Multiple script fields can be supplied together.
   - `preview`: If `true` (default), stores the change in `PreviewTokenStore` and returns a `preview_token`.
-- **Notes:** When the resolved script field has `internal_type == 'xml'` (e.g. `sys_ui_macro.xml`), `record_write` validates the rendered XML (`xml.etree.ElementTree.fromstring`) before any platform call; malformed content is rejected with a structured error.
+- **Notes:** No local script-file loading. Dictionary metadata is queried only for supplied fields, with child-first inheritance. Fields with `internal_type == 'xml'` require string values containing well-formed XML before staging or mutation. Empty, null, and malformed values are rejected. Metadata request errors block writes; fields hidden by dictionary ACLs cannot receive local type validation. Script syntax is not checked.
 - **Example:**
 
   ```python
@@ -94,7 +92,7 @@ Unified tool for staging `create`, `update`, or `delete` actions.
 
 Read-only counterpart to `record_write` for any table.
 
-- **Purpose:** Inspect an existing record (and learn its script-bearing fields) before composing a multi-field update via `record_write` + `script_field`.
+- **Purpose:** Inspect an existing record (and learn its script-bearing fields) before composing a multi-field update through `record_write.data`.
 - **Key Parameters:**
   - `table`: Target table name.
   - `sys_id` **or** `name`: Exactly one must be supplied. Ambiguous names (more than one match) and missing records return a structured error.

@@ -22,7 +22,6 @@ class Settings(BaseSettings):
     servicenow_env: str = "dev"
     max_row_limit: int = 100
     large_table_names_csv: str = _DEFAULT_LARGE_TABLES
-    script_allowed_root: str = ""
     httpx_timeout_seconds: float = 30.0
     metadata_cache_ttl_seconds: int = 300
 

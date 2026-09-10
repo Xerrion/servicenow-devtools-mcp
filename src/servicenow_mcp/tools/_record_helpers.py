@@ -33,7 +33,13 @@ async def _check_mandatory_fields(
     validate server-side).
     """
     try:
-        metadata = await client.get_metadata(table)
+        result = await client.query_records(
+            table="sys_dictionary",
+            query=ServiceNowQuery().equals("name", table).equals("mandatory", "true").build(),
+            fields=["element", "mandatory"],
+            limit=1000,
+        )
+        metadata = result.get("records", [])
     except (NotFoundError, ForbiddenError, ServerError, httpx.HTTPError):
         # Metadata genuinely unavailable for this table or the instance is
         # unreachable; defer to ServiceNow's own server-side validation.

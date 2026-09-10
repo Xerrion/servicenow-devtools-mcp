@@ -16,7 +16,6 @@ All configuration is handled through environment variables, loaded via [pydantic
 | `SERVICENOW_ENV` | No | `"dev"` | Set to `"prod"` or `"production"` to block all write operations |
 | `MAX_ROW_LIMIT` | No | `100` | Max records per query (1-10000) |
 | `LARGE_TABLE_NAMES_CSV` | No | `syslog,...` | Tables requiring date-bounded queries |
-| `SCRIPT_ALLOWED_ROOT` | No | `""` | Root directory for `script_path` in `record_write` |
 | `HTTPX_TIMEOUT_SECONDS` | No | `30` | ServiceNow HTTP timeout in seconds (1-600) |
 | `METADATA_CACHE_TTL_SECONDS` | No | `300` | Metadata cache freshness in seconds (1-86400) |
 | `SENTRY_DSN` | No | `""` | Sentry DSN for error tracking |
@@ -70,12 +69,12 @@ When `SERVICENOW_ENV` is `"prod"` or `"production"`:
 
 ---
 
-## Script Path Security
+## Inline Record Writes
 
-To use the `script_path` feature in `record_write`, you **must** configure `SCRIPT_ALLOWED_ROOT` with an absolute path. The server will reject any `script_path` that resolves outside of this directory.
-
-Example:
-`SCRIPT_ALLOWED_ROOT=/Users/dev/projects/servicenow-scripts`
+`record_write` takes all field values through the JSON string `data`. No script
+directory configuration is needed. The total input limit is 256 KiB of UTF-8
+JSON, including field names and escaping. See [[Tool-Reference]] for field
+selection and XML validation.
 
 ---
 

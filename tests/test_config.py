@@ -8,6 +8,11 @@ import pytest
 class TestSettings:
     """Test ServiceNow MCP settings loading and validation."""
 
+    def test_file_input_setting_is_removed(self) -> None:
+        from servicenow_mcp.config import Settings
+
+        assert "script_allowed_root" not in Settings.model_fields
+
     def _make_env(self, **overrides: str) -> dict[str, str]:
         """Create a minimal valid environment dict."""
         base = {

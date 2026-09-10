@@ -22,7 +22,7 @@ from servicenow_mcp.client import ServiceNowClient, ServiceNowClientProvider
 from servicenow_mcp.config import Settings
 from servicenow_mcp.metadata_cache import AsyncMetadataCache
 from servicenow_mcp.telemetry import CacheName, HttpTelemetry
-from servicenow_mcp.utils import ServiceNowQuery
+from servicenow_mcp.utils import ServiceNowQuery, validate_identifier
 
 
 logger = logging.getLogger(__name__)
@@ -296,6 +296,56 @@ class DictionaryRegistry:
             return list(collected.values())
 
         return list(await self._all_cache.get_or_load(table, load))
+
+    async def get_fields(self, table: str, names: list[str]) -> list[DictionaryField]:
+        """Resolve only the named fields, child-first, without loading all metadata.
+
+        Empty selection performs no I/O. Missing fields are omitted. Metadata
+        errors propagate so callers cannot silently bypass type validation.
+        """
+        validate_identifier(table)
+        for name in names:
+            validate_identifier(name)
+        if not names:
+            return []
+
+        remaining = set(names)
+        fields: list[DictionaryField] = []
+        chain = await self.get_chain(table)
+        async with self._client_factory() as client:
+            for level, current in enumerate(chain):
+                # Bound the IN query and result size even for large field maps.
+                pending = sorted(remaining)
+                for start in range(0, len(pending), 100):
+                    batch = pending[start : start + 100]
+                    result = await client.query_records(
+                        table="sys_dictionary",
+                        query=ServiceNowQuery()
+                        .equals("name", current)
+                        .in_list("element", batch)
+                        .equals("active", "true")
+                        .build(),
+                        fields=["element", "internal_type.name"],
+                        limit=len(batch),
+                    )
+                    for row in result.get("records", []):
+                        name = str(row.get("element") or "").strip()
+                        if name not in remaining or name not in batch:
+                            continue
+                        fields.append(
+                            DictionaryField(
+                                name=name,
+                                internal_type=self._dictionary_value(
+                                    row.get("internal_type.name") or row.get("internal_type")
+                                ),
+                                attributes="",
+                                inherited_from=None if level == 0 else current,
+                            )
+                        )
+                        remaining.remove(name)
+                if not remaining:
+                    break
+        return fields
 
     async def get_chain(self, table: str) -> list[str]:
         """Return the resolved super_class chain for ``table`` (child-first)."""
