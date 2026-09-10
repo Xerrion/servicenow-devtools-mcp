@@ -276,24 +276,15 @@ The `looks_like_template(content)` helper (regex `\${[^}]+}`) is exposed for rec
 
 Discover the script fields for any table at runtime via `describe(action='list_script_fields', table='<table>')`, which returns the resolved super_class chain and a list of `{name, internal_type, inherited_from, via_heuristic}` entries.
 
-### script_path Security
+### Inline Field Writes
 
-`record_write` accepts an optional `script_path` for any table that has at least one script-bearing field:
-
-- Path is resolved via `Path.resolve(strict=True)` to prevent symlink/traversal attacks.
-- The resolved path must be under the directory defined by the `script_allowed_root` setting.
-- File is read as UTF-8; maximum size is 1 MB (`MAX_SCRIPT_FILE_BYTES`).
-- Content is written to the first script-bearing field detected by `DictionaryRegistry` (child-first, sys_dictionary row order), unless `script_field` overrides it.
-- When the resolved field has `internal_type == 'xml'`, the content is validated as well-formed XML (`xml.etree.ElementTree.fromstring`) before any platform call; malformed content yields a structured error.
-- `record_write` uses the `PreviewTokenStore` flow (preview/apply) by default for these operations.
-
-### script_field parameter
-
-`record_write` accepts an optional `script_field` parameter when `script_path` is set. It selects which script-bearing field receives the file contents:
-
-- Empty (default): writes to the first field returned by `DictionaryRegistry.get_script_fields(table)`.
-- Non-empty: must match a field name returned by the registry for that table; otherwise the call returns a structured error listing the allowed fields.
-- Setting `script_field` without `script_path` is rejected.
+- `record_write.data` is the canonical JSON string field map. Include complete script or markup strings under their field names. Multiple script fields can be written together; omitted fields stay unchanged on update.
+- The server has no local script-file input. Discover script fields through `record_read` or `describe(action='list_script_fields', table=...)`.
+- `parse_payload_json` enforces the existing 256 KiB UTF-8 JSON limit (`MAX_JSON_PAYLOAD_BYTES`), including keys and escaping, before metadata I/O or token allocation.
+- `DictionaryRegistry.get_fields(table, names)` queries only supplied fields with a narrow `element,internal_type.name` projection. It resolves child overrides before inherited fields and batches at 100 names. It reuses the cached table chain, but does not cache selected field results or load all script fields.
+- Supplied fields with `internal_type == 'xml'` must be strings containing well-formed XML. Empty, null, and malformed XML are rejected before preview creation or mutation. No hardcoded artifact map or script-field heuristic is required for this check.
+- Metadata request errors block the write. Fields hidden by dictionary ACLs cannot receive local type validation. ServiceNow remains responsible for authorization and server-side validation.
+- Preview/apply, single-use tokens, production gates, denied-table gates, and sensitive-field masking remain in force.
 
 ### record_read
 
@@ -415,7 +406,6 @@ Dispatched via the read-only `audit` tool. Available in the `full` and `readonly
 | `servicenow_env` | `str` | `"dev"` | `SERVICENOW_ENV` |
 | `max_row_limit` | `int` | `100` (range 1-10000) | `MAX_ROW_LIMIT` |
 | `large_table_names_csv` | `str` | `"syslog,sys_audit,sys_log_transaction,sys_email_log"` | `LARGE_TABLE_NAMES_CSV` |
-| `script_allowed_root` | `str` | `""` | `SCRIPT_ALLOWED_ROOT` |
 | `httpx_timeout_seconds` | `float` | `30.0` (range 1.0-600.0) | `HTTPX_TIMEOUT_SECONDS` |
 | `metadata_cache_ttl_seconds` | `int` | `300` (range 1-86400) | `METADATA_CACHE_TTL_SECONDS` |
 | `sentry_dsn` | `str` | `""` | `SENTRY_DSN` |

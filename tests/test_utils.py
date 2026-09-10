@@ -93,6 +93,39 @@ class TestFormatResponse:
 
         assert "Limit capped at 100" in resp["warnings"]
 
+    def test_empty_warnings_omitted_without_pruning_data(self) -> None:
+        from servicenow_mcp.utils import format_response
+
+        data = {"empty": "", "missing": None, "zero": 0, "disabled": False, "items": []}
+        resp = decode_response(format_response(data=data, correlation_id="test-compact", warnings=[]))
+
+        assert resp == {"correlation_id": "test-compact", "status": "success", "data": data}
+
+    def test_error_and_continuation_metadata_preserved(self) -> None:
+        from servicenow_mcp.utils import format_response
+
+        envelope = {
+            "data": None,
+            "correlation_id": "test-error",
+            "status": "error",
+            "error": {"message": "Access denied"},
+            "pagination": {"offset": 0, "limit": 5, "total": 20},
+            "selection": {"mode": "explicit", "returned_fields": [], "truncated": True},
+            "warnings": ["Results truncated", "ACLs limit completeness", "Narrow the filter"],
+        }
+        resp = decode_response(
+            format_response(
+                data=envelope["data"],
+                correlation_id="test-error",
+                status="error",
+                error={"message": "Access denied"},
+                pagination={"offset": 0, "limit": 5, "total": 20},
+                selection={"mode": "explicit", "returned_fields": [], "truncated": True},
+                warnings=["Results truncated", "ACLs limit completeness", "Narrow the filter"],
+            )
+        )
+        assert resp == envelope
+
 
 class TestSerialize:
     """Test serialize function with JSON output and error-envelope fallback."""

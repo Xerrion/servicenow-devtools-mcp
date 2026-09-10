@@ -11,7 +11,7 @@ The previous specialized helper tools (e.g., `incident_list`, `debug_trace`, `ch
 | `query` | Fetch records, aggregates, or single records from any table using encoded queries. List mode requires `fields`; use `fields="*"` only for an intentional full record. |
 | `describe` | Retrieve slim field metadata (8 keys) for a table to understand its structure. Empty fields return an alphabetical page of 25 fields; use `field_offset` and `field_limit` to continue. |
 | `record_read` | Read a record by `sys_id` or `name`. Returns the masked record plus the `script_fields` list resolved from `sys_dictionary` for the table. |
-| `record_write` | Dispatcher for creating, updating, or deleting records (with `script_path` file injection and `script_field` targeting for tables with multiple script-bearing fields). |
+| `record_write` | Create, update, or delete records. Supply all field values, including complete scripts, in the JSON string `data`. |
 | `record_apply` | Commits a write operation previously staged with `preview=True`. |
 | `attachment` | Dispatcher for reading, listing, and downloading record attachments. |
 | `attachment_write` | Dispatcher for uploading or deleting record attachments. |
@@ -207,33 +207,43 @@ choices = json.loads(await resolve_choice(table="incident", field="state"))
 
 ---
 
-### 9. Update a Business Rule from a local file
+### 9. Update a Business Rule with inline script content
 
-**Goal:** Sync a script developed locally into a ServiceNow Business Rule.  
+**Goal:** Replace a Business Rule script through a reviewed field-map update.
 **Old way:** `artifact_update`  
 **New way:**
 
 ```python
 import json
 
-# Stage the update using a local path.
-# content is read, validated, and placed in the first script-bearing field
-# resolved by DictionaryRegistry (here: sys_script.script).
+# Read the current record and discover its script fields first.
+current = json.loads(await record_read(table="sys_script", sys_id="<sys_id>"))
+
+# Supply the complete replacement value, not a patch or file path.
 preview = json.loads(
     await record_write(
         action="update",
         table="sys_script",
         sys_id="<sys_id>",
-        script_path="/Users/dev/project/br_logic.js",
+        data=json.dumps(
+            {
+                "script": "(function executeRule(current, previous) {\n    current.setValue('short_description', (current.getValue('short_description') || '').trim());\n})(current, previous);\n"
+            }
+        ),
         preview=True,
     )
 )
 
-# Commit
+# Review preview["data"]["preview"]["diff"] before applying.
 await record_apply(preview_token=preview["data"]["preview_token"])
 ```
 
-**Notes:** `script_path` must be within the directory defined by the `SCRIPT_ALLOWED_ROOT` setting. Files are capped at 1MB and must be UTF-8.
+**Notes:** The server does not load local script files. `data` is limited to
+256 KiB of UTF-8 JSON, including field names and escaping. Omitted fields stay
+unchanged. To change several script fields, include each complete value in the
+same map, for example `{"script_true": "onTrue();", "script_false": "onFalse();"}`.
+Dictionary-confirmed XML fields require well-formed XML before staging or
+writing. Metadata request errors block writes; script syntax is not checked.
 
 ---
 

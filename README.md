@@ -118,7 +118,6 @@ process with another working directory will not read the files you expect.
 | `SERVICENOW_ENV` | No | `dev` | Any string; `prod` and `production` block writes | Local environment label and write policy input. |
 | `MAX_ROW_LIMIT` | No | `100` | `1`-`10000` | Maximum row count for bounded generic and query-oriented tool paths that use this setting. It is not a universal response or egress cap. |
 | `LARGE_TABLE_NAMES_CSV` | No | `syslog,sys_audit,sys_log_transaction,sys_email_log` | Comma-separated table names | Tables that require date-bounded queries. |
-| `SCRIPT_ALLOWED_ROOT` | No | Empty | Filesystem path | Root required for `script_path`; empty disables that file input. |
 | `HTTPX_TIMEOUT_SECONDS` | No | `30.0` | `1.0`-`600.0`, finite | ServiceNow HTTP timeout. |
 | `METADATA_CACHE_TTL_SECONDS` | No | `300` | `1`-`86400` | Metadata freshness window. |
 | `SENTRY_DSN` | No | Empty | String accepted by the Sentry SDK as a DSN | Enables optional Sentry error reporting. |
@@ -222,7 +221,7 @@ the server and is not part of the client-facing schema.
 | `query` | Reads records or aggregates. | `table`; list mode needs `fields`; use `encoded_query`, `limit`, `offset`, `order_by`, `display_values`, `aggregate`, `group_by`, and `resolve_labels`. Exact `sys_id` mode is also supported. | `full`, `readonly`, `core_readonly` |
 | `describe` | Describes fields, tables, or script fields. | Default table description; `action=list_tables` with optional `name_filter`; `action=list_script_fields` with `table`. Supports `fields`, `verbose`, `include_docs`, `field_offset`, and `field_limit`. | `full`, `readonly`, `core_readonly` |
 | `record_read` | Reads one record by `sys_id` or `name`. | `table` and exactly one selector. `fields` is optional; `*` requests all masked fields. Includes discovered `script_fields`. | `full`, `readonly` |
-| `record_write` | Creates, updates, or deletes a record. | `action=create \| update \| delete`, `table`, optional `sys_id`, JSON `data`, optional `script_path` and `script_field`, and `preview` (default `true`). | `full` |
+| `record_write` | Creates, updates, or deletes a record. | `action=create \| update \| delete`, `table`, optional `sys_id`, JSON `data` with all field values (including scripts), and `preview` (default `true`). | `full` |
 | `record_apply` | Applies a record-write preview. | `preview_token` from `record_write`. The token is single-use. | `full` |
 | `attachment` | Reads attachment metadata and content. | `action=list \| get \| download \| download_by_name`; list and name lookup use `table` and `table_sys_id`; direct actions use attachment `sys_id`. | `full`, `readonly`, `core_readonly` |
 | `attachment_write` | Uploads or deletes attachments. | `action=upload \| delete`; upload uses parent table, record ID, file name, Base64 content, and MIME type; delete uses attachment `sys_id`. | `full` |
@@ -344,6 +343,18 @@ an explicit `fields` projection. Use
 included. Exact-record mode defaults to `sys_id,sys_updated_on` and accepts an
 explicit projection or `*`.
 
+`query` and `code_search` report the effective row cap in `pagination.limit`,
+without a redundant limit-cap warning. Query offsets, totals, and selection
+metadata remain available for continuing bounded reads. Empty warning lists
+are omitted from response envelopes; non-empty warnings are preserved.
+
+`code_search` defaults to `extended_matching=false` to avoid additional
+context fields from the search group's configuration. Set
+`extended_matching=true` to request that context. Search result fields and
+platform metadata are otherwise passed through unchanged. Its `pagination`
+reports only the effective limit; it does not imply offset support or a known
+total. Keep platform completeness signals and narrow the search when needed.
+
 `record_read` with empty `fields` returns compact identity and update fields
 plus all discovered script-bearing fields. `fields="*"` returns the full
 masked record. `record_read` always includes `script_fields` and `sys_id`.
@@ -414,12 +425,21 @@ consumed before the application attempt. A failed attempt cannot be retried
 with the same token. Set `preview=false` only when an immediate write is
 appropriate.
 
-When `script_path` is used, the resolved file must be under
-`SCRIPT_ALLOWED_ROOT`, must be readable as UTF-8, and must be no larger than
-1 MiB. Strict path resolution prevents traversal and symlink escapes. The
-dictionary registry chooses the first script-bearing field child-first unless
-`script_field` selects one of the discovered fields. XML script fields are
-validated as well-formed XML before the platform call.
+`record_write.data` is the only field-value input. Supply a JSON string such as
+`{"script":"run();\n","active":true}`. Include the complete value for each
+field you change; omitted fields stay unchanged on update. Multiple script
+fields can be changed in one payload. Use `record_read` or
+`describe(action="list_script_fields", table=...)` to discover field names.
+The server does not read local script files.
+
+The complete UTF-8 JSON input is limited to 256 KiB (262144 bytes), including
+field names and JSON escaping. Before staging or writing, the server queries
+dictionary types for supplied fields only, resolving inherited fields
+child-first. Values for XML fields must be strings containing well-formed XML;
+empty, null, and malformed values are rejected. Metadata request errors block
+the write. Dictionary visibility depends on ServiceNow ACLs; fields not
+returned by the dictionary cannot receive local type validation. These checks
+do not validate script syntax or replace ServiceNow authorization.
 
 Attachment upload and delete are in `attachment_write`, which is separate from
 read-only `attachment` and is gated again at runtime. Attachment transfer size

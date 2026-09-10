@@ -459,8 +459,6 @@ async def _run_query_mode(
 
     safety = enforce_query_safety(table, encoded_query, limit, settings)
     effective_limit = safety["limit"]
-    if effective_limit < limit:
-        warnings.append(f"Limit capped at {effective_limit}")
 
     async with client_factory() as client:
         result = await client.query_records(

@@ -13,7 +13,7 @@ The server enforces multiple layers of safety guardrails to prevent accidental d
 | Query safety | Enforces row limits and date-bounded filters on large tables |
 | Write gating | Blocks all mutations in production environments |
 | Input validation | Validates identifiers and sys_ids to prevent injection |
-| Script security | Constrains local script file reads for artifact writes |
+| Write payload validation | Bounds inline JSON and checks dictionary-confirmed XML fields |
 
 ---
 
@@ -77,19 +77,16 @@ All write operations are blocked when `SERVICENOW_ENV` is set to `"prod"` or `"p
 
 ### Preview Pattern
 
-The system uses a mandatory preview/apply flow mediated by the `PreviewTokenStore`. You must first call `record_write` with `preview=true` (the default) to stage the change and receive a `preview_token`. The change is only committed when this token is passed to `record_apply`.
+The system defaults to a preview/apply flow mediated by the `PreviewTokenStore`. Call `record_write` with `preview=true` to stage the change and receive a `preview_token`. This staged change is committed when the token is passed to `record_apply`. Tokens are single-use, and apply re-checks write gates. Set `preview=false` only for an authorized immediate write.
 
 ---
 
-## Script Security
+## Inline Write Validation
 
-When writing platform artifacts (e.g., Business Rules, Widgets, UI Pages, ACLs) using the `script_path` parameter in `record_write`:
-
-- **Root Constraint:** Paths must resolve within the directory defined by `SCRIPT_ALLOWED_ROOT`.
-- **Resolution:** Paths are resolved strictly to prevent symlink or traversal attacks.
-- **Limits:** Files are capped at 1 MB and must be UTF-8 encoded.
-- **Mapping:** Content is automatically routed to the first script-bearing field returned by `DictionaryRegistry.get_script_fields(table)` (resolved at runtime from `sys_dictionary`). Tables with multiple script fields (e.g. `sys_ui_policy.script_true`/`script_false`, `sp_widget.client_script`/`template`/`css`, `sys_ui_page.html`/`processing_script`) accept an optional `script_field` parameter to override the default target.
-- **XML Validation:** When the resolved field has `internal_type == 'xml'` (e.g. `sys_ui_macro.xml`), the file contents are parsed with `xml.etree.ElementTree.fromstring` before any platform call; malformed XML is rejected with a structured error.
+- **Input:** `record_write.data` is a JSON string mapping field names to complete values. The server does not read local script files. Multiple script fields can be written in one payload; omitted fields stay unchanged on update.
+- **Limits:** The complete UTF-8 JSON input is capped at 256 KiB (262144 bytes), including field names and escaping. Parsing and key validation run before metadata I/O.
+- **XML validation:** Dictionary types are fetched only for supplied fields, with child-first inheritance. Every supplied field with `internal_type == 'xml'` must contain a string of well-formed XML. Empty, null, and malformed XML are rejected before token creation or mutation. Script syntax is not checked.
+- **Metadata access:** Request errors block writes. Dictionary ACLs can hide fields, which prevents local type validation for those fields. ServiceNow remains the authority for authorization and server-side validation.
 
 ---
 

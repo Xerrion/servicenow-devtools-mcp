@@ -55,6 +55,66 @@ def _mock_root_table(dictionary_rows: list[dict[str, Any]]) -> None:
 # ---------------------------------------------------------------------------
 
 
+class TestSelectedFields:
+    """Write validation fetches only supplied columns, without a broad field load."""
+
+    @respx.mock
+    async def test_empty_selection_does_not_query(self, settings: Settings, auth_provider: BasicAuthProvider) -> None:
+        assert await DictionaryRegistry(settings, auth_provider).get_fields("u_child", []) == []
+        assert not respx.calls
+
+    @respx.mock
+    async def test_child_override_and_inherited_types(
+        self, settings: Settings, auth_provider: BasicAuthProvider
+    ) -> None:
+        def objects(request: httpx.Request) -> httpx.Response:
+            parent = "u_parent" if request.url.params["sysparm_query"] == "name=u_child" else ""
+            return httpx.Response(200, json={"result": [{"super_class.name": parent}]})
+
+        def dictionary(request: httpx.Request) -> httpx.Response:
+            query = request.url.params["sysparm_query"]
+            assert request.url.params["sysparm_fields"] == "element,internal_type.name"
+            if "name=u_child^" in query:
+                assert "elementINoverridden,u_markup" in query
+                rows = [{"element": "overridden", "internal_type.name": "string"}]
+            else:
+                assert query == "name=u_parent^elementINu_markup^active=true"
+                rows = [{"element": "u_markup", "internal_type.name": "xml"}]
+            return httpx.Response(200, json={"result": rows})
+
+        respx.get(DB_OBJECT_URL).mock(side_effect=objects)
+        metadata = respx.get(DICTIONARY_URL).mock(side_effect=dictionary)
+        fields = await DictionaryRegistry(settings, auth_provider).get_fields("u_child", ["overridden", "u_markup"])
+        assert [(field.name, field.internal_type, field.inherited_from) for field in fields] == [
+            ("overridden", "string", None),
+            ("u_markup", "xml", "u_parent"),
+        ]
+        assert metadata.call_count == 2
+
+    @respx.mock
+    async def test_selection_is_batched_and_stops_after_resolution(
+        self, settings: Settings, auth_provider: BasicAuthProvider
+    ) -> None:
+        registry = DictionaryRegistry(settings, auth_provider)
+        registry.get_chain = AsyncMock(return_value=["u_child", "u_parent"])
+        names = [f"field_{index}" for index in range(205)]
+
+        def dictionary(request: httpx.Request) -> httpx.Response:
+            query = request.url.params["sysparm_query"]
+            assert query.startswith("name=u_child^")
+            selected = query.split("elementIN", 1)[1].split("^", 1)[0].split(",")
+            assert 1 <= len(selected) <= 100
+            assert request.url.params["sysparm_limit"] == str(len(selected))
+            return httpx.Response(
+                200, json={"result": [{"element": name, "internal_type.name": "string"} for name in selected]}
+            )
+
+        metadata = respx.get(DICTIONARY_URL).mock(side_effect=dictionary)
+        fields = await registry.get_fields("u_child", names)
+        assert {field.name for field in fields} == set(names)
+        assert metadata.call_count == 3
+
+
 class TestTypeFilter:
     """The unambiguous-type list admits fields regardless of attributes."""
 

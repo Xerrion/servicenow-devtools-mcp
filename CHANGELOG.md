@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased
+
+### Breaking changes
+
+- Removed `record_write.script_path` and `record_write.script_field`. Supply all
+  field values through the JSON string `data`, including complete script or
+  markup strings under their field names. For example, replace file input with
+  `data='{"script":"run();\\n"}'`. Multiple fields can be written together;
+  omitted fields stay unchanged on update. Refresh cached MCP tool schemas.
+- Removed `script_allowed_root` / `SCRIPT_ALLOWED_ROOT`. Remove this setting
+  from client and environment configuration. The server no longer loads local
+  script files. If a client reads a file, it must send the content in `data`.
+- The existing inline limit remains **256 KiB of UTF-8 JSON**, including keys
+  and escaping. The former 1 MiB file allowance is gone; do not send partial
+  script chunks to work around the limit because field writes replace values.
+- XML well-formedness validation now applies to inline dictionary-confirmed XML
+  fields, including inherited fields. Empty, null, non-string, and malformed
+  XML are rejected before preview creation or mutation. Writes query types only
+  for supplied fields and fail on metadata request errors. Dictionary visibility
+  still depends on ServiceNow ACLs. Script discovery through `record_read` and
+  `describe`, preview/apply safety, and masking remain unchanged.
+
 ## [0.12.1](https://github.com/Xerrion/servicenow-platform-mcp/compare/v0.12.0...v0.12.1) (2026-09-08)
 
 

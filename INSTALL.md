@@ -180,7 +180,6 @@ environment variables override both.
 | `SERVICENOW_ENV` | No | `dev` | Any string | `prod` and `production` block writes. |
 | `MAX_ROW_LIMIT` | No | `100` | `1`-`10000` | Cap for bounded generic and query-oriented paths that use it. Not a global response cap. |
 | `LARGE_TABLE_NAMES_CSV` | No | `syslog,sys_audit,sys_log_transaction,sys_email_log` | Comma-separated names | Tables that require date-bounded queries. |
-| `SCRIPT_ALLOWED_ROOT` | No | Empty | Filesystem path | Required root for `record_write` `script_path`; empty disables that input. |
 | `HTTPX_TIMEOUT_SECONDS` | No | `30.0` | `1.0`-`600.0`, finite | ServiceNow HTTP timeout. |
 | `METADATA_CACHE_TTL_SECONDS` | No | `300` | `1`-`86400` | Freshness window for choice, dictionary, and audit-configuration metadata. |
 | `SENTRY_DSN` | No | Empty | Sentry DSN | Optional error reporting. |
@@ -188,6 +187,13 @@ environment variables override both.
 
 Sentry is optional. `SERVICENOW_INSTANCE_URL` and usable authentication are
 validated at startup even when the selected package has no operational tools.
+
+Record writes need no script directory configuration. Put complete script and
+markup values under their field names in the JSON string `record_write.data`.
+The total UTF-8 JSON limit is 256 KiB, including escaping. Read access to
+`sys_db_object` and `sys_dictionary` supports inherited XML-field validation;
+metadata request errors block writes. See the [migration note](CHANGELOG.md#unreleased)
+when updating a client that used file input.
 
 ## 6. Public tool inventory
 
